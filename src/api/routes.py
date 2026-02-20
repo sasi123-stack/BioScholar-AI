@@ -77,6 +77,30 @@ async def health_check(
             version="1.0.0"
         )
 
+@router.get("/bot-logs")
+async def get_bot_logs():
+    """
+    Diagnostic endpoint to view Maverick Bot background logs.
+    """
+    import os
+    log_path = "/tmp/maverick_bot.log"
+    if not os.path.exists(log_path):
+        return {"status": "not_found", "message": f"Log file at {log_path} does not exist yet."}
+    
+    try:
+        with open(log_path, "r") as f:
+            # Get last 100 lines
+            lines = f.readlines()
+            last_lines = lines[-100:] if len(lines) > 100 else lines
+            return {
+                "status": "success",
+                "log_file": log_path,
+                "line_count": len(lines),
+                "logs": last_lines
+            }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @router.post("/search", response_model=SearchResponse)
 async def search_documents(
     request: SearchRequest,
