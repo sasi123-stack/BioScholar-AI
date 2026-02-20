@@ -1,0 +1,17 @@
+# Vercel requirements for serverless backend
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart
+# Minimal dependencies for Vercel (to avoid 250MB size limit)
+# Note: Heavy ML libraries like torch/transformers might cause issues on Vercel
+# Using API-based models (Gemini/Groq) is recommended here.
+requests>=2.31.0
+google-generativeai>=0.3.0
+groq>=0.4.2
+elasticsearch==8.11.0
+redis>=5.0.0
+psycopg2-binary>=2.9.0
+sqlalchemy>=2.0.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0

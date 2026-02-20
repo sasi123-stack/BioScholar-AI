@@ -1,0 +1,2206 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="BioMedScholar AI - Search biomedical literature, PubMed articles, and clinical trials with AI-powered semantic search">
+    <title>BioMedScholar AI | Evidence-Based Research Engine</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="chat_styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0056D2">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registered!'))
+                    .catch(err => console.log('SW registration failed:', err));
+            });
+        }
+    </script>
+</head>
+
+<body>
+    <!-- Dynamic Scroll Progress -->
+    <div class="scroll-progress" id="scroll-progress"></div>
+
+    <!-- Header Bar -->
+    <header class="scholar-header glass-panel">
+        <div class="header-left">
+            <a href="#" class="scholar-logo" onclick="location.reload(); return false;">
+                <svg class="logo-dna" width="40" height="28" viewBox="0 0 40 28" fill="none">
+                    <rect width="40" height="28" rx="8" fill="#0056D2" />
+                    <!-- DNA Helix in negative space (White) -->
+                    <path d="M12 6C12 6 16 10 20 10C24 10 28 6 28 6" stroke="white" stroke-width="2.5"
+                        stroke-linecap="round" />
+                    <path d="M12 14C12 14 16 18 20 18C24 18 28 14 28 14" stroke="white" stroke-width="2.5"
+                        stroke-linecap="round" />
+                    <path d="M12 22C12 22 16 26 20 26C24 26 28 22 28 22" stroke="white" stroke-width="2.5"
+                        stroke-linecap="round" />
+                    <circle cx="16" cy="8" r="1.5" fill="white" />
+                    <circle cx="24" cy="8" r="1.5" fill="white" />
+                    <circle cx="16" cy="16" r="1.5" fill="white" />
+                    <circle cx="24" cy="16" r="1.5" fill="white" />
+                    <circle cx="16" cy="24" r="1.5" fill="white" />
+                    <circle cx="24" cy="24" r="1.5" fill="white" />
+                </svg>
+                <span class="logo-text">BioMedScholar <span class="logo-scholar">AI</span></span>
+                <span class="beta-tag" style="margin-left: 10px; vertical-align: middle;">Professional Research
+                    Platform</span>
+            </a>
+        </div>
+
+        <div class="header-search">
+            <div class="search-input-wrapper">
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="M21 21l-4.35-4.35" />
+                </svg>
+                <input type="text" id="header-search-input" placeholder="Search biomedical literature..."
+                    autocomplete="off">
+                <button id="clear-search-btn" class="clear-input-btn hidden" onclick="clearSearchInput()"
+                    title="Clear search">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <button id="stop-search-btn" class="stop-input-btn hidden" onclick="stopSearching()"
+                    title="Stop searching">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                        <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
+                    </svg>
+                </button>
+                <!-- Autocomplete Dropdown -->
+                <div id="autocomplete-dropdown" class="autocomplete-dropdown hidden">
+                    <div class="autocomplete-section" id="search-history-section">
+                        <div class="autocomplete-header">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                            Recent Searches
+                            <button class="clear-history-btn" onclick="clearSearchHistory(event)">Clear</button>
+                        </div>
+                        <div id="history-items"></div>
+                    </div>
+                    <div class="autocomplete-section" id="suggestions-section">
+                        <div class="autocomplete-header">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="M21 21l-4.35-4.35" />
+                            </svg>
+                            Suggestions
+                        </div>
+                        <div id="suggestion-items"></div>
+                    </div>
+                </div>
+                <button class="search-icon-btn" onclick="openAdvancedSearch()" title="Advanced Search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="4" y1="21" x2="4" y2="14" />
+                        <line x1="4" y1="10" x2="4" y2="3" />
+                        <line x1="12" y1="21" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12" y2="3" />
+                        <line x1="20" y1="21" x2="20" y2="16" />
+                        <line x1="20" y1="12" x2="20" y2="3" />
+                        <line x1="1" y1="14" x2="7" y2="14" />
+                        <line x1="9" y1="8" x2="15" y2="8" />
+                        <line x1="17" y1="16" x2="23" y2="16" />
+                    </svg>
+                </button>
+                <div class="search-loader hidden" id="search-loader">
+                    <svg class="spinner" viewBox="0 0 50 50">
+                        <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+                    </svg>
+                </div>
+                <button id="header-search-btn" class="search-btn" title="Search">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="M21 21l-4.35-4.35" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div class="header-stats" id="header-stats">
+                <div class="stat-item" title="PubMed Articles">
+                    <span class="stats-count pubmed-count-val">17,106</span>
+                    <span class="stats-label">PubMed</span>
+                </div>
+                <div class="stat-item" title="Clinical Trials">
+                    <span class="stats-count trials-count-val">7,726</span>
+                    <span class="stats-label">Trials</span>
+                </div>
+                <div class="stat-item" title="Total Articles">
+                    <span class="stats-count total-docs-count-val">24,832</span>
+                    <span class="stats-label">Total</span>
+                </div>
+            </div>
+
+
+
+            <!-- Telegram Link -->
+            <a href="https://web.telegram.org/a/#8513211167" target="_blank" class="header-icon-btn telegram-btn"
+                title="Chat with Maverick on Telegram" style="margin-right: 8px; color: #0088cc;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+            </a>
+
+            <!-- Reading List Button -->
+            <button class="header-icon-btn reading-list-btn" onclick="toggleReadingList()" title="Reading List">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+                <span class="reading-list-count" id="reading-list-count">0</span>
+            </button>
+
+            <!-- Notification Button -->
+            <div class="notification-container">
+                <button class="header-icon-btn notification-btn" onclick="toggleNotifications()"
+                    title="Notifications (N)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span class="notification-count hidden" id="notification-count">0</span>
+                </button>
+
+                <!-- Notification Dropdown -->
+                <div class="notification-dropdown hidden" id="notification-dropdown">
+                    <div class="notification-header">
+                        <div class="header-main">
+                            <h3>Notifications</h3>
+                            <button class="settings-btn" onclick="event.stopPropagation(); openNotificationSettings()"
+                                title="Settings">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="3" />
+                                    <path
+                                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <button class="mark-read-btn" onclick="markAllNotificationsRead()">Mark all read</button>
+                    </div>
+                    <!-- Notification Filters -->
+                    <div class="notification-filters">
+                        <button class="notif-filter-tab active" data-filter="all"
+                            onclick="filterNotifications('all', this)">All</button>
+                        <button class="notif-filter-tab" data-filter="articles"
+                            onclick="filterNotifications('articles', this)">Library</button>
+                        <button class="notif-filter-tab" data-filter="searches"
+                            onclick="filterNotifications('searches', this)">Search</button>
+                        <button class="notif-filter-tab" data-filter="updates"
+                            onclick="filterNotifications('updates', this)">Updates</button>
+                    </div>
+                    <div class="notification-list" id="notification-list">
+                        <div class="empty-state">
+                            <p>No new notifications</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reading Mode Toggle -->
+            <button class="header-icon-btn zen-btn" onclick="toggleZenMode()" title="Focus Mode (Zen)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" />
+                    <path d="M3 12h1m8-9v1m8 8h1m-9 8v1M5.6 5.6l.7.7m12.1-.1l-.7.7m0 11.4l.7.7m-12.1-.1l-.7.7" />
+                </svg>
+            </button>
+
+            <!-- Help Button -->
+            <button class="header-icon-btn help-btn" onclick="showHelpModal()" title="Help & Guide (H)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+            </button>
+
+
+            <!-- Search History -->
+            <div class="notification-container">
+                <button class="header-icon-btn history-btn" onclick="toggleHistoryDropdown()" title="Search History">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </button>
+                <div class="notification-dropdown history-dropdown hidden" id="history-header-dropdown">
+                    <div class="notification-header">
+                        <h3>Search History</h3>
+                        <button class="mark-read-btn" onclick="clearHistory()">Clear all</button>
+                    </div>
+                    <div class="notification-list" id="history-header-list">
+                        <!-- History items will be injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Keyboard Shortcuts -->
+            <button class="header-icon-btn" onclick="showKeyboardShortcuts()" title="Keyboard Shortcuts (?)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="4" width="20" height="16" rx="2" ry="2" />
+                    <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M8 16h8" />
+                </svg>
+            </button>
+
+
+            <button class="header-icon-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                <svg id="theme-icon-sun" class="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+                <svg id="theme-icon-moon" class="theme-icon hidden" width="20" height="20" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+            </button>
+
+            <!-- GitHub Link -->
+            <a href="https://github.com/sasi123-stack/BioScholar-AI" target="_blank" rel="noopener noreferrer"
+                class="header-icon-btn github-btn" title="View on GitHub">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                        d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                </svg>
+            </a>
+
+            <!-- Login Button -->
+            <button class="header-icon-btn login-btn" onclick="openLoginModal()" title="Login">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                </svg>
+                <span>Login</span>
+            </button>
+
+
+
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="scholar-nav">
+        <div class="nav-container">
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-tab="articles">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                    <span>Research Desk</span>
+                    <span class="tab-badge tab-badge-beta">BETA</span>
+                </button>
+                <button class="nav-tab" data-tab="qa">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    <span>Research AI Chat</span>
+                    <span class="tab-badge tab-badge-testing">Yet to Test</span>
+                </button>
+                <button class="nav-tab" data-tab="trends">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                        <polyline points="17 6 23 6 23 12" />
+                    </svg>
+                    <span>Research Trends</span>
+                    <span class="tab-badge tab-badge-testing">Yet to Test</span>
+                </button>
+            </div>
+            <div class="nav-info">
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="list" title="List View">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="8" y1="6" x2="21" y2="6" />
+                            <line x1="8" y1="12" x2="21" y2="12" />
+                            <line x1="8" y1="18" x2="21" y2="18" />
+                            <line x1="3" y1="6" x2="3.01" y2="6" />
+                            <line x1="3" y1="12" x2="3.01" y2="12" />
+                            <line x1="3" y1="18" x2="3.01" y2="18" />
+                        </svg>
+                    </button>
+                    <button class="view-btn" data-view="compact" title="Compact View">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" />
+                            <rect x="14" y="3" width="7" height="7" />
+                            <rect x="14" y="14" width="7" height="7" />
+                            <rect x="3" y="14" width="7" height="7" />
+                        </svg>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </nav>
+
+    <!-- Reading List Panel (Slide-in) -->
+    <aside class="reading-list-panel" id="reading-list-panel">
+        <div class="reading-list-header">
+            <h3>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+                Reading List
+            </h3>
+            <button class="close-panel-btn" onclick="toggleReadingList()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </button>
+        </div>
+        <div class="reading-list-actions">
+            <button class="export-btn" onclick="exportReadingList('csv')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                CSV
+            </button>
+            <button class="export-btn" onclick="exportReadingList('bibtex')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                </svg>
+                BibTeX
+            </button>
+            <button class="export-btn" onclick="clearReadingList()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                Clear
+            </button>
+        </div>
+        <div class="reading-list-items" id="reading-list-items">
+            <div class="empty-reading-list">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+                <p>No saved articles yet</p>
+                <span>Click the bookmark icon on any article to save it</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Mobile Filter Toggle -->
+    <button class="mobile-filter-toggle" onclick="toggleMobileFilters()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        </svg>
+        Filters & Options
+    </button>
+
+    <!-- Main Content -->
+    <main class="scholar-main">
+        <div class="main-container">
+            <!-- Sidebar Filters -->
+            <aside class="filters-sidebar" id="filters-sidebar">
+                <!-- Quick Filter Search -->
+                <div class="sidebar-search">
+                    <input type="text" id="sidebar-filter-input" placeholder="Quick filter results..."
+                        oninput="filterResultsLocally()">
+                </div>
+                <!-- Source Type Chips -->
+                <div class="filter-section">
+                    <h3 class="filter-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                        </svg>
+                        Source Type
+                    </h3>
+                    <div class="filter-chips">
+                        <button class="filter-chip active" data-filter="all">All Sources</button>
+                        <button class="filter-chip" data-filter="pubmed">PubMed</button>
+                        <button class="filter-chip" data-filter="clinical_trials">Clinical Trials</button>
+                    </div>
+                </div>
+
+                <!-- Date Range -->
+                <div class="filter-section">
+                    <h3 class="filter-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                        </svg>
+                        Date Range
+                    </h3>
+                    <div class="date-filter-options">
+                        <label class="radio-option">
+                            <input type="radio" name="date-range" value="any" checked>
+                            <span>Any time</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="date-range" value="2024">
+                            <span>Since 2024</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="date-range" value="2020">
+                            <span>Since 2020</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="date-range" value="custom">
+                            <span>Custom range...</span>
+                        </label>
+                    </div>
+                    <div class="custom-date-range hidden" id="custom-date-range">
+                        <input type="number" id="date-from" placeholder="From" min="1900" max="2099">
+                        <span>—</span>
+                        <input type="number" id="date-to" placeholder="To" min="1900" max="2099">
+                    </div>
+                </div>
+
+                <!-- Sort By -->
+                <div class="filter-section">
+                    <h3 class="filter-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="11" y1="5" x2="19" y2="5" />
+                            <line x1="11" y1="9" x2="19" y2="9" />
+                            <line x1="11" y1="13" x2="19" y2="13" />
+                            <line x1="11" y1="17" x2="19" y2="17" />
+                            <circle cx="7" cy="5" r="2" />
+                            <circle cx="7" cy="9" r="2" />
+                            <circle cx="7" cy="13" r="2" />
+                            <circle cx="7" cy="17" r="2" />
+                        </svg>
+                        Sort By
+                    </h3>
+                    <select class="filter-select" id="sort-by">
+                        <option value="relevance">Relevance</option>
+                        <option value="date_desc">Newest First</option>
+                        <option value="date_asc">Oldest First</option>
+                    </select>
+                </div>
+
+
+
+                <!-- Article Type -->
+                <div class="filter-section">
+                    <h3 class="filter-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <polyline points="10 9 9 9 8 9" />
+                        </svg>
+                        Article Type
+                    </h3>
+                    <div class="checkbox-filters" id="article-type-filters">
+                        <label class="checkbox-filter">
+                            <input type="checkbox" value="research" checked>
+                            <span>Research Articles</span>
+                        </label>
+                        <label class="checkbox-filter">
+                            <input type="checkbox" value="review" checked>
+                            <span>Review Articles</span>
+                        </label>
+                        <label class="checkbox-filter">
+                            <input type="checkbox" value="systematic-review" checked>
+                            <span>Systematic Reviews</span>
+                        </label>
+                        <label class="checkbox-filter">
+                            <input type="checkbox" value="meta-analysis" checked>
+                            <span>Meta-Analysis</span>
+                        </label>
+                        <label class="checkbox-filter">
+                            <input type="checkbox" value="rct" checked>
+                            <span>Randomized Controlled Trials (RCT)</span>
+                        </label>
+                        <label class="checkbox-filter">
+                            <input type="checkbox" value="case-study" checked>
+                            <span>Case Studies</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Advanced Options - Active -->
+                <div class="filter-section">
+                    <h3 class="filter-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                        </svg>
+                        Advanced Options
+                    </h3>
+                    <div class="advanced-options">
+                        <label class="checkbox-option">
+                            <input type="checkbox" id="use-reranking" checked>
+                            <span>AI Re-ranking</span>
+                            <span class="beta-tag" style="padding: 2px 6px; font-size: 8px;">BETA</span>
+                        </label>
+                        <label class="checkbox-option">
+                            <input type="checkbox" id="highlight-matches" checked>
+                            <span>Highlight Matches</span>
+                        </label>
+                        <div class="slider-option">
+                            <label>Search Mode</label>
+                            <div class="slider-wrapper">
+                                <span class="slider-label">Keyword</span>
+                                <input type="range" id="alpha-slider" min="0" max="100" value="50">
+                                <span class="slider-label">Semantic</span>
+                            </div>
+                            <span class="slider-value" id="alpha-value">Balanced (50%)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filter-section stats-section">
+                    <h3 class="filter-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+                            <path d="M22 12A10 10 0 0 0 12 2v10z" />
+                        </svg>
+                        Index Statistics
+                    </h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-icon">📄</span>
+                            <div class="stat-info">
+                                <span class="stat-value pubmed-count-val">17,106</span>
+                                <span class="stat-label">PubMed Articles</span>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">🔬</span>
+                            <div class="stat-info">
+                                <span class="stat-value trials-count-val">7,726</span>
+                                <span class="stat-label">Clinical Trials</span>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">📚</span>
+                            <div class="stat-info">
+                                <span class="stat-value total-docs-count-val">24,832</span>
+                                <span class="stat-label">Total Articles</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Results Area -->
+            <div class="results-area">
+                <!-- Articles Tab -->
+                <div id="articles-tab" class="tab-content active">
+                    <div class="results-header" id="results-header">
+                        <div class="results-info">
+                            <label class="select-all-wrapper">
+                                <input type="checkbox" id="select-all-docs" onclick="toggleSelectAll(this)">
+                                <span class="custom-checkbox"></span>
+                            </label>
+                            <span id="results-count">Enter a search query to find biomedical literature</span>
+                        </div>
+
+                        <!-- Selection Toolbar (Hidden by default) -->
+                        <div id="selection-toolbar" class="selection-toolbar hidden">
+                            <span class="selection-count">0 selected</span>
+                            <div class="selection-actions">
+                                <button class="results-save-all" onclick="bulkSave()"><svg width="14" height="14"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                                    </svg> Save All</button>
+                                <button onclick="bulkExport('csv')"><svg width="14" height="14" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                        <polyline points="7 10 12 15 17 10" />
+                                        <line x1="12" y1="15" x2="12" y2="3" />
+                                    </svg> CSV</button>
+                                <button onclick="bulkExport('bibtex')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                    </svg> BibTeX</button>
+
+                                <button onclick="copySelectedUrls()" title="Copy all selected URLs">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path
+                                            d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                                    </svg> URLs</button>
+                                <button onclick="cancelSelection()" class="cancel-btn">Cancel</button>
+                            </div>
+                        </div>
+
+                        <div class="results-actions-header">
+                            <button class="results-action-btn results-save-all" onclick="saveAllResults()"
+                                title="Save All Results">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                                </svg>
+                                Save All
+                            </button>
+                            <button class="results-action-btn" onclick="exportResults('csv')" title="Export to CSV">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="7 10 12 15 17 10" />
+                                    <line x1="12" y1="15" x2="12" y2="3" />
+                                </svg>
+                                CSV
+                            </button>
+                            <button class="results-action-btn" onclick="exportResults('bibtex')"
+                                title="Export to BibTeX">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                                BibTeX
+                            </button>
+                            <button class="results-action-btn" onclick="window.print()" title="Print">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="6 9 6 2 18 2 18 9" />
+                                    <path
+                                        d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                                    <rect x="6" y="14" width="12" height="8" />
+                                </svg>
+                                Print
+                            </button>
+
+                        </div>
+                    </div>
+
+                    <!-- Related Searches -->
+                    <div class="related-searches hidden" id="related-searches">
+                        <h3>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="M21 21l-4.35-4.35" />
+                            </svg>
+                            Related Research Topics
+                        </h3>
+                        <div class="related-tags-container" id="related-tags"></div>
+                    </div>
+
+                    <div id="skeleton-loader" class="hidden">
+                        <!-- skeletons... -->
+                    </div>
+
+                    <!-- Enhanced Results Toolbar -->
+                    <div class="results-toolbar hidden" id="results-toolbar">
+                        <div class="results-filter-wrapper">
+                            <svg class="results-filter-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="M21 21l-4.35-4.35" />
+                            </svg>
+                            <input type="text" id="results-filter-input" class="results-filter-input"
+                                placeholder="Filter results by keyword..." oninput="filterResultsList()">
+                        </div>
+
+                        <button class="toolbar-btn" onclick="toggleAllAbstracts()" id="expand-all-btn"
+                            title="Expand All Abstracts">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="7 13 12 18 17 13" />
+                                <polyline points="7 6 12 11 17 6" />
+                            </svg>
+                            Expand All
+                        </button>
+
+                        <div class="view-toggle-group">
+                            <button class="view-btn active" onclick="setViewMode('list')" id="view-list-btn"
+                                title="Detailed List View">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <line x1="8" y1="6" x2="21" y2="6" />
+                                    <line x1="8" y1="12" x2="21" y2="12" />
+                                    <line x1="8" y1="18" x2="21" y2="18" />
+                                    <line x1="3" y1="6" x2="3.01" y2="6" />
+                                    <line x1="3" y1="12" x2="3.01" y2="12" />
+                                    <line x1="3" y1="18" x2="3.01" y2="18" />
+                                </svg>
+                            </button>
+                            <button class="view-btn" onclick="setViewMode('compact')" id="view-compact-btn"
+                                title="Compact List View">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <line x1="3" y1="6" x2="21" y2="6" />
+                                    <line x1="3" y1="12" x2="21" y2="12" />
+                                    <line x1="3" y1="18" x2="21" y2="18" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="articles-layout">
+                        <button id="show-sidebar-btn" onclick="toggleSidebar()" class="show-sidebar-btn hidden"
+                            title="Show Filters">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <line x1="9" y1="3" x2="9" y2="21" />
+                            </svg>
+                        </button>
+                        <!-- Quick Filters Sidebar (Left Side) -->
+                        <div class="quick-filters" id="quick-filters">
+                            <div class="filters-header"
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid var(--primary-blue-light); padding-bottom: 12px;">
+                                <span class="quick-filters-label"
+                                    style="margin-bottom: 0; padding-bottom: 0; border: none;">Full Research
+                                    Filters</span>
+                                <button onclick="toggleSidebar()" class="sidebar-toggle-btn" title="Hide Sidebar"
+                                    style="background: none; border: none; cursor: pointer; color: var(--text-muted);">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M18 6L6 18M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div class="quick-filter-section">
+                                <span class="quick-filter-sublabel">Data Source</span>
+                                <div class="quick-filter-group">
+                                    <button class="quick-filter-chip" data-type="source" data-value="all"
+                                        onclick="toggleQuickFilter('source', 'all')">All
+                                        Sources</button>
+                                    <button class="quick-filter-chip" data-type="source" data-value="pubmed"
+                                        onclick="toggleQuickFilter('source', 'pubmed')">PubMed</button>
+                                    <button class="quick-filter-chip" data-type="source" data-value="clinical_trials"
+                                        onclick="toggleQuickFilter('source', 'clinical_trials')">ClinicalTrials.gov</button>
+                                    <button class="quick-filter-chip" data-type="source" data-value="google"
+                                        onclick="toggleQuickFilter('source', 'google')">Web Search (Google)</button>
+                                </div>
+                            </div>
+
+                            <div class="quick-filter-divider"></div>
+
+                            <div class="quick-filter-section">
+                                <span class="quick-filter-sublabel">Publication Year</span>
+                                <div class="quick-filter-group">
+                                    <button class="quick-filter-chip" data-type="dateRange" data-value="2026"
+                                        onclick="toggleQuickFilter('dateRange', '2026')">2026</button>
+                                    <button class="quick-filter-chip" data-type="dateRange" data-value="2025"
+                                        onclick="toggleQuickFilter('dateRange', '2025')">2025</button>
+                                    <button class="quick-filter-chip" data-type="dateRange" data-value="2024"
+                                        onclick="toggleQuickFilter('dateRange', '2024')">2024</button>
+                                    <button class="quick-filter-chip" data-type="dateRange" data-value="2023"
+                                        onclick="toggleQuickFilter('dateRange', '2023')">2023</button>
+                                    <button class="quick-filter-chip" data-type="dateRange" data-value="2022"
+                                        onclick="toggleQuickFilter('dateRange', '2022')">2022</button>
+                                    <button class="quick-filter-chip" data-type="dateRange" data-value="2021"
+                                        onclick="toggleQuickFilter('dateRange', '2021')">2021</button>
+                                    <button class="quick-filter-chip" data-type="dateRange" data-value="2020"
+                                        onclick="toggleQuickFilter('dateRange', '2020')">2020</button>
+                                </div>
+                            </div>
+
+                            <div class="quick-filter-section">
+                                <span class="quick-filter-sublabel">Time Horizon</span>
+                                <div class="quick-filter-group">
+                                    <button class="quick-filter-chip" data-type="dateRange" data-value="any"
+                                        onclick="toggleQuickFilter('dateRange', 'any')">All Time</button>
+                                    <button class="quick-filter-chip" data-type="dateRange" data-value="3y"
+                                        onclick="toggleQuickFilter('dateRange', '3y')">Last 3Y</button>
+                                    <button class="quick-filter-chip" data-type="dateRange" data-value="5y"
+                                        onclick="toggleQuickFilter('dateRange', '5y')">Last 5Y</button>
+                                    <button class="quick-filter-chip" data-type="dateRange" data-value="10y"
+                                        onclick="toggleQuickFilter('dateRange', '10y')">Last 10Y</button>
+                                </div>
+                            </div>
+
+                            <div class="quick-filter-divider"></div>
+
+                            <div class="quick-filter-section">
+                                <span class="quick-filter-sublabel">Sort Order</span>
+                                <div class="quick-filter-group">
+                                    <button class="quick-filter-chip"
+                                        onclick="toggleQuickFilter('sortBy', 'relevance')">Relevance</button>
+                                    <button class="quick-filter-chip"
+                                        onclick="toggleQuickFilter('sortBy', 'date_desc')">Newest</button>
+                                    <button class="quick-filter-chip"
+                                        onclick="toggleQuickFilter('sortBy', 'date_asc')">Oldest</button>
+                                </div>
+                            </div>
+
+                            <div class="quick-filter-divider"></div>
+
+                            <div class="quick-filter-section">
+                                <span class="quick-filter-sublabel">Search Engine Mode</span>
+                                <div class="quick-alpha-container" title="Adjust Semantic Weight">
+                                    <span class="quick-alpha-text">Key</span>
+                                    <input type="range" id="quick-alpha-slider" min="0" max="100" value="50" step="10"
+                                        onchange="handleQuickAlpha(this.value)">
+                                    <span class="quick-alpha-text">Sem</span>
+                                </div>
+                            </div>
+
+                            <div class="quick-filter-divider"></div>
+
+                            <div class="quick-filter-section">
+                                <span class="quick-filter-sublabel">Real-time Index Health</span>
+                                <div class="quick-stats-badge" title="PubMed Articles">
+                                    <span class="badge-label">PubMed Papers:</span>
+                                    <span class="badge-value pubmed-count-val">17,106</span>
+                                </div>
+                                <div class="quick-stats-badge" title="Clinical Trials">
+                                    <span class="badge-label">Clinical Trials:</span>
+                                    <span class="badge-value trials-count-val">7,726</span>
+                                </div>
+                                <div class="quick-stats-badge" title="Total Articles in Index">
+                                    <span class="badge-label">Total Volume:</span>
+                                    <span class="badge-value total-docs-count-val">24,832</span>
+                                </div>
+                            </div>
+
+                            <div class="quick-filter-divider"></div>
+
+                            <button class="quick-filter-clear" onclick="clearAllQuickFilters()"
+                                title="Reset all filters">
+                                Reset Search Parameters
+                            </button>
+                        </div>
+
+                        <div class="articles-main">
+                            <div id="search-results" class="results-list">
+                                <!-- Welcome state -->
+                                <div class="welcome-state">
+                                    <div class="welcome-header">
+                                        <div class="welcome-icon">
+                                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="1.2">
+                                                <path d="M12 2v20M2 12h20" stroke-opacity="0.2" />
+                                                <circle cx="11" cy="11" r="8" stroke-width="1.5" />
+                                                <path d="M21 21l-4.35-4.35" stroke-width="1.5" />
+                                            </svg>
+                                        </div>
+                                        <h2>Biomedical Research Intelligence</h2>
+                                        <p>Comprehensive access to 35M+ PubMed records and global clinical trial
+                                            registries with AI-augmented analysis.</p>
+                                    </div>
+
+
+                                    <div class="suggested-queries-wrapper">
+                                        <h3>Jump Start Your Research</h3>
+                                        <div class="suggested-queries">
+                                            <!-- Dynamically populated -->
+                                        </div>
+                                    </div>
+
+                                    <div class="keyboard-hint">
+                                        <span>Press <kbd>Ctrl</kbd> + <kbd>K</kbd> to search</span>
+                                        <span class="dot">·</span>
+                                        <span>Press <kbd>?</kbd> for help</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div class="pagination hidden" id="pagination">
+                            <button class="page-btn" id="prev-page" disabled>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="15 18 9 12 15 6" />
+                                </svg>
+                                Previous
+                            </button>
+                            <div class="page-info">
+                                <span id="current-page">1</span> of <span id="total-pages">1</span>
+                            </div>
+                            <button class="page-btn" id="next-page">
+                                Next
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Deepseek Chat Tab -->
+                <div id="qa-tab" class="tab-content">
+                    <div class="chat-container">
+                        <!-- AI Chat Interface -->
+                        <div class="chat-header">
+                            <div class="chat-header-info">
+                                <div class="chat-avatar ai-chat-avatar">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path
+                                            d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z" />
+                                        <path d="M12 16v-4" />
+                                        <path d="M12 8h.01" />
+                                    </svg>
+                                </div>
+                                <div class="chat-title">
+                                    <h3>Maverick AI Assistant</h3>
+                                    <span class="chat-subtitle" style="font-size: 10px; color: var(--text-muted);">Groq
+                                        Llama 4 Maverick (MoE)</span>
+                                </div>
+
+                            </div>
+                            <div class="chat-header-actions" style="display: flex; gap: 8px; align-items: center;">
+                                <a href="https://t.me/BioScholarAI_Bot" target="_blank"
+                                    class="chat-action-btn telegram-chat-btn" title="Open in Telegram"
+                                    style="background: #0088cc; color: white; padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="3">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                    </svg>
+                                    TELEGRAM
+                                </a>
+                                <button class="chat-action-btn" onclick="clearChat()" title="Clear Chat">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M3 6h18" />
+                                        <path
+                                            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="chat-history" class="chat-history">
+                            <div class="chat-welcome-message">
+                                <div class="welcome-logo"
+                                    style="background: #0088cc; color: white; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; margin: 0 auto 20px auto;">
+                                    M
+                                </div>
+                                <h2>Hello, I'm Maverick</h2>
+                                <p>Your Groq Llama 4 Maverick research engine. Ask me about biomedical topics, clinical
+                                    trials, or specific articles.</p>
+                            </div>
+                        </div>
+
+                        <div class="chat-input-area">
+                            <div class="chat-input-wrapper">
+                                <textarea id="chat-input" placeholder="Ask the AI research assistant..." rows="1"
+                                    oninput="autoResizeTextarea(this)"></textarea>
+                                <button id="chat-send-btn" onclick="handleChatSubmit()">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <line x1="22" y1="2" x2="11" y2="13" />
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="chat-disclaimer">
+                                AI responses are generated from indexed literature. Verify important medical
+                                information.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trends Tab -->
+                <div id="trends-tab" class="tab-content">
+                    <div class="trends-dashboard">
+                        <!-- Dashboard Header -->
+                        <div class="trends-header-new">
+                            <div class="header-left">
+                                <h2>🧬 Research Insights</h2>
+                                <p>Real-time analysis of biomedical literature and clinical trends</p>
+                            </div>
+                            <div class="header-right">
+                                <div class="stats-mini">
+                                    <div class="stat-mini-item">
+                                        <span class="label">Total Indexed</span>
+                                        <span class="value">2.4M+</span>
+                                    </div>
+                                    <div class="stat-mini-item">
+                                        <span class="label">Daily Growth</span>
+                                        <span class="value positive">+1.2k</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Top Analytics Row -->
+                        <div class="analytics-row top-metrics">
+                            <div class="metric-card">
+                                <div class="metric-icon blue"><svg width="24" height="24" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                                    </svg></div>
+                                <div class="metric-info">
+                                    <span class="metric-label">Results Processed</span>
+                                    <span class="metric-value" id="trends-processed-count">0</span>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon green"><svg width="24" height="24" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                                        <polyline points="16 7 22 7 22 13" />
+                                    </svg></div>
+                                <div class="metric-info">
+                                    <span class="metric-label">Relativity Score</span>
+                                    <span class="metric-value">94.2%</span>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon purple"><svg width="24" height="24" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 2v10l4.5 4.5" />
+                                        <circle cx="12" cy="12" r="10" />
+                                    </svg></div>
+                                <div class="metric-info">
+                                    <span class="metric-label">Avg. Pub Age</span>
+                                    <span class="metric-value">2.4 Yrs</span>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon orange"><svg width="24" height="24" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                    </svg></div>
+                                <div class="metric-info">
+                                    <span class="metric-label">Active Trials</span>
+                                    <span class="metric-value">128</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Section -->
+                        <div class="analytics-row charts-grid">
+                            <div class="chart-card main-trend">
+                                <div class="card-header">
+                                    <h3>📈 Publication over Time</h3>
+                                    <div class="card-actions">
+                                        <button class="active">Yearly</button>
+                                        <button>Monthly</button>
+                                    </div>
+                                </div>
+                                <div class="chart-wrapper">
+                                    <canvas id="trendsChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="chart-card distribution">
+                                <div class="card-header">
+                                    <h3>📊 Research Field Distribution</h3>
+                                </div>
+                                <div class="chart-wrapper">
+                                    <canvas id="distributionChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Context Row -->
+                        <div class="analytics-row meta-grid">
+                            <div class="meta-card topics">
+                                <div class="card-header">
+                                    <h3>🔥 Hot Topics & Entities</h3>
+                                </div>
+                                <div class="topics-cloud" id="trends-topics-cloud">
+                                    <!-- Dynamic tags -->
+                                    <div class="empty-state">No search data available</div>
+                                </div>
+                            </div>
+                            <div class="meta-card journals">
+                                <div class="card-header">
+                                    <h3>🏛️ Leading Journals</h3>
+                                </div>
+                                <div class="journal-list" id="trends-journals-list">
+                                    <div class="empty-state">No journal data available</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="scholar-footer">
+        <div class="footer-container">
+            <div class="footer-left">
+                <div class="footer-brand-container">
+                    <div class="footer-brand-top">
+                        <svg width="20" height="20" viewBox="0 0 48 48" fill="none">
+                            <path d="M12 8C12 8 18 14 24 14C30 14 36 8 36 8" stroke="#4285F4" stroke-width="2.5"
+                                stroke-linecap="round" />
+                            <path d="M12 20C12 20 18 26 24 26C30 26 36 20 36 20" stroke="#EA4335" stroke-width="2.5"
+                                stroke-linecap="round" />
+                            <path d="M12 32C12 32 18 38 24 38C30 38 36 32 36 32" stroke="#34A853" stroke-width="2.5"
+                                stroke-linecap="round" />
+                        </svg>
+                        <span>© 2026 BioMedScholar AI</span>
+                    </div>
+                    <span class="footer-brand-tagline">AI-Powered Biomedical Research Engine</span>
+                </div>
+            </div>
+            <div class="footer-center">
+                <span>Powered by Groq Llama 4 & BioBERT | Built with ❤️ by <span class="attribution-name">Sasidhara
+                        Kashyap Ch</span></span>
+            </div>
+            <div class="footer-right">
+                <a href="https://wa.me/918500419303" target="_blank" class="footer-feedback-btn"
+                    title="Give Feedback (WhatsApp)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-11.7 8.38 8.38 0 0 1 3.8.9L21 3.5l-1 4.5z" />
+                    </svg>
+                    Feedback
+                </a>
+                <div class="status-indicator">
+                    <span id="status-dot" class="status-dot"></span>
+                    <span id="status-text">Checking...</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Advanced Search Modal -->
+    <div id="advanced-search-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>🔍 Advanced Search</h2>
+                <button class="modal-close" onclick="closeAdvancedSearch()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="advanced-search-form">
+                    <div class="form-group">
+                        <label>All of these words:</label>
+                        <input type="text" id="adv-all-words" placeholder="e.g., COVID vaccine efficacy">
+                    </div>
+                    <div class="form-group">
+                        <label>Exact phrase:</label>
+                        <input type="text" id="adv-exact-phrase" placeholder="e.g., &quot;mRNA vaccine&quot;">
+                    </div>
+                    <div class="form-group">
+                        <label>Any of these words:</label>
+                        <input type="text" id="adv-any-words" placeholder="e.g., treatment therapy cure">
+                    </div>
+                    <div class="form-group">
+                        <label>None of these words:</label>
+                        <input type="text" id="adv-none-words" placeholder="e.g., animal mice">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Author:</label>
+                            <input type="text" id="adv-author" placeholder="e.g., Smith J">
+                        </div>
+                        <div class="form-group">
+                            <label>Journal:</label>
+                            <input type="text" id="adv-journal" placeholder="e.g., Nature Medicine">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Title contains:</label>
+                            <input type="text" id="adv-title" placeholder="Words in the title">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" onclick="closeAdvancedSearch()">Cancel</button>
+                <button class="modal-btn primary" onclick="executeAdvancedSearch()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="M21 21l-4.35-4.35" />
+                    </svg>
+                    Search
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Citation Modal -->
+    <div id="citation-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📝 Cite This Article</h2>
+                <button class="modal-close" onclick="closeCitationModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="citation-tabs">
+                    <button class="citation-tab active" data-format="apa">APA</button>
+                    <button class="citation-tab" data-format="mla">MLA</button>
+                    <button class="citation-tab" data-format="chicago">Chicago</button>
+                    <button class="citation-tab" data-format="bibtex">BibTeX</button>
+                </div>
+                <div class="citation-content">
+                    <pre id="citation-text"></pre>
+                    <button class="copy-citation-btn" onclick="copyCitation()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                        Copy to Clipboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="shortcuts-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⌨️ Keyboard Shortcuts</h2>
+                <button class="modal-close" onclick="closeShortcutsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="shortcuts-grid">
+                    <div class="shortcut-category">Navigation</div>
+                    <div class="shortcut-item">
+                        <kbd>1</kbd>
+                        <span>Articles tab</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>2</kbd>
+                        <span>Ask Questions tab</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>3</kbd>
+                        <span>Trends tab</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>←</kbd> <kbd>→</kbd>
+                        <span>Navigate pages</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Home</kbd>
+                        <span>Scroll to top</span>
+                    </div>
+
+                    <div class="shortcut-category">Search</div>
+                    <div class="shortcut-item">
+                        <kbd>Ctrl</kbd> + <kbd>K</kbd>
+                        <span>Focus search bar</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd>
+                        <span>Advanced search</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Ctrl</kbd> + <kbd>E</kbd>
+                        <span>Export results (CSV)</span>
+                    </div>
+
+                    <div class="shortcut-category">Panels & Actions</div>
+                    <div class="shortcut-item">
+                        <kbd>B</kbd>
+                        <span>Toggle reading list</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>N</kbd>
+                        <span>Toggle notifications</span>
+                    </div>
+
+                    <div class="shortcut-item">
+                        <kbd>G</kbd>
+                        <span>Toggle filters sidebar</span>
+                    </div>
+
+                    <div class="shortcut-category">Article Modal</div>
+                    <div class="shortcut-item">
+                        <kbd>S</kbd>
+                        <span>Share article</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>C</kbd>
+                        <span>Cite article</span>
+                    </div>
+
+                    <div class="shortcut-category">Display</div>
+                    <div class="shortcut-item">
+                        <kbd>D</kbd>
+                        <span>Toggle dark mode</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Z</kbd>
+                        <span>Toggle Zen mode</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>F</kbd>
+                        <span>Toggle fullscreen</span>
+                    </div>
+
+                    <div class="shortcut-category">Help & Modals</div>
+                    <div class="shortcut-item">
+                        <kbd>?</kbd>
+                        <span>Show shortcuts</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>H</kbd>
+                        <span>Open help guide</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Escape</kbd>
+                        <span>Close modal / panel</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>📚 BioMed Scholar Help Guide</h2>
+                <button class="modal-close" onclick="closeHelpModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="help-tabs">
+                    <button class="help-tab active" data-section="getting-started"
+                        onclick="switchHelpTab('getting-started', this)">Getting Started</button>
+                    <button class="help-tab" data-section="authentication"
+                        onclick="switchHelpTab('authentication', this)">Authentication</button>
+                    <button class="help-tab" data-section="search-tips"
+                        onclick="switchHelpTab('search-tips', this)">Search & Q&A</button>
+                    <button class="help-tab" data-section="library"
+                        onclick="switchHelpTab('library', this)">Library</button>
+                    <button class="help-tab" data-section="shortcuts"
+                        onclick="switchHelpTab('shortcuts', this)">Shortcuts</button>
+                    <button class="help-tab" data-section="faq" onclick="switchHelpTab('faq', this)">FAQ</button>
+                </div>
+
+                <div class="help-content">
+                    <!-- Getting Started -->
+                    <div class="help-section active" id="help-getting-started">
+                        <h3>🚀 Welcome to BioMed Scholar</h3>
+                        <p>BioMed Scholar is an AI-powered search engine for biomedical literature. Search millions of
+                            PubMed articles and clinical trials with semantic understanding.</p>
+
+                        <div class="help-card">
+                            <h4>🔍 Quick Search</h4>
+                            <ol>
+                                <li>Type your query in the search bar (e.g., "COVID-19 vaccine efficacy")</li>
+                                <li>Press Enter or click the search button</li>
+                                <li>Browse results with article details, authors, and publication dates</li>
+                            </ol>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>❓ Ask Questions</h4>
+                            <ol>
+                                <li>Click the "Ask Questions" tab</li>
+                                <li>Type a medical question (e.g., "What are the symptoms of diabetes?")</li>
+                                <li>Get AI-powered answers with source citations</li>
+                            </ol>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>📈 Explore Trends</h4>
+                            <ol>
+                                <li>Click the "Trends" tab</li>
+                                <li>View trending research topics</li>
+                                <li>Click any topic to search for it</li>
+                                <li>View Publication Trends charts to see research volume over time</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <!-- Authentication -->
+                    <div class="help-section" id="help-authentication">
+                        <h3>🔐 Authentication</h3>
+                        <p>Create an account to sync your research across devices and personalize your experience.</p>
+
+                        <div class="help-card">
+                            <h4>Sign Up / Login</h4>
+                            <ol>
+                                <li>Click the <strong>"Login"</strong> button in the top-right header</li>
+                                <li><strong>To Sign Up:</strong> Click "Sign up", enter Name, Email, Password, and click
+                                    "Sign Up"</li>
+                                <li><strong>To Login:</strong> Enter Email and Password, then click "Sign In"</li>
+                                <li><strong>Google Sign-In:</strong> Click "Continue with Google" for instant access
+                                </li>
+                            </ol>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>Why create an account?</h4>
+                            <ul>
+                                <li><strong>Cloud Sync:</strong> Your Reading List is saved to the cloud, accessible
+                                    from any device</li>
+                                <li><strong>Personalization:</strong> Settings and preferences follow you</li>
+                                <li><strong>Secure:</strong> Powered by Firebase Authentication</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Search Tips -->
+                    <div class="help-section" id="help-search-tips">
+                        <h3>💡 Search & Q&A Strategies</h3>
+
+                        <div class="help-card">
+                            <h4>Search Modes</h4>
+                            <ul>
+                                <li><strong>Keyword (0%):</strong> Strict exact word matching. Good for specific codes.
+                                </li>
+                                <li><strong>Balanced (50%):</strong> Default. Combines keywords with meaning.</li>
+                                <li><strong>Semantic (100%):</strong> Focuses on meaning. Great for natural language
+                                    queries.</li>
+                            </ul>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>Advanced Search</h4>
+                            <ul>
+                                <li><strong>Exact phrase:</strong> <code>"mRNA vaccine"</code> (use quotes)</li>
+                                <li><strong>Exclude words:</strong> <code>cancer -mice</code> (excludes "mice")</li>
+                                <li><strong>OR operator:</strong> <code>treatment OR therapy</code></li>
+                                <li><strong>Author search:</strong> Use Advanced Search modal (Ctrl+Shift+F)</li>
+                            </ul>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>Filters</h4>
+                            <ul>
+                                <li><strong>Source Type:</strong> PubMed or Clinical Trials</li>
+                                <li><strong>Date Range:</strong> Filter by publication year</li>
+                                <li><strong>Article Type:</strong> Research, Review, Meta-Check, etc.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Library Management -->
+                    <div class="help-section" id="help-library">
+                        <h3>📚 Managing Your Library</h3>
+
+                        <div class="help-card">
+                            <h4>Reading List</h4>
+                            <ul>
+                                <li><strong>Save:</strong> Click the Bookmark icon on any result to save it</li>
+                                <li><strong>View:</strong> Click the Bookmark icon in the header or press <kbd>B</kbd>
+                                </li>
+                                <li><strong>Export:</strong> Download your list as CSV or BibTeX from the panel</li>
+                                <li><strong>Save All:</strong> Click "Save All" in results header to bookmark all
+                                    results at once</li>
+                            </ul>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>Citations</h4>
+                            <p>Generate citations instantly for any article:</p>
+                            <ol>
+                                <li>Click the "Cite" button on a result card (or press <kbd>C</kbd> in article modal)
+                                </li>
+                                <li>Choose format: <strong>APA, MLA, Chicago, BibTeX</strong></li>
+                                <li>Click "Copy to Clipboard"</li>
+                            </ol>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>Share Articles</h4>
+                            <p>Share articles with colleagues easily:</p>
+                            <ul>
+                                <li><strong>From Results:</strong> Click the "Share" button on any search result card
+                                </li>
+                                <li><strong>From Modal:</strong> Click the share icon in the article detail view, or
+                                    press <kbd>S</kbd></li>
+                                <li><strong>Native Sharing:</strong> Uses your device's native share dialog on mobile
+                                </li>
+                                <li><strong>Clipboard Fallback:</strong> On desktop, the article title and link are
+                                    copied to clipboard</li>
+                            </ul>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>Export Results</h4>
+                            <ul>
+                                <li><strong>CSV:</strong> Click the CSV button in the results header or press
+                                    <kbd>Ctrl</kbd>+<kbd>E</kbd>
+                                </li>
+                                <li><strong>BibTeX:</strong> Click the BibTeX button for reference manager import</li>
+                                <li><strong>Print:</strong> Click the Print button or use <kbd>Ctrl</kbd>+<kbd>P</kbd>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Keyboard Shortcuts -->
+                    <div class="help-section" id="help-shortcuts">
+                        <h3>⌨️ Keyboard Shortcuts</h3>
+                        <p>Speed up your workflow with these keyboard shortcuts. Press <kbd>?</kbd> anytime to see a
+                            quick reference.</p>
+
+                        <div class="help-card">
+                            <h4>Navigation</h4>
+                            <ul>
+                                <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> — Switch between Articles, Q&A, and Trends
+                                    tabs</li>
+                                <li><kbd>←</kbd> <kbd>→</kbd> — Navigate between result pages</li>
+                                <li><kbd>Home</kbd> — Scroll back to the top of the page</li>
+                            </ul>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>Search</h4>
+                            <ul>
+                                <li><kbd>Ctrl</kbd>+<kbd>K</kbd> — Focus the search bar from anywhere</li>
+                                <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> — Open Advanced Search modal</li>
+                                <li><kbd>Ctrl</kbd>+<kbd>E</kbd> — Quick export results as CSV</li>
+                            </ul>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>Panels & Actions</h4>
+                            <ul>
+                                <li><kbd>B</kbd> — Toggle Reading List sidebar</li>
+                                <li><kbd>N</kbd> — Toggle Notifications panel</li>
+
+                                <li><kbd>G</kbd> — Toggle filters sidebar (mobile)</li>
+                            </ul>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>Article Modal</h4>
+                            <ul>
+                                <li><kbd>S</kbd> — Share the currently open article</li>
+                                <li><kbd>C</kbd> — Generate a citation for the current article</li>
+                            </ul>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>Display & Modes</h4>
+                            <ul>
+                                <li><kbd>D</kbd> — Toggle dark / light mode</li>
+                                <li><kbd>Z</kbd> — Toggle Zen (focus) mode</li>
+                                <li><kbd>F</kbd> — Toggle fullscreen</li>
+                            </ul>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>Help & Modals</h4>
+                            <ul>
+                                <li><kbd>?</kbd> — Show keyboard shortcuts quick reference</li>
+                                <li><kbd>H</kbd> — Open this Help Guide</li>
+                                <li><kbd>Escape</kbd> — Close any open modal or panel</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- FAQ -->
+                    <div class="help-section" id="help-faq">
+                        <h3>❓ Frequently Asked Questions</h3>
+
+                        <div class="faq-item">
+                            <h4>What data sources are included?</h4>
+                            <p>BioMed Scholar indexes articles from PubMed (biomedical literature) and
+                                ClinicalTrials.gov (clinical trial registries).</p>
+                        </div>
+
+                        <div class="faq-item">
+                            <h4>How does semantic search work?</h4>
+                            <p>We use BioBERT, a language model trained on biomedical text, to understand the meaning of
+                                your query. This allows finding relevant results even when exact keywords don't match.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notification Settings Modal -->
+            <div id="notification-settings-modal" class="modal">
+                <div class="modal-content modal-small">
+                    <div class="modal-header">
+                        <h2>🔔 Notification Settings</h2>
+                        <button class="modal-close" onclick="closeNotificationSettings()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="settings-group">
+                            <div class="settings-item">
+                                <label class="toggle-container">
+                                    <span>Enable Notifications</span>
+                                    <input type="checkbox" id="notif-enabled-main" checked
+                                        onchange="updatePref('enabled', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="settings-item">
+                                <label class="toggle-container">
+                                    <span>Sound Effects</span>
+                                    <input type="checkbox" id="notif-sound" checked
+                                        onchange="updatePref('sound', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="settings-item">
+                                <label class="toggle-container">
+                                    <span>Browser Notifications</span>
+                                    <input type="checkbox" id="notif-browser"
+                                        onchange="toggleBrowserNotifs(this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="settings-divider">Categories</div>
+                        <div class="settings-grid">
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="cat-articles" checked
+                                    onchange="updatePrefCat('articles', this.checked)">
+                                <span>Library Updates</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="cat-searches" checked
+                                    onchange="updatePrefCat('searches', this.checked)">
+                                <span>Search History</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="cat-updates" checked
+                                    onchange="updatePrefCat('updates', this.checked)">
+                                <span>System Updates</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="cat-achievements" checked
+                                    onchange="updatePrefCat('achievements', this.checked)">
+                                <span>Achievements</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-btn primary" onclick="closeNotificationSettings()">Done</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <h4>Is my data private?</h4>
+                <p>Yes! Your reading list is private to your account. We don't track your individual
+                    searches.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4>Can I use this for medical advice?</h4>
+                <p>⚠️ BioMed Scholar is a research tool, not a substitute for professional medical advice.
+                    Always consult healthcare providers for medical decisions.</p>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    </div>
+    </div>
+
+
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>🔐 Login to BioMed Scholar</h2>
+                <button class="modal-close" onclick="closeLoginModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="auth-subtitle">Save your research across all your devices.</p>
+                <form id="login-form" onsubmit="handleLogin(event)">
+                    <div class="filter-group hidden" id="login-name-group">
+                        <label for="login-name">Full Name</label>
+                        <input type="text" id="login-name" placeholder="John Doe">
+                    </div>
+                    <div class="filter-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" required placeholder="name@example.com">
+                    </div>
+                    <div class="filter-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="modal-btn primary full-width">Sign In</button>
+                </form>
+                <div class="auth-divider">
+                    <span>or</span>
+                </div>
+                <button class="modal-btn secondary full-width google-btn" onclick="handleGoogleLogin()">
+                    <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" width="16" alt="Google">
+                    Continue with Google
+                </button>
+            </div>
+            <div class="modal-footer">
+                <span id="auth-switch-text">Don't have an account? <a href="#" onclick="toggleAuthMode(); return false;"
+                        id="auth-switch-link">Sign up</a></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back to Top Button -->
+
+
+
+    <!-- Article Detail Modal -->
+    <div id="article-detail-modal" class="article-modal-overlay">
+        <div class="article-modal">
+            <div class="article-modal-header">
+                <h2 class="article-modal-title" id="modal-article-title">Article Title</h2>
+                <button class="article-modal-share" onclick="shareArticleFromModal()" title="Share Article">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="18" cy="5" r="3" />
+                        <circle cx="6" cy="12" r="3" />
+                        <circle cx="18" cy="19" r="3" />
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                    </svg>
+                </button>
+                <button class="article-modal-close" onclick="closeArticleModal()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="article-modal-body">
+                <div class="modal-tabs">
+                    <button class="modal-tab active" onclick="switchModalTab('summary')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                        Summary
+                    </button>
+                    <button class="modal-tab" onclick="switchModalTab('fulltext')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4l2 2h4a2 2 0 0 1 2 2z" />
+                        </svg>
+                        Full Text
+                    </button>
+                    <button class="modal-tab" onclick="switchModalTab('discussion')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                        </svg>
+                        Discussion
+                    </button>
+                </div>
+
+                <div id="modal-tab-summary" class="modal-tab-content active">
+                    <div class="article-meta-grid">
+                        <div class="meta-item">
+                            <div class="meta-label">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="2" y1="12" x2="22" y2="12" />
+                                    <path
+                                        d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                </svg>
+                                <span>Source</span>
+                            </div>
+                            <span class="meta-value source-pill" id="modal-article-source">PubMed</span>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-label">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                    <line x1="16" y1="2" x2="16" y2="6" />
+                                    <line x1="8" y1="2" x2="8" y2="6" />
+                                    <line x1="3" y1="10" x2="21" y2="10" />
+                                </svg>
+                                <span>Date</span>
+                            </div>
+                            <span class="meta-value" id="modal-article-date">2024</span>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-label">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                    <circle cx="9" cy="7" r="4" />
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                </svg>
+                                <span>Authors</span>
+                            </div>
+                            <span class="meta-value" id="modal-article-authors">Authors...</span>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-label">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                    <path d="M6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+                                </svg>
+                                <span>Journal</span>
+                            </div>
+                            <span class="meta-value" id="modal-article-journal">Journal...</span>
+                        </div>
+                    </div>
+
+                    <div class="article-abstract">
+                        <h3 class="section-title">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="21" y1="10" x2="3" y2="10" />
+                                <line x1="21" y1="6" x2="3" y2="6" />
+                                <line x1="21" y1="14" x2="3" y2="14" />
+                                <line x1="21" y1="18" x2="3" y2="18" />
+                            </svg>
+                            Abstract
+                        </h3>
+                        <p class="abstract-text" id="modal-article-abstract">
+                            Abstract content goes here...
+                        </p>
+                    </div>
+                </div>
+
+                <div id="modal-tab-fulltext" class="modal-tab-content">
+                    <div class="fulltext-placeholder">
+                        <div class="fulltext-header">
+                            <h3>Full Article Content</h3>
+                            <p>This is a preview. Access the original source for the complete text, figures, and data.
+                            </p>
+                        </div>
+                        <div class="fulltext-preview" id="modal-fulltext-content">
+                            <!-- Content will be mirrored here -->
+                        </div>
+                        <div class="fulltext-cta">
+                            <a href="#" target="_blank" id="modal-fulltext-link" class="modal-btn modal-btn-primary">
+                                Read Complete Article at Source
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                    <polyline points="15 3 21 3 21 9" />
+                                    <line x1="10" y1="14" x2="21" y2="3" />
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="modal-tab-discussion" class="modal-tab-content">
+                    <div class="comments-section">
+                        <div class="comment-form">
+                            <textarea id="comment-input" placeholder="Add a comment or observation..."
+                                rows="3"></textarea>
+                            <button class="modal-btn modal-btn-primary" onclick="addComment()">Post Comment</button>
+                        </div>
+                        <div id="comments-list" class="comments-list">
+                            <!-- Comments will be injected here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Citation Modal -->
+    <div class="modal" id="citation-modal">
+        <div class="modal-overlay" onclick="closeCitationModal()"></div>
+        <div class="modal-container citation-modal-container">
+            <div class="modal-header">
+                <h2>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                    Cite This Article
+                </h2>
+                <button class="modal-close-btn" onclick="closeCitationModal()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="citation-tabs">
+                    <button class="citation-tab active" data-format="apa"
+                        onclick="switchCitationFormat('apa')">APA</button>
+                    <button class="citation-tab" data-format="mla" onclick="switchCitationFormat('mla')">MLA</button>
+                    <button class="citation-tab" data-format="chicago"
+                        onclick="switchCitationFormat('chicago')">Chicago</button>
+                    <button class="citation-tab" data-format="bibtex"
+                        onclick="switchCitationFormat('bibtex')">BibTeX</button>
+                </div>
+                <div class="citation-content">
+                    <div class="citation-text" id="citation-text">
+                        <!-- Citation will be generated here -->
+                    </div>
+                    <button class="modal-btn modal-btn-primary" onclick="copyCitation()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                        Copy to Clipboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help & Guide Modal -->
+    <div class="modal" id="help-modal">
+        <div class="modal-overlay" onclick="closeHelpModal()"></div>
+        <div class="modal-container help-modal-container">
+            <div class="modal-header">
+                <h2>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    Help & Guide
+                </h2>
+                <button class="modal-close-btn" onclick="closeHelpModal()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body help-modal-body">
+                <div class="help-section">
+                    <h3>🔍 Search Features</h3>
+                    <div class="help-card">
+                        <h4>Semantic Search</h4>
+                        <p>Use the search bar to find biomedical articles. Our AI understands context and synonyms, so
+                            searching for "heart attack" will also find articles about "myocardial infarction".</p>
+                    </div>
+                    <div class="help-card">
+                        <h4>Advanced Search</h4>
+                        <p>Click the sliders icon in the search bar to access advanced filters including date ranges,
+                            article types, and search modes.</p>
+                    </div>
+                    <div class="help-card">
+                        <h4>Search Modes</h4>
+                        <p>Adjust the slider between <strong>Keyword</strong> (exact matches) and
+                            <strong>Semantic</strong> (AI-powered understanding) to control search behavior.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h3>🤖 Maverick AI Chat Assistant</h3>
+                    <div class="help-card">
+                        <h4>Ask Questions</h4>
+                        <p>Navigate to the "Research AI Chat" tab to ask biomedical questions. The AI will search
+                            through indexed
+                            literature and provide evidence-based answers with citations.</p>
+                    </div>
+                    <div class="help-card">
+                        <h4>Long-Term Memory</h4>
+                        <p>Maverick now features <strong>Persistent Memory</strong>! It remembers your previous
+                            questions and
+                            context across sessions, allowing for complex follow-up research.</p>
+                    </div>
+                    <div class="help-card">
+                        <h4>Telegram Integration</h4>
+                        <p>Take Maverick on the go! Connect your Telegram to chat with Maverick 24/7. Use the
+                            <a href="https://web.telegram.org/a/#8513211167" target="_blank"
+                                style="color: var(--primary-blue); font-weight: 600;">Telegram Link</a>
+                            in the header to get started.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h3>📚 Managing Articles</h3>
+                    <div class="help-card">
+                        <h4>Reading List</h4>
+                        <p>Click the bookmark icon on any article to save it to your reading list. Access your saved
+                            articles by clicking the bookmark icon in the header.</p>
+                    </div>
+                    <div class="help-card">
+                        <h4>Citations</h4>
+                        <p>Click "Cite" on any article to generate citations in APA, MLA, Chicago, or BibTeX format.
+                            Copy to clipboard with one click.</p>
+                    </div>
+                    <div class="help-card">
+                        <h4>Export</h4>
+                        <p>Export your search results or reading list as CSV or BibTeX files for use in reference
+                            managers.</p>
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h3>⚡ Pro Tips</h3>
+                    <div class="help-card">
+                        <ul>
+                            <li>Press <code>Ctrl+K</code> to quickly focus the search bar from anywhere</li>
+                            <li>Use <code>←</code> and <code>→</code> arrow keys to navigate between pages</li>
+                            <li>Press <code>?</code> to view all keyboard shortcuts</li>
+                            <li>Toggle dark mode with <code>D</code> for comfortable reading</li>
+                            <li>Press <code>Esc</code> to close any modal</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div class="modal" id="shortcuts-modal">
+        <div class="modal-overlay" onclick="closeShortcutsModal()"></div>
+        <div class="modal-container shortcuts-modal-container">
+            <div class="modal-header">
+                <h2>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="4" width="20" height="16" rx="2" ry="2" />
+                        <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M8 16h8" />
+                    </svg>
+                    Keyboard Shortcuts
+                </h2>
+                <button class="modal-close-btn" onclick="closeShortcutsModal()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body shortcuts-modal-body">
+                <div class="shortcuts-grid">
+                    <div class="shortcut-category">
+                        <h3>Navigation</h3>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>1</kbd>
+                            </div>
+                            <span>Switch to Articles tab</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>2</kbd>
+                            </div>
+                            <span>Switch to AI Chat tab</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>3</kbd>
+                            </div>
+                            <span>Switch to Trends tab</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>←</kbd> <kbd>→</kbd>
+                            </div>
+                            <span>Navigate pages</span>
+                        </div>
+                    </div>
+
+                    <div class="shortcut-category">
+                        <h3>Search</h3>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>Ctrl</kbd> + <kbd>K</kbd>
+                            </div>
+                            <span>Focus search bar</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd>
+                            </div>
+                            <span>Open advanced search</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>Enter</kbd>
+                            </div>
+                            <span>Perform search</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>Esc</kbd>
+                            </div>
+                            <span>Clear search / Close modals</span>
+                        </div>
+                    </div>
+
+                    <div class="shortcut-category">
+                        <h3>Actions</h3>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>B</kbd>
+                            </div>
+                            <span>Toggle reading list</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>D</kbd>
+                            </div>
+                            <span>Toggle dark mode</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>Z</kbd>
+                            </div>
+                            <span>Toggle Zen (focus) mode</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>E</kbd>
+                            </div>
+                            <span>Export current results</span>
+                        </div>
+                    </div>
+
+                    <div class="shortcut-category">
+                        <h3>Help</h3>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>?</kbd>
+                            </div>
+                            <span>Show keyboard shortcuts</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <div class="shortcut-keys">
+                                <kbd>H</kbd>
+                            </div>
+                            <span>Show help & guide</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

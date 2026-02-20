@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: biomedical-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms4g -Xmx4g"
+    ports:
+      - "9201:9200"
+      - "9301:9300"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - biomedical-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: biomedical-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - biomedical-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: biomedical-postgres
+    environment:
+      POSTGRES_DB: biomedical_search
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - biomedical-network
+
+volumes:
+  elasticsearch-data:
+  redis-data:
+  postgres-data:
+
+
+networks:
+  biomedical-network:
+    driver: bridge

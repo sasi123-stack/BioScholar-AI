@@ -1,0 +1,25 @@
+{
+    "size": 0,
+    "aggs": {
+        "source_types": {
+            "terms": {
+                "field": "source.keyword"
+            }
+        },
+        "article_types": {
+            "terms": {
+                "field": "metadata.article_type.keyword"
+            }
+        },
+        "subjects": {
+            "terms": {
+                "field": "metadata.subject.keyword"
+            }
+        },
+        "languages": {
+            "terms": {
+                "field": "metadata.language.keyword"
+            }
+        }
+    }
+}

@@ -1,0 +1,11 @@
+{
+    "size": 0,
+    "aggs": {
+        "years": {
+            "terms": {
+                "field": "metadata.publication_year.keyword",
+                "size": 100
+            }
+        }
+    }
+}

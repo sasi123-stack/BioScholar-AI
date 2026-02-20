@@ -1,0 +1,9 @@
+﻿2026-02-11 18:55:13 | INFO     | src.qa_module.deepseek_generator:__init__:28 - DeepSeekGenerator initialized
+API Key found: True
+API Key prefix: sk-0c...
+Testing generation...
+2026-02-11 18:55:13 | INFO     | src.qa_module.deepseek_generator:generate_answer:65 - Requesting DeepSeek completion for: What is the capital of France?...
+2026-02-11 18:55:15 | ERROR    | src.qa_module.deepseek_generator:generate_answer:89 - DeepSeek generation failed: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+
+Result:
+{'answer': "I encountered an error generating an answer via DeepSeek: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}", 'confidence': 0.0, 'confidence_level': 'none', 'title': 'DeepSeek Error', 'doc_id': 'deepseek-error', 'source_type': 'error', 'section': 'Error'}

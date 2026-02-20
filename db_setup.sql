@@ -1,0 +1,1 @@
+DO $block$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_user WHERE usename = 'user') THEN CREATE USER "user" WITH PASSWORD 'password' SUPERUSER; END IF; END $block$; CREATE DATABASE biomedical_search OWNER "user";

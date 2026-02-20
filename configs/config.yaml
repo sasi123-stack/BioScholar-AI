@@ -1,0 +1,97 @@
+# Application Configuration
+
+app:
+  name: "Biomedical Search Engine"
+  version: "1.0.0"
+  environment: "development"
+  debug: true
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  reload: true
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:8000"
+
+elasticsearch:
+  host: "localhost"
+  port: 9200
+  scheme: "http"
+  indices:
+    pubmed: "pubmed_articles"
+    clinical_trials: "clinical_trials"
+  settings:
+    number_of_shards: 1
+    number_of_replicas: 0
+  batch_size: 1000
+
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  cache_ttl: 3600
+
+database:
+  url: "postgresql://user:password@localhost:5432/biomedical_search"
+  pool_size: 10
+  max_overflow: 20
+  echo: false
+
+models:
+  biobert:
+    name: "dmis-lab/biobert-v1.1"
+    cache_dir: "./models/biobert"
+    max_length: 512
+    batch_size: 16
+  
+  clinicalbert:
+    name: "emilyalsentzer/Bio_ClinicalBERT"
+    cache_dir: "./models/clinicalbert"
+    max_length: 512
+    batch_size: 16
+  
+  qa_model:
+    name: "dmis-lab/biobert-base-cased-v1.1-squad"
+    cache_dir: "./models/qa"
+    max_length: 384
+    doc_stride: 128
+    max_answer_length: 100
+    min_confidence: 0.3
+    top_answers: 3
+
+search:
+  top_k: 20
+  rerank_top_k: 5
+  min_score: 0.5
+  hybrid_alpha: 0.7  # Weight for semantic vs keyword search
+  use_reranking: true
+
+data_sources:
+  pubmed:
+    api_url: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
+    rate_limit: 10  # requests per second
+    batch_size: 100
+    max_results: 10000
+  
+  clinicaltrials:
+    api_url: "https://clinicaltrials.gov/api/v2"
+    rate_limit: 5
+    batch_size: 100
+
+logging:
+  level: "INFO"
+  format: "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+  rotation: "500 MB"
+  retention: "10 days"
+  log_dir: "./logs"
+
+celery:
+  broker_url: "redis://localhost:6379/0"
+  result_backend: "redis://localhost:6379/0"
+  task_serializer: "json"
+  result_serializer: "json"
+  accept_content: ["json"]
+  timezone: "UTC"
+  enable_utc: true

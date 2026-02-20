@@ -1,0 +1,2071 @@
+// API Configuration
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = isLocal ? 'http://localhost:8000/api/v1' : 'https://nonreliably-unaxised-kit.ngrok-free.dev/api/v1';
+
+// Firebase Configuration
+// REPLACE THESE VALUES WITH YOUR FIREBASE PROJECT CONFIGURATION
+const firebaseConfig = {
+    apiKey: "AIzaSyAGDU8IdYYVEufji3vTz6xBGCrI4uDmXjE",
+    authDomain: "biomed-scholar.firebaseapp.com",
+    projectId: "biomed-scholar",
+    storageBucket: "biomed-scholar.firebasestorage.app",
+    messagingSenderId: "115477996356",
+    appId: "1:115477996356:web:395f8f1ce760de94812d11",
+    measurementId: "G-CGJ5B74CEQ"
+};
+
+// Initialize Firebase
+let auth;
+if (typeof firebase !== 'undefined') {
+    try {
+        firebase.initializeApp(firebaseConfig);
+        auth = firebase.auth();
+    } catch (e) {
+        console.error("Firebase initialization failed:", e);
+    }
+}
+
+// State
+let currentFilters = {
+    source: 'all',
+    dateRange: 'any',
+    dateFrom: null,
+    dateTo: null,
+    sortBy: 'relevance',
+    useReranking: true,
+    highlightMatches: true,
+    alpha: 50
+    // Note: articleTypes and language are Coming Soon features
+    // They are disabled in the UI and not used for filtering
+};
+
+let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
+let readingList = JSON.parse(localStorage.getItem('readingList') || '[]');
+let currentResults = [];
+let currentQuery = '';
+let currentPage = 1;
+let resultsPerPage = 10;
+let currentView = 'list';
+let currentCitationArticle = null;
+let currentCitationFormat = 'apa';
+
+// Auth State
+let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+
+// Suggestions for autocomplete
+const suggestions = [
+    'COVID-19 vaccine efficacy',
+    'cancer immunotherapy',
+    'diabetes treatment',
+    'Alzheimers disease',
+    'heart disease prevention',
+    'mRNA vaccines',
+    'CRISPR gene editing',
+    'antibiotic resistance',
+    'mental health treatment',
+    'obesity management',
+    'clinical trials phases',
+    'drug interactions'
+];
+
+// Related search mappings
+const relatedSearches = {
+    'covid': ['COVID-19 symptoms', 'COVID-19 treatment', 'COVID-19 long term effects', 'mRNA vaccines'],
+    'vaccine': ['vaccine efficacy', 'vaccine side effects', 'mRNA technology', 'herd immunity'],
+    'cancer': ['cancer immunotherapy', 'chemotherapy', 'cancer prevention', 'oncology research'],
+    'diabetes': ['diabetes type 2', 'insulin resistance', 'diabetes management', 'glucose monitoring'],
+    'heart': ['cardiovascular disease', 'heart attack prevention', 'blood pressure', 'cholesterol']
+};
+
+// DOM Elements
+const headerSearchInput = document.getElementById('header-search-input');
+const headerSearchBtn = document.getElementById('header-search-btn');
+const searchResults = document.getElementById('search-results');
+const resultsCount = document.getElementById('results-count');
+const statusDot = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+const pubmedCount = document.getElementById('pubmed-count');
+const trialsCount = document.getElementById('trials-count');
+const totalDocsCount = document.getElementById('total-docs-count');
+const autocompleteDropdown = document.getElementById('autocomplete-dropdown');
+const historyItems = document.getElementById('history-items');
+const suggestionItems = document.getElementById('suggestion-items');
+
+// QA Elements
+const qaInput = document.getElementById('qa-input');
+const qaButton = document.getElementById('qa-button');
+const qaResults = document.getElementById('qa-results');
+const qaIndex = document.getElementById('qa-index');
+const maxAnswers = document.getElementById('max-answers');
+
+// Filter Elements
+const filterChips = document.querySelectorAll('.filter-chip');
+const dateRadios = document.querySelectorAll('input[name="date-range"]');
+const customDateRange = document.getElementById('custom-date-range');
+const sortBySelect = document.getElementById('sort-by');
+const useRerankingCheckbox = document.getElementById('use-reranking');
+const highlightMatchesCheckbox = document.getElementById('highlight-matches');
+const alphaSlider = document.getElementById('alpha-slider');
+const alphaValue = document.getElementById('alpha-value');
+const languageFilter = document.getElementById('language-filter');
+
+// Pagination Elements
+const pagination = document.getElementById('pagination');
+const prevPageBtn = document.getElementById('prev-page');
+const nextPageBtn = document.getElementById('next-page');
+const currentPageSpan = document.getElementById('current-page');
+const totalPagesSpan = document.getElementById('total-pages');
+
+// ==========================================
+// INITIALIZATION
+// ==========================================
+async function init() {
+    initTheme();
+    initEventListeners();
+    initKeyboardShortcuts();
+    initDynamicScroll();
+    initScrollReveal();
+    updateReadingListCount();
+    updateLoginUI();
+    await checkHealth();
+    await loadStatistics();
+    createModal();
+}
+
+function initDynamicScroll() {
+    const progressBar = document.getElementById('scroll-progress');
+    const backToTopBtn = document.getElementById('back-to-top');
+
+    window.addEventListener('scroll', () => {
+        const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+
+        // Update Progress Bar
+        const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        const scrolled = (winScroll / height) * 100;
+        if (progressBar) progressBar.style.width = scrolled + "%";
+
+        // Show/Hide Back to Top
+        if (backToTopBtn) {
+            if (winScroll > 300) {
+                backToTopBtn.classList.add('show');
+            } else {
+                backToTopBtn.classList.remove('show');
+            }
+        }
+    });
+}
+
+function initScrollReveal() {
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('reveal-active');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, observerOptions);
+
+    window.revealObserver = observer;
+}
+
+function initEventListeners() {
+    // Search
+    headerSearchBtn?.addEventListener('click', performSearch);
+    headerSearchInput?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            hideAutocomplete();
+            performSearch();
+        }
+    });
+
+    // Autocomplete
+    headerSearchInput?.addEventListener('input', handleSearchInput);
+    headerSearchInput?.addEventListener('focus', showAutocomplete);
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.header-search')) {
+            hideAutocomplete();
+        }
+    });
+
+    // Tab Navigation
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    });
+
+    // View Toggle
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentView = btn.dataset.view;
+            applyViewMode();
+        });
+    });
+
+    // Filter Chips
+    filterChips?.forEach(chip => {
+        chip.addEventListener('click', () => {
+            filterChips.forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            currentFilters.source = chip.dataset.filter;
+            // Trigger a new search if there's an active query
+            if (currentQuery) {
+                performSearch();
+            }
+        });
+    });
+
+    // Date Range
+    dateRadios?.forEach(radio => {
+        radio.addEventListener('change', () => {
+            currentFilters.dateRange = radio.value;
+            if (radio.value === 'custom') {
+                customDateRange?.classList.remove('hidden');
+            } else {
+                customDateRange?.classList.add('hidden');
+                // Update results if we have results
+                if (currentResults.length > 0) {
+                    displayCurrentResults();
+                }
+            }
+        });
+    });
+
+    // Sort By
+    sortBySelect?.addEventListener('change', () => {
+        currentFilters.sortBy = sortBySelect.value;
+        if (currentResults.length > 0) {
+            displayCurrentResults();
+        }
+    });
+
+    // AI Options
+    useRerankingCheckbox?.addEventListener('change', () => {
+        currentFilters.useReranking = useRerankingCheckbox.checked;
+    });
+
+    highlightMatchesCheckbox?.addEventListener('change', () => {
+        currentFilters.highlightMatches = highlightMatchesCheckbox.checked;
+        if (currentResults.length > 0) {
+            displayCurrentResults();
+        }
+    });
+
+    // Alpha Slider
+    alphaSlider?.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        currentFilters.alpha = value;
+        updateAlphaLabel(value);
+    });
+
+    // Language Filter - Coming Soon (disabled in UI)
+    // languageFilter?.addEventListener('change', () => {
+    //     currentFilters.language = languageFilter.value;
+    //     if (currentResults.length > 0) {
+    //         displayCurrentResults();
+    //     }
+    // });
+
+    // Article Type Checkboxes - Coming Soon (disabled in UI)
+    // These checkboxes are disabled, so no event listener needed
+
+    // Q&A
+    qaButton?.addEventListener('click', performQA);
+    qaInput?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') performQA();
+    });
+
+    // Custom date inputs
+    document.getElementById('date-from')?.addEventListener('change', (e) => {
+        currentFilters.dateFrom = e.target.value ? parseInt(e.target.value) : null;
+        // Update results if we have results
+        if (currentResults.length > 0) {
+            displayCurrentResults();
+        }
+    });
+    document.getElementById('date-to')?.addEventListener('change', (e) => {
+        currentFilters.dateTo = e.target.value ? parseInt(e.target.value) : null;
+        // Update results if we have results
+        if (currentResults.length > 0) {
+            displayCurrentResults();
+        }
+    });
+
+    // Pagination
+    prevPageBtn?.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            displayCurrentResults();
+            scrollToResults();
+        }
+    });
+
+    nextPageBtn?.addEventListener('click', () => {
+        const totalPages = Math.ceil(currentResults.length / resultsPerPage);
+        if (currentPage < totalPages) {
+            currentPage++;
+            displayCurrentResults();
+            scrollToResults();
+        }
+    });
+
+    // Citation tabs
+    document.querySelectorAll('.citation-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.citation-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentCitationFormat = tab.dataset.format;
+            updateCitationText();
+        });
+    });
+}
+
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Ignore if typing in input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            if (e.key === 'Escape') {
+                e.target.blur();
+                hideAutocomplete();
+            }
+            return;
+        }
+
+        // Ctrl+K - Focus search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            headerSearchInput?.focus();
+        }
+
+        // Ctrl+Shift+F - Advanced search
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+            e.preventDefault();
+            openAdvancedSearch();
+        }
+
+        // ? - Show shortcuts
+        if (e.key === '?') {
+            showKeyboardShortcuts();
+        }
+
+        // 1, 2, 3 - Switch tabs
+        if (e.key === '1') switchTab('articles');
+        if (e.key === '2') switchTab('qa');
+        if (e.key === '3') switchTab('trends');
+
+        // B - Toggle reading list
+        if (e.key === 'b' || e.key === 'B') {
+            toggleReadingList();
+        }
+
+        // D - Toggle dark mode
+        if (e.key === 'd' || e.key === 'D') {
+            toggleTheme();
+        }
+
+        // Arrow keys for pagination
+        if (e.key === 'ArrowLeft' && currentPage > 1) {
+            currentPage--;
+            displayCurrentResults();
+        }
+        if (e.key === 'ArrowRight') {
+            const totalPages = Math.ceil(currentResults.length / resultsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                displayCurrentResults();
+            }
+        }
+
+        // Escape - Close modals
+        if (e.key === 'Escape') {
+            closeAllModals();
+        }
+    });
+}
+
+// ==========================================
+// AUTOCOMPLETE
+// ==========================================
+function handleSearchInput() {
+    const query = headerSearchInput.value.trim().toLowerCase();
+
+    if (query.length === 0) {
+        showAutocomplete();
+        return;
+    }
+
+    // Filter suggestions
+    const filteredSuggestions = suggestions.filter(s =>
+        s.toLowerCase().includes(query)
+    ).slice(0, 5);
+
+    // Update suggestions
+    suggestionItems.innerHTML = filteredSuggestions.map(s => `
+        <div class="autocomplete-item" onclick="selectSuggestion('${escapeHtml(s)}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <span>${highlightMatch(s, query)}</span>
+        </div>
+    `).join('');
+
+    showAutocomplete();
+}
+
+function showAutocomplete() {
+    // Update history items
+    historyItems.innerHTML = searchHistory.slice(0, 5).map(h => `
+        <div class="autocomplete-item" onclick="selectSuggestion('${escapeHtml(h)}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span>${escapeHtml(h)}</span>
+        </div>
+    `).join('');
+
+    // Show/hide sections
+    const historySection = document.getElementById('search-history-section');
+    if (historySection) {
+        historySection.style.display = searchHistory.length > 0 ? 'block' : 'none';
+    }
+
+    autocompleteDropdown?.classList.remove('hidden');
+}
+
+function hideAutocomplete() {
+    autocompleteDropdown?.classList.add('hidden');
+}
+
+function selectSuggestion(query) {
+    headerSearchInput.value = query;
+    hideAutocomplete();
+    performSearch();
+}
+
+function clearSearchHistory(e) {
+    e.stopPropagation();
+    searchHistory = [];
+    localStorage.setItem('searchHistory', '[]');
+    historyItems.innerHTML = '';
+    showToast('Search history cleared', 'success');
+}
+
+function addToSearchHistory(query) {
+    // Remove if exists
+    searchHistory = searchHistory.filter(h => h.toLowerCase() !== query.toLowerCase());
+    // Add to front
+    searchHistory.unshift(query);
+    // Keep only last 20
+    searchHistory = searchHistory.slice(0, 20);
+    localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
+}
+
+function highlightMatch(text, query) {
+    if (!query) return escapeHtml(text);
+    const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+    return escapeHtml(text).replace(regex, '<mark>$1</mark>');
+}
+
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ==========================================
+// TAB & VIEW MANAGEMENT
+// ==========================================
+function switchTab(tabName) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.nav-tab[data-tab="${tabName}"]`)?.classList.add('active');
+
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(`${tabName}-tab`)?.classList.add('active');
+}
+
+function applyViewMode() {
+    const resultsList = document.querySelector('.results-list');
+    if (resultsList) {
+        if (currentView === 'compact') {
+            resultsList.classList.add('compact');
+        } else {
+            resultsList.classList.remove('compact');
+        }
+    }
+}
+
+function scrollToResults() {
+    document.getElementById('results-header')?.scrollIntoView({ behavior: 'smooth' });
+}
+
+function updateAlphaLabel(value) {
+    let label = '';
+    if (value < 25) {
+        label = `Keyword-focused (${value}%)`;
+    } else if (value < 75) {
+        label = `Balanced (${value}%)`;
+    } else {
+        label = `Semantic-focused (${value}%)`;
+    }
+    if (alphaValue) alphaValue.textContent = label;
+}
+
+// ==========================================
+// API HEALTH CHECK
+// ==========================================
+async function checkHealth() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' },
+            timeout: 5000
+        });
+        const data = await response.json();
+
+        if (data.status === 'healthy' || data.status === 'degraded') {
+            statusDot?.classList.remove('offline');
+            statusDot?.classList.add('online');
+            if (statusText) statusText.textContent = 'Online';
+            window.isBackendOnline = true;
+
+            // Remove demo banner if present
+            const banner = document.getElementById('demo-banner');
+            if (banner) banner.remove();
+        } else {
+            statusDot?.classList.remove('online');
+            statusDot?.classList.add('offline');
+            if (statusText) statusText.textContent = 'Degraded';
+            window.isBackendOnline = false;
+        }
+    } catch (error) {
+        statusDot?.classList.add('offline');
+        if (statusText) statusText.textContent = 'Offline';
+        window.isBackendOnline = false;
+        console.log('Backend not available - running in demo mode, retrying in 5s...');
+        showDemoBanner();
+
+        // Retry after 5 seconds
+        setTimeout(checkHealth, 5000);
+    }
+}
+
+function showDemoBanner() {
+    if (document.getElementById('demo-banner')) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'demo-banner';
+    banner.innerHTML = `
+        <div class="demo-banner">
+            <span>🎨 <strong>Demo Mode</strong> - This is a UI preview. Connect to a backend server for full functionality.</span>
+            <button onclick="this.parentElement.remove()">×</button>
+        </div>
+    `;
+    document.body.insertBefore(banner, document.body.firstChild);
+}
+
+// ==========================================
+// STATISTICS
+// ==========================================
+async function loadStatistics() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/statistics`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        const data = await response.json();
+
+        const pubmedDocs = data.pubmed_articles?.document_count || 0;
+        const trialsDocs = data.clinical_trials?.document_count || 0;
+        const totalDocs = pubmedDocs + trialsDocs;
+
+        if (pubmedCount) pubmedCount.textContent = pubmedDocs.toLocaleString();
+        if (trialsCount) trialsCount.textContent = trialsDocs.toLocaleString();
+        if (totalDocsCount) {
+            totalDocsCount.textContent = totalDocs > 0 ? totalDocs.toLocaleString() + '+' : '0';
+        }
+    } catch (error) {
+        console.error('Failed to load statistics:', error);
+        if (totalDocsCount) totalDocsCount.textContent = '---';
+    }
+}
+
+// ==========================================
+// SEARCH FUNCTIONALITY
+// ==========================================
+async function performSearch() {
+    const query = headerSearchInput?.value.trim();
+    if (!query) return;
+
+    currentQuery = query;
+    currentPage = 1;
+    addToSearchHistory(query);
+
+    if (headerSearchBtn) headerSearchBtn.disabled = true;
+    if (searchResults) searchResults.innerHTML = showLoading();
+
+    try {
+        let index = 'both';
+        if (currentFilters.source === 'pubmed') index = 'pubmed';
+        else if (currentFilters.source === 'clinical_trials') index = 'clinical_trials';
+
+        const response = await fetch(`${API_BASE_URL}/search`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true'
+            },
+            body: JSON.stringify({
+                query: query,
+                index: index,
+                max_results: 50,
+                alpha: currentFilters.alpha / 100,
+                use_reranking: currentFilters.useReranking
+            })
+        });
+
+        const data = await response.json();
+        currentResults = data.results || [];
+        displayCurrentResults();
+        showRelatedSearches(query);
+
+    } catch (error) {
+        if (searchResults) searchResults.innerHTML = showError('Failed to perform search. Please try again.');
+        console.error('Search failed:', error);
+    } finally {
+        if (headerSearchBtn) headerSearchBtn.disabled = false;
+    }
+}
+
+function shareSearch() {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+        showToast('Search link copied to clipboard!', 'success');
+    }).catch(err => {
+        console.error('Could not copy text: ', err);
+        showToast('Failed to copy link', 'error');
+    });
+}
+
+function exportResults(format) {
+    if (!currentResults || currentResults.length === 0) {
+        showToast('No results to export', 'info');
+        return;
+    }
+
+    if (format === 'csv') {
+        const headers = ['ID', 'Title', 'Source', 'Publication Date', 'Authors', 'Score'];
+        const rows = currentResults.map(r => [
+            r.id,
+            `"${(r.title || '').replace(/"/g, '""')}"`,
+            r.source,
+            r.metadata?.publication_date || '',
+            `"${(r.metadata?.authors || []).join(', ').replace(/"/g, '""')}"`,
+            r.score
+        ]);
+
+        const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `biomed_search_results_${new Date().getTime()}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('Results exported to CSV', 'success');
+    }
+}
+
+function displayCurrentResults() {
+    if (!currentResults || currentResults.length === 0) {
+        if (resultsCount) resultsCount.innerHTML = `No results found for "<strong>${escapeHtml(currentQuery)}</strong>"`;
+        if (searchResults) searchResults.innerHTML = showEmptyState('No results found', 'Try different keywords or adjust filters');
+        pagination?.classList.add('hidden');
+        return;
+    }
+
+    // Apply client-side filtering and sorting
+    let results = filterAndSortResults(currentResults);
+
+    // Pagination
+    const totalPages = Math.ceil(results.length / resultsPerPage);
+    const startIdx = (currentPage - 1) * resultsPerPage;
+    const endIdx = startIdx + resultsPerPage;
+    const pageResults = results.slice(startIdx, endIdx);
+
+    if (resultsCount) {
+        resultsCount.innerHTML = `About <strong>${results.length.toLocaleString()}</strong> results`;
+    }
+
+    if (searchResults) {
+        searchResults.innerHTML = pageResults.map(result => createResultCard(result)).join('');
+        applyViewMode();
+
+        // Apply Reveal Observer
+        if (window.revealObserver) {
+            searchResults.querySelectorAll('.result-card').forEach(card => {
+                window.revealObserver.observe(card);
+            });
+        }
+    }
+
+    // Update pagination
+    if (pagination) {
+        if (totalPages > 1) {
+            pagination.classList.remove('hidden');
+            if (currentPageSpan) currentPageSpan.textContent = currentPage;
+            if (totalPagesSpan) totalPagesSpan.textContent = totalPages;
+            if (prevPageBtn) prevPageBtn.disabled = currentPage === 1;
+            if (nextPageBtn) nextPageBtn.disabled = currentPage === totalPages;
+        } else {
+            pagination.classList.add('hidden');
+        }
+    }
+}
+
+
+function filterAndSortResults(results) {
+    let filtered = [...results];
+
+    // Apply date filter
+    if (currentFilters.dateRange !== 'any') {
+        const currentYear = new Date().getFullYear();
+        if (currentFilters.dateRange === 'custom') {
+            const minYear = currentFilters.dateFrom || 1900;
+            const maxYear = currentFilters.dateTo || currentYear;
+            filtered = filtered.filter(r => {
+                const year = extractYear(r.metadata?.publication_date || r.publication_date);
+                // If no date available, include the result (don't filter it out)
+                if (!year) return true;
+                return year >= minYear && year <= maxYear;
+            });
+        } else {
+            const minYear = parseInt(currentFilters.dateRange);
+            filtered = filtered.filter(r => {
+                const year = extractYear(r.metadata?.publication_date || r.publication_date);
+                // If no date available, include the result
+                if (!year) return true;
+                return year >= minYear;
+            });
+        }
+    }
+
+    // Note: Language and Article Type filters are "Coming Soon" 
+    // and are disabled in the UI - no filtering logic needed here
+
+    // Apply sorting
+    if (currentFilters.sortBy === 'date_desc') {
+        filtered.sort((a, b) => {
+            const dateA = extractYear(a.metadata?.publication_date || a.publication_date) || 0;
+            const dateB = extractYear(b.metadata?.publication_date || b.publication_date) || 0;
+            return dateB - dateA;
+        });
+    } else if (currentFilters.sortBy === 'date_asc') {
+        filtered.sort((a, b) => {
+            const dateA = extractYear(a.metadata?.publication_date || a.publication_date) || 0;
+            const dateB = extractYear(b.metadata?.publication_date || b.publication_date) || 0;
+            return dateA - dateB;
+        });
+    } else if (currentFilters.sortBy === 'relevance') {
+        // Default is usually relevance from API, but we ensure it here if client re-sorts
+        filtered.sort((a, b) => (b.score || 0) - (a.score || 0));
+    }
+
+    return filtered;
+}
+
+function extractYear(dateStr) {
+    if (!dateStr) return null;
+    const match = dateStr.match(/\d{4}/);
+    return match ? parseInt(match[0]) : null;
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+
+    // Handle different date formats
+    // Format 1: "YYYY-MM" (e.g., "2024-05")
+    // Format 2: "YYYY" (e.g., "2024")  
+    // Format 3: "Month YYYY" (e.g., "January 2024")
+    // Format 4: "Month Day, YYYY" (e.g., "January 15, 2024")
+    // Format 5: ISO date (e.g., "2024-01-15")
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Try to parse as YYYY-MM format
+    const yyyyMmMatch = dateStr.match(/^(\d{4})-(\d{2})$/);
+    if (yyyyMmMatch) {
+        const year = yyyyMmMatch[1];
+        const monthNum = parseInt(yyyyMmMatch[2]) - 1;
+        if (monthNum >= 0 && monthNum < 12) {
+            return `${monthNames[monthNum]} ${year}`;
+        }
+        return year;
+    }
+
+    // Try to parse as YYYY only
+    const yyyyMatch = dateStr.match(/^(\d{4})$/);
+    if (yyyyMatch) {
+        return yyyyMatch[1];
+    }
+
+    // Try to parse ISO date format (YYYY-MM-DD)
+    const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+        const year = isoMatch[1];
+        const monthNum = parseInt(isoMatch[2]) - 1;
+        if (monthNum >= 0 && monthNum < 12) {
+            return `${monthNames[monthNum]} ${year}`;
+        }
+        return year;
+    }
+
+    // Return as-is if format not recognized (e.g., "January 2024")
+    return dateStr;
+}
+
+function showRelatedSearches(query) {
+    const relatedContainer = document.getElementById('related-searches');
+    const relatedTags = document.getElementById('related-tags');
+
+    if (!relatedContainer || !relatedTags) return;
+
+    // Find related searches
+    const queryLower = query.toLowerCase();
+    let related = [];
+
+    for (const [key, values] of Object.entries(relatedSearches)) {
+        if (queryLower.includes(key)) {
+            related = [...related, ...values];
+        }
+    }
+
+    if (related.length === 0) {
+        relatedContainer.classList.add('hidden');
+        return;
+    }
+
+    // Remove duplicates and limit
+    related = [...new Set(related)].filter(r => r.toLowerCase() !== queryLower).slice(0, 5);
+
+    relatedTags.innerHTML = related.map(r =>
+        `<button class="related-tag" onclick="setExampleQuery('${escapeHtml(r)}')">${escapeHtml(r)}</button>`
+    ).join('');
+
+    relatedContainer.classList.remove('hidden');
+}
+
+function createResultCard(result) {
+    const isPubMed = result.source === 'pubmed';
+    const sourceLabel = isPubMed ? 'PubMed' : 'Clinical Trial';
+    const sourceClass = isPubMed ? 'pubmed' : 'clinical-trial';
+    const externalUrl = getExternalUrl(result);
+    const isBookmarked = readingList.some(item => item.id === result.id);
+
+    const resultDataB64 = btoa(unescape(encodeURIComponent(JSON.stringify(result))));
+
+    const authors = result.metadata?.authors?.slice(0, 3).join(', ') || '';
+    const rawDate = result.metadata?.publication_date || '';
+    const date = formatDate(rawDate);
+    const journal = result.metadata?.journal || '';
+
+    // Highlight matches
+    let title = escapeHtml(result.title);
+    let abstract = result.abstract ? truncate(result.abstract, 280) : '';
+
+    if (currentFilters.highlightMatches && currentQuery) {
+        const terms = currentQuery.split(/\s+/).filter(t => t.length > 2);
+        terms.forEach(term => {
+            const regex = new RegExp(`(${escapeRegex(term)})`, 'gi');
+            title = title.replace(regex, '<mark>$1</mark>');
+            abstract = abstract.replace(regex, '<mark>$1</mark>');
+        });
+    }
+
+    return `
+        <div class="result-card" data-id="${result.id}">
+            <div class="result-source">
+                <span class="result-source-badge ${sourceClass}">${sourceLabel}</span>
+                ${result.metadata?.pmid ? `<span>PMID: ${result.metadata.pmid}</span>` : ''}
+                ${result.metadata?.nct_id ? `<span>NCT: ${result.metadata.nct_id}</span>` : ''}
+            </div>
+            
+            <a class="result-title" href="${externalUrl || '#'}" target="_blank" rel="noopener">${title}</a>
+            
+            ${externalUrl ? `<div class="result-url">${externalUrl}</div>` : ''}
+            
+            ${abstract ? `<p class="result-abstract">${abstract}</p>` : ''}
+            
+            <div class="result-meta">
+                ${result.metadata?.authors?.length ? `<span class="result-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    ${result.metadata.authors.slice(0, 5).join(', ')}${result.metadata.authors.length > 5 ? ', et al.' : ''}
+                </span>` : ''}
+                ${date ? `<span class="result-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    ${date}
+                </span>` : ''}
+                ${journal ? `<span class="result-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
+                    ${journal}
+                </span>` : ''}
+            </div>
+            
+            <div class="result-actions">
+                <button class="result-action-btn bookmark-btn ${isBookmarked ? 'active' : ''}" onclick="toggleBookmark('${resultDataB64}', this)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="${isBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    ${isBookmarked ? 'Saved' : 'Save'}
+                </button>
+                <button class="result-action-btn" onclick="openCitationModal('${resultDataB64}')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 6 9 6 9zM18 9h1.5a2.5 2.5 0 0 0 0-5C17 4 18 9 18 9z"/>
+                        <path d="M6 22V9M18 22V9"/>
+                    </svg>
+                    Cite
+                </button>
+                ${externalUrl ? `<a href="${externalUrl}" target="_blank" rel="noopener" class="result-action-btn primary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                    View Source
+                </a>` : ''}
+                <button class="result-action-btn" data-result="${resultDataB64}" onclick="openDocumentModalFromB64(this.dataset.result)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="16" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                    Details
+                </button>
+                <span class="result-score">Score: ${result.score?.toFixed(3) || 'N/A'}</span>
+            </div>
+        </div>
+    `;
+}
+
+function getExternalUrl(result) {
+    if (result.source === 'pubmed' && result.metadata?.pmid) {
+        return `https://pubmed.ncbi.nlm.nih.gov/${result.metadata.pmid}/`;
+    } else if (result.source === 'clinical_trials' && result.metadata?.nct_id) {
+        return `https://clinicaltrials.gov/study/${result.metadata.nct_id}`;
+    }
+    return null;
+}
+
+// ==========================================
+// READING LIST / BOOKMARKS
+// ==========================================
+function toggleBookmark(b64Data, button) {
+    try {
+        const jsonStr = decodeURIComponent(escape(atob(b64Data)));
+        const result = JSON.parse(jsonStr);
+
+        const idx = readingList.findIndex(item => item.id === result.id);
+
+        if (idx >= 0) {
+            readingList.splice(idx, 1);
+            button.classList.remove('active');
+            button.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+                Save
+            `;
+            showToast('Removed from reading list', 'info');
+        } else {
+            readingList.push({
+                id: result.id,
+                title: result.title,
+                source: result.source,
+                metadata: result.metadata,
+                abstract: result.abstract,
+                savedAt: new Date().toISOString()
+            });
+            button.classList.add('active');
+            button.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+                Saved
+            `;
+            showToast('Added to reading list', 'success');
+        }
+
+        localStorage.setItem('readingList', JSON.stringify(readingList));
+        updateReadingListCount();
+        renderReadingList();
+    } catch (error) {
+        console.error('Error toggling bookmark:', error);
+    }
+}
+
+function updateReadingListCount() {
+    const countEl = document.getElementById('reading-list-count');
+    if (countEl) {
+        countEl.textContent = readingList.length;
+        countEl.setAttribute('data-count', readingList.length);
+    }
+}
+
+function toggleReadingList() {
+    const panel = document.getElementById('reading-list-panel');
+    panel?.classList.toggle('open');
+    renderReadingList();
+}
+
+function renderReadingList() {
+    const container = document.getElementById('reading-list-items');
+    if (!container) return;
+
+    if (readingList.length === 0) {
+        container.innerHTML = `
+            <div class="empty-reading-list">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+                <p>No saved articles yet</p>
+                <span>Click the bookmark icon on any article to save it</span>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = readingList.map(item => {
+        const externalUrl = getExternalUrl(item);
+        return `
+            <div class="reading-list-item">
+                <a class="reading-list-item-title" href="${externalUrl || '#'}" target="_blank">${escapeHtml(item.title)}</a>
+                <div class="reading-list-item-meta">
+                    ${item.metadata?.publication_date || ''} • ${item.source === 'pubmed' ? 'PubMed' : 'Clinical Trial'}
+                </div>
+                <div class="reading-list-item-actions">
+                    <button onclick="removeFromReadingList('${item.id}')">Remove</button>
+                    <button onclick="openCitationModalById('${item.id}')">Cite</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function removeFromReadingList(id) {
+    readingList = readingList.filter(item => item.id !== id);
+    localStorage.setItem('readingList', JSON.stringify(readingList));
+    updateReadingListCount();
+    renderReadingList();
+    showToast('Removed from reading list', 'info');
+}
+
+function clearReadingList() {
+    if (confirm('Are you sure you want to clear your reading list?')) {
+        readingList = [];
+        localStorage.setItem('readingList', '[]');
+        updateReadingListCount();
+        renderReadingList();
+        showToast('Reading list cleared', 'success');
+    }
+}
+
+function exportReadingList(format) {
+    if (readingList.length === 0) {
+        showToast('Reading list is empty', 'error');
+        return;
+    }
+
+    if (format === 'csv') {
+        const csv = [
+            ['Title', 'Source', 'Date', 'URL'].join(','),
+            ...readingList.map(item => [
+                `"${item.title.replace(/"/g, '""')}"`,
+                item.source,
+                item.metadata?.publication_date || '',
+                getExternalUrl(item) || ''
+            ].join(','))
+        ].join('\n');
+
+        downloadFile(csv, 'reading_list.csv', 'text/csv');
+    } else if (format === 'bibtex') {
+        const bibtex = readingList.map(item => generateBibtex(item)).join('\n\n');
+        downloadFile(bibtex, 'reading_list.bib', 'text/plain');
+    }
+
+    showToast(`Exported ${readingList.length} articles`, 'success');
+}
+
+// ==========================================
+// CITATION SYSTEM
+// ==========================================
+function openCitationModal(b64Data) {
+    try {
+        const jsonStr = decodeURIComponent(escape(atob(b64Data)));
+        currentCitationArticle = JSON.parse(jsonStr);
+        updateCitationText();
+        document.getElementById('citation-modal')?.classList.add('show');
+    } catch (error) {
+        console.error('Error opening citation modal:', error);
+    }
+}
+
+function openCitationModalById(id) {
+    const article = readingList.find(item => item.id === id);
+    if (article) {
+        currentCitationArticle = article;
+        updateCitationText();
+        document.getElementById('citation-modal')?.classList.add('show');
+    }
+}
+
+function closeCitationModal() {
+    document.getElementById('citation-modal')?.classList.remove('show');
+}
+
+function updateCitationText() {
+    const citationText = document.getElementById('citation-text');
+    if (!citationText || !currentCitationArticle) return;
+
+    const article = currentCitationArticle;
+    const authors = article.metadata?.authors || ['Unknown Author'];
+    const year = extractYear(article.metadata?.publication_date) || 'n.d.';
+    const title = article.title;
+    const journal = article.metadata?.journal || 'Unknown Journal';
+    const url = getExternalUrl(article);
+
+    let citation = '';
+
+    switch (currentCitationFormat) {
+        case 'apa':
+            citation = `${formatAuthorsAPA(authors)} (${year}). ${title}. ${journal}. ${url ? `Retrieved from ${url}` : ''}`;
+            break;
+        case 'mla':
+            citation = `${formatAuthorsMLA(authors)}. "${title}." ${journal}, ${year}. ${url ? `Web. ${url}` : ''}`;
+            break;
+        case 'chicago':
+            citation = `${formatAuthorsChicago(authors)}. "${title}." ${journal} (${year}). ${url || ''}`;
+            break;
+        case 'bibtex':
+            citation = generateBibtex(article);
+            break;
+    }
+
+    citationText.textContent = citation.trim();
+}
+
+function formatAuthorsAPA(authors) {
+    if (authors.length === 1) return authors[0];
+    if (authors.length === 2) return `${authors[0]} & ${authors[1]}`;
+    return `${authors[0]} et al.`;
+}
+
+function formatAuthorsMLA(authors) {
+    if (authors.length === 1) return authors[0];
+    if (authors.length === 2) return `${authors[0]}, and ${authors[1]}`;
+    return `${authors[0]}, et al.`;
+}
+
+function formatAuthorsChicago(authors) {
+    if (authors.length <= 3) return authors.join(', ');
+    return `${authors[0]} et al.`;
+}
+
+function generateBibtex(article) {
+    const id = (article.metadata?.pmid || article.metadata?.nct_id || 'article').toString().replace(/\W/g, '');
+    const authors = article.metadata?.authors?.join(' and ') || 'Unknown';
+    const year = extractYear(article.metadata?.publication_date) || '';
+    const title = article.title.replace(/[{}]/g, '');
+    const journal = article.metadata?.journal || '';
+
+    return `@article{${id},
+  author = {${authors}},
+  title = {${title}},
+  journal = {${journal}},
+  year = {${year}},
+  note = {${getExternalUrl(article) || ''}}
+}`;
+}
+
+function copyCitation() {
+    const citationText = document.getElementById('citation-text')?.textContent;
+    if (citationText) {
+        navigator.clipboard.writeText(citationText).then(() => {
+            showToast('Citation copied to clipboard', 'success');
+        });
+    }
+}
+
+// ==========================================
+// EXPORT & SHARE
+// ==========================================
+function exportResults(format) {
+    if (currentResults.length === 0) {
+        showToast('No results to export', 'error');
+        return;
+    }
+
+    if (format === 'csv') {
+        const csv = [
+            ['Title', 'Source', 'Date', 'Authors', 'Abstract', 'URL'].join(','),
+            ...currentResults.map(r => [
+                `"${r.title.replace(/"/g, '""')}"`,
+                r.source,
+                r.metadata?.publication_date || '',
+                `"${(r.metadata?.authors || []).join('; ')}"`,
+                `"${(r.abstract || '').substring(0, 500).replace(/"/g, '""')}"`,
+                getExternalUrl(r) || ''
+            ].join(','))
+        ].join('\n');
+
+        downloadFile(csv, 'search_results.csv', 'text/csv');
+        showToast(`Exported ${currentResults.length} results`, 'success');
+    }
+}
+
+function shareSearch() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('q', currentQuery);
+
+    navigator.clipboard.writeText(url.toString()).then(() => {
+        showToast('Search link copied to clipboard', 'success');
+    });
+}
+
+function downloadFile(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ==========================================
+// ADVANCED SEARCH
+// ==========================================
+function openAdvancedSearch() {
+    document.getElementById('advanced-search-modal')?.classList.add('show');
+}
+
+function closeAdvancedSearch() {
+    document.getElementById('advanced-search-modal')?.classList.remove('show');
+}
+
+function executeAdvancedSearch() {
+    const allWords = document.getElementById('adv-all-words')?.value.trim();
+    const exactPhrase = document.getElementById('adv-exact-phrase')?.value.trim();
+    const anyWords = document.getElementById('adv-any-words')?.value.trim();
+    const noneWords = document.getElementById('adv-none-words')?.value.trim();
+    const author = document.getElementById('adv-author')?.value.trim();
+    const journal = document.getElementById('adv-journal')?.value.trim();
+    const titleContains = document.getElementById('adv-title')?.value.trim();
+
+    let query = '';
+
+    if (allWords) query += allWords + ' ';
+    if (exactPhrase) query += `"${exactPhrase}" `;
+    if (anyWords) query += `(${anyWords.split(/\s+/).join(' OR ')}) `;
+    if (noneWords) query += noneWords.split(/\s+/).map(w => `-${w}`).join(' ') + ' ';
+    if (author) query += `author:${author} `;
+    if (titleContains) query += `title:${titleContains} `;
+
+    query = query.trim();
+
+    if (query) {
+        headerSearchInput.value = query;
+        closeAdvancedSearch();
+        performSearch();
+    } else {
+        showToast('Please enter at least one search term', 'error');
+    }
+}
+
+// ==========================================
+// Q&A FUNCTIONALITY
+// ==========================================
+async function performQA() {
+    const question = qaInput?.value.trim();
+    if (!question) return;
+
+    if (qaButton) qaButton.disabled = true;
+    if (qaResults) qaResults.innerHTML = showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/question`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true'
+            },
+            body: JSON.stringify({
+                question: question,
+                index: qaIndex?.value || 'both',
+                max_answers: parseInt(maxAnswers?.value || '3'),
+                min_confidence: 0.01
+            })
+        });
+
+        const data = await response.json();
+        displayQAResults(data);
+    } catch (error) {
+        if (qaResults) qaResults.innerHTML = showError('Failed to get answer. Please try again.');
+        console.error('QA failed:', error);
+    } finally {
+        if (qaButton) qaButton.disabled = false;
+    }
+}
+
+function displayQAResults(data) {
+    if (!qaResults) return;
+
+    if (data.status === 'no_answer' || !data.answers || data.answers.length === 0) {
+        qaResults.innerHTML = showEmptyState('No answer found', 'Try rephrasing your question');
+        return;
+    }
+
+    const answersHtml = data.answers.map(answer => createAnswerCard(answer)).join('');
+    const passagesHtml = data.passages?.length > 0 ? `
+        <div style="margin-top: 24px;">
+            <h3 style="font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px;">
+                📚 Supporting Evidence
+            </h3>
+            ${data.passages.map(passage => createPassageCard(passage)).join('')}
+        </div>
+    ` : '';
+
+    qaResults.innerHTML = `
+        <div style="margin-bottom: 16px; font-size: 14px; color: var(--text-secondary);">
+            Found ${data.answers.length} answer(s) in ${data.qa_time_ms?.toFixed(0) || 0}ms
+        </div>
+        ${answersHtml}
+        ${passagesHtml}
+    `;
+}
+
+function createAnswerCard(answer) {
+    const confidenceClass = answer.confidence_level?.toLowerCase() || 'medium';
+    const confidencePercent = ((answer.confidence || 0) * 100).toFixed(1);
+
+    const externalUrl = answer.source_type === 'pubmed' && answer.pmid
+        ? `https://pubmed.ncbi.nlm.nih.gov/${answer.pmid}/`
+        : answer.source_type === 'clinical_trials' && answer.nct_id
+            ? `https://clinicaltrials.gov/study/${answer.nct_id}`
+            : null;
+
+    return `
+        <div class="answer-card">
+            <div class="answer-header">
+                <span class="answer-label">Answer</span>
+                <span class="confidence-badge ${confidenceClass}">${confidencePercent}% ${answer.confidence_level || ''}</span>
+            </div>
+            <div class="answer-text">${escapeHtml(answer.answer)}</div>
+            <div class="answer-source">
+                📚 Source: ${escapeHtml(answer.source_title || 'Unknown')}<br>
+                📍 Section: ${answer.section || 'Unknown'} | ${answer.source_type === 'pubmed' ? '📄 PubMed' : '🔬 Clinical Trial'}
+                ${externalUrl ? `<a href="${externalUrl}" target="_blank" rel="noopener" class="answer-source-link">View Source →</a>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function createPassageCard(passage) {
+    const externalUrl = passage.source_type === 'pubmed' && passage.pmid
+        ? `https://pubmed.ncbi.nlm.nih.gov/${passage.pmid}/`
+        : passage.source_type === 'clinical_trials' && passage.nct_id
+            ? `https://clinicaltrials.gov/study/${passage.nct_id}`
+            : null;
+
+    return `
+        <div class="answer-card" style="background: var(--bg-secondary);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 13px; font-weight: 500; color: var(--text-primary);">${truncate(passage.source_title, 60)}</span>
+                <span style="font-size: 12px; color: var(--text-muted);">Relevance: ${passage.score?.toFixed(3) || 'N/A'}</span>
+            </div>
+            <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 8px;">${passage.text}</p>
+            ${externalUrl ? `<a href="${externalUrl}" target="_blank" rel="noopener" style="font-size: 13px; color: var(--primary-blue); text-decoration: none;">View Source →</a>` : ''}
+        </div>
+    `;
+}
+
+// ==========================================
+// MODAL SYSTEM
+// ==========================================
+function createModal() {
+    const modalHtml = `
+        <div id="document-modal" class="modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2 id="modal-title">Document Details</h2>
+                    <button class="modal-close" onclick="closeDocumentModal()">&times;</button>
+                </div>
+                <div class="modal-body" id="modal-body"></div>
+                <div class="modal-footer" id="modal-footer"></div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function openDocumentModalFromB64(b64Data) {
+    try {
+        const jsonStr = decodeURIComponent(escape(atob(b64Data)));
+        const result = JSON.parse(jsonStr);
+        openDocumentModal(result);
+    } catch (error) {
+        console.error('Error decoding result data:', error);
+        showToast('Error opening document details', 'error');
+    }
+}
+
+function openDocumentModal(result) {
+    const modal = document.getElementById('document-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalFooter = document.getElementById('modal-footer');
+
+    if (!modal || !modalTitle || !modalBody || !modalFooter) return;
+
+    const isPubMed = result.source === 'pubmed';
+    const externalUrl = getExternalUrl(result);
+
+    modalTitle.textContent = result.title;
+
+    modalBody.innerHTML = `
+        <div style="margin-bottom: 16px;">
+            <span class="result-source-badge ${isPubMed ? 'pubmed' : 'clinical-trial'}" style="display: inline-block; padding: 6px 12px; font-size: 13px;">
+                ${isPubMed ? '📄 PubMed Article' : '🔬 Clinical Trial'}
+            </span>
+        </div>
+        
+        <div class="modal-section">
+            <h3>📝 Abstract</h3>
+            <p>${result.abstract || 'No abstract available.'}</p>
+        </div>
+        
+        ${result.metadata?.authors?.length > 0 ? `
+            <div class="modal-section">
+                <h3>👥 Authors</h3>
+                <p>${result.metadata.authors.join(', ')}</p>
+            </div>
+        ` : ''}
+        
+        <div class="modal-section">
+            <h3>📊 Metadata</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                ${result.metadata?.pmid ? `
+                    <div style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">PMID</div>
+                        <div style="font-weight: 500; color: var(--primary-blue); cursor: pointer;" onclick="window.open('https://pubmed.ncbi.nlm.nih.gov/${result.metadata.pmid}/', '_blank')">${result.metadata.pmid}</div>
+                    </div>
+                ` : ''}
+                ${result.metadata?.nct_id ? `
+                    <div style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">NCT ID</div>
+                        <div style="font-weight: 500; color: var(--primary-blue); cursor: pointer;" onclick="window.open('https://clinicaltrials.gov/study/${result.metadata.nct_id}', '_blank')">${result.metadata.nct_id}</div>
+                    </div>
+                ` : ''}
+                ${result.metadata?.publication_date ? `
+                    <div style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Publication Date</div>
+                        <div style="font-weight: 500;">${result.metadata.publication_date}</div>
+                    </div>
+                ` : ''}
+                ${result.metadata?.journal ? `
+                    <div style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Journal</div>
+                        <div style="font-weight: 500;">${result.metadata.journal}</div>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+        
+        <div class="modal-section">
+            <h3>🎯 Search Score</h3>
+            <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 12px;">
+                <div style="height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
+                    <div style="height: 100%; width: ${Math.min((result.score || 0) * 100, 100)}%; background: var(--primary-blue); border-radius: 4px;"></div>
+                </div>
+                <div style="font-size: 13px; color: var(--text-secondary);">${result.score?.toFixed(4) || 'N/A'} relevance score</div>
+            </div>
+        </div>
+    `;
+
+    modalFooter.innerHTML = `
+        ${externalUrl ? `
+            <a href="${externalUrl}" target="_blank" rel="noopener" class="modal-btn primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                View on ${isPubMed ? 'PubMed' : 'ClinicalTrials.gov'}
+            </a>
+        ` : ''}
+        <button class="modal-btn secondary" onclick="closeDocumentModal()">Close</button>
+    `;
+
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDocumentModal() {
+    const modal = document.getElementById('document-modal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+}
+
+function showKeyboardShortcuts() {
+    document.getElementById('shortcuts-modal')?.classList.add('show');
+}
+
+function closeShortcutsModal() {
+    document.getElementById('shortcuts-modal')?.classList.remove('show');
+}
+
+function closeAllModals() {
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.classList.remove('show');
+    });
+    document.body.style.overflow = '';
+}
+
+// ==========================================
+// THEME SYSTEM
+// ==========================================
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme');
+    const newTheme = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+}
+
+function updateThemeIcon(theme) {
+    const sunIcon = document.getElementById('theme-icon-sun');
+    const moonIcon = document.getElementById('theme-icon-moon');
+
+    if (theme === 'dark') {
+        sunIcon?.classList.add('hidden');
+        moonIcon?.classList.remove('hidden');
+    } else {
+        sunIcon?.classList.remove('hidden');
+        moonIcon?.classList.add('hidden');
+    }
+}
+
+// ==========================================
+// UTILITY FUNCTIONS
+// ==========================================
+function showLoading() {
+    return `
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Searching...</p>
+        </div>
+    `;
+}
+
+function showEmptyState(title, message) {
+    return `
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <h3>${title}</h3>
+            <p>${message}</p>
+        </div>
+    `;
+}
+
+function showError(message) {
+    return `<div class="error-message">⚠️ ${message}</div>`;
+}
+
+function truncate(text, length) {
+    if (!text) return '';
+    return text.length > length ? text.substring(0, length) + '...' : text;
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showToast(message, type = 'info') {
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+        if (container.children.length === 0) {
+            container.remove();
+        }
+    }, 4000);
+}
+
+// Example query helpers
+function setExampleQuery(query) {
+    if (headerSearchInput) headerSearchInput.value = query;
+    switchTab('articles');
+    performSearch();
+}
+
+function setExampleQuestion(question) {
+    if (qaInput) qaInput.value = question;
+    performQA();
+}
+
+// ==========================================
+// HELP MODAL
+// ==========================================
+function showHelpModal() {
+    const modal = document.getElementById('help-modal');
+    if (modal) {
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+        initHelpTabs();
+    }
+}
+
+function closeHelpModal() {
+    const modal = document.getElementById('help-modal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+}
+
+function initHelpTabs() {
+    document.querySelectorAll('.help-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Update tab buttons
+            document.querySelectorAll('.help-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Update sections
+            const sectionId = `help-${tab.dataset.section}`;
+            document.querySelectorAll('.help-section').forEach(s => s.classList.remove('active'));
+            document.getElementById(sectionId)?.classList.add('active');
+        });
+    });
+}
+
+// Add H key shortcut for help
+document.addEventListener('keydown', (e) => {
+    // Only trigger if not in an input field
+    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        if (e.key === 'h' || e.key === 'H') {
+            // Don't trigger if Ctrl/Cmd is pressed
+            if (!e.ctrlKey && !e.metaKey) {
+                showHelpModal();
+            }
+        }
+    }
+});
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', init);
+
+function openAdvancedSearch() {
+    const modal = document.getElementById('advanced-search-modal');
+    if (modal) modal.classList.add('show');
+}
+
+function closeAdvancedSearch() {
+    const modal = document.getElementById('advanced-search-modal');
+    if (modal) modal.classList.remove('show');
+}
+
+function applyAdvancedSearch() {
+    const authorInput = document.getElementById('adv-author');
+    const journalInput = document.getElementById('adv-journal');
+    const minYear = document.getElementById('adv-year-from');
+    const maxYear = document.getElementById('adv-year-to');
+
+    // Here we would typically enhance the query or apply complex filters
+    // For now, let's just trigger a search and show a toast
+    showToast('Advanced filters applied!', 'info');
+    closeAdvancedSearch();
+    performSearch();
+}
+
+// Authentication Functions
+let isRegisterMode = false;
+
+function openLoginModal() {
+    const modal = document.getElementById('login-modal');
+    if (modal) modal.classList.add('show');
+    // Reset to login mode
+    isRegisterMode = false;
+    updateAuthModalUI();
+}
+
+function closeLoginModal() {
+    const modal = document.getElementById('login-modal');
+    if (modal) modal.classList.remove('show');
+}
+
+function toggleAuthMode() {
+    isRegisterMode = !isRegisterMode;
+    updateAuthModalUI();
+}
+
+function updateAuthModalUI() {
+    const title = document.querySelector('#login-modal h2');
+    const submitBtn = document.querySelector('#login-form button[type="submit"]');
+    const switchText = document.getElementById('auth-switch-text');
+    const nameGroup = document.getElementById('login-name-group');
+    const nameInput = document.getElementById('login-name');
+
+    if (isRegisterMode) {
+        if (title) title.textContent = '📝 Create Account';
+        if (submitBtn) submitBtn.textContent = 'Sign Up';
+        if (nameGroup) nameGroup.classList.remove('hidden');
+        if (nameInput) nameInput.required = true;
+        if (switchText) {
+            switchText.innerHTML = 'Already have an account? <a href="#" onclick="toggleAuthMode(); return false;" id="auth-switch-link">Sign in</a>';
+        }
+    } else {
+        if (title) title.textContent = '🔐 Login to BioMed Scholar';
+        if (submitBtn) submitBtn.textContent = 'Sign In';
+        if (nameGroup) nameGroup.classList.add('hidden');
+        if (nameInput) nameInput.required = false;
+        if (switchText) {
+            switchText.innerHTML = 'Don\'t have an account? <a href="#" onclick="toggleAuthMode(); return false;" id="auth-switch-link">Sign up</a>';
+        }
+    }
+}
+
+async function handleLogin(e) {
+    if (e) e.preventDefault();
+    const email = document.getElementById('login-email')?.value;
+    const password = document.getElementById('login-password')?.value;
+    const name = document.getElementById('login-name')?.value;
+
+    if (!email || !password) {
+        showToast('Please enter both email and password', 'error');
+        return;
+    }
+
+    if (!auth) {
+        showToast('Firebase not initialized. Please check configuration.', 'error');
+        return;
+    }
+
+    const submitBtn = document.querySelector('#login-form button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+    }
+
+    try {
+        if (isRegisterMode) {
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            if (name && userCredential.user) {
+                await userCredential.user.updateProfile({
+                    displayName: name
+                });
+            }
+            showToast('Account created successfully!', 'success');
+        } else {
+            await auth.signInWithEmailAndPassword(email, password);
+            showToast('Logged in successfully!', 'success');
+        }
+        closeLoginModal();
+    } catch (error) {
+        console.error("Auth error:", error);
+        let msg = error.message;
+        if (error.code === 'auth/wrong-password') msg = 'Invalid password.';
+        if (error.code === 'auth/user-not-found') msg = 'User not found.';
+        if (error.code === 'auth/email-already-in-use') msg = 'Email already in use.';
+        if (error.code === 'auth/weak-password') msg = 'Password should be at least 6 characters.';
+        showToast(msg, 'error');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = isRegisterMode ? 'Sign Up' : 'Sign In';
+        }
+    }
+}
+
+async function handleGoogleLogin() {
+    if (!auth) {
+        showToast('Firebase not initialized', 'error');
+        return;
+    }
+
+    const provider = new firebase.auth.GoogleAuthProvider();
+    try {
+        await auth.signInWithPopup(provider);
+        showToast('Logged in with Google successfully!', 'success');
+        closeLoginModal();
+    } catch (error) {
+        console.error("Google Auth error:", error);
+        showToast(error.message, 'error');
+    }
+}
+
+function updateLoginUI() {
+    const loginBtn = document.querySelector('.login-btn');
+    const existingUserBtn = document.querySelector('.user-profile-btn');
+
+    if (currentUser) {
+        const displayName = currentUser.displayName || currentUser.email.split('@')[0];
+        const initial = displayName[0].toUpperCase();
+
+        const userBtnHtml = `
+            <div class="user-avatar">${initial}</div>
+            <span>${truncate(displayName, 15)}</span>
+        `;
+
+        if (existingUserBtn) {
+            existingUserBtn.innerHTML = userBtnHtml;
+            existingUserBtn.title = `Logged in as ${currentUser.email}`;
+            existingUserBtn.onclick = handleLogout;
+        } else if (loginBtn) {
+            const userBtn = document.createElement('button');
+            userBtn.className = 'header-icon-btn user-profile-btn';
+            userBtn.title = `Logged in as ${currentUser.email}`;
+            userBtn.onclick = handleLogout;
+            userBtn.innerHTML = userBtnHtml;
+            loginBtn.replaceWith(userBtn);
+        }
+    } else {
+        // Show login button
+        if (existingUserBtn) {
+            const newLoginBtn = document.createElement('button');
+            newLoginBtn.className = 'header-icon-btn login-btn';
+            newLoginBtn.onclick = openLoginModal;
+            newLoginBtn.title = 'Login';
+            newLoginBtn.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                </svg>
+                <span>Login</span>
+            `;
+            existingUserBtn.replaceWith(newLoginBtn);
+        }
+    }
+}
+
+async function handleLogout() {
+    if (confirm('Are you sure you want to logout?')) {
+        try {
+            if (auth) await auth.signOut();
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            updateLoginUI();
+            showToast('Logged out successfully', 'info');
+        } catch (error) {
+            console.error("Logout error:", error);
+            showToast('Error logging out', 'error');
+        }
+    }
+}
+
+// Auth State Listener
+if (typeof firebase !== 'undefined' && auth) {
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL
+            };
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        } else {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+        }
+        updateLoginUI();
+    });
+}
+
+// Notification System Logic
+let notifications = [
+    {
+        id: 1,
+        title: 'New Feature: AI Chat',
+        body: 'You can now ask questions about specific papers using our new AI Chat feature!',
+        time: '2 hours ago',
+        read: false,
+        type: 'feature'
+    },
+    {
+        id: 2,
+        title: 'Welcome to BioMed Scholar',
+        body: 'Thanks for joining our beta program. We indexed over 1,800 new articles today.',
+        time: '1 day ago',
+        read: false,
+        type: 'info'
+    }
+];
+
+function toggleNotifications() {
+    const dropdown = document.getElementById('notification-dropdown');
+    dropdown.classList.toggle('hidden');
+}
+
+function updateNotificationUI() {
+    const list = document.getElementById('notification-list');
+    const countBadge = document.getElementById('notification-count');
+
+    // Safety check if elements don't exist yet
+    if (!list || !countBadge) return;
+
+    const unreadCount = notifications.filter(n => !n.read).length;
+
+    // Update Badge
+    if (unreadCount > 0) {
+        countBadge.textContent = unreadCount;
+        countBadge.classList.remove('hidden');
+    } else {
+        countBadge.classList.add('hidden');
+    }
+
+    // Update List
+    if (notifications.length === 0) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <p>No new notifications</p>
+            </div>
+        `;
+        return;
+    }
+
+    list.innerHTML = notifications.map(n => `
+        <div class="notification-item ${n.read ? '' : 'unread'}" onclick="handleNotificationClick(${n.id}, '${n.type}')">
+            <div class="notif-icon">
+                ${getNotificationIcon(n.type)}
+            </div>
+            <div class="notif-content">
+                <div class="notif-title">${n.title}</div>
+                <div class="notif-body">${n.body}</div>
+                <div class="notif-time">${n.time}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getNotificationIcon(type) {
+    if (type === 'feature') {
+        return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>`;
+    }
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="16" x2="12" y2="12"/>
+        <line x1="12" y1="8" x2="12.01" y2="8"/>
+    </svg>`;
+}
+
+function markAllNotificationsRead() {
+    notifications.forEach(n => n.read = true);
+    updateNotificationUI();
+}
+
+function markNotificationRead(id) {
+    const notif = notifications.find(n => n.id === id);
+    if (notif) {
+        notif.read = true;
+        updateNotificationUI();
+    }
+}
+
+function handleNotificationClick(id, type) {
+    markNotificationRead(id);
+
+    // Close dropdown
+    const dropdown = document.getElementById('notification-dropdown');
+    dropdown?.classList.add('hidden');
+
+    if (type === 'feature') {
+        // Navigate to AI Chat (QA) tab
+        switchTab('qa');
+        // Optional: Focus the input
+        setTimeout(() => {
+            const input = document.getElementById('qa-input');
+            if (input) input.focus();
+        }, 100);
+    }
+}
+
+// Close Dropdown on Click Outside
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('notification-dropdown');
+    const btn = document.querySelector('.notification-btn');
+
+    // Close Notification Dropdown
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+        if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+            dropdown.classList.add('hidden');
+        }
+    }
+});
+
+// Initialize Notifications and Health Check on Load
+document.addEventListener('DOMContentLoaded', () => {
+    updateNotificationUI();
+    checkBackendHealth();
+    setInterval(checkBackendHealth, 30000); // Check every 30 seconds
+});
+
+async function checkBackendHealth() {
+    const statusText = document.getElementById('status-text');
+    const statusDot = document.getElementById('status-dot');
+
+    if (!statusText || !statusDot) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        if (response.ok) {
+            statusText.textContent = 'Online';
+            statusDot.className = 'status-dot online';
+        } else {
+            throw new Error('Health check failed');
+        }
+    } catch (error) {
+        console.warn('Backend health check failed:', error);
+        statusText.textContent = 'Offline';
+        statusDot.className = 'status-dot offline';
+    }
+}

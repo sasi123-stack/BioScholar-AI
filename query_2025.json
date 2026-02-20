@@ -1,0 +1,8 @@
+{
+    "query": {
+        "match": {
+            "metadata.publication_year.keyword": "2025"
+        }
+    },
+    "size": 2
+}

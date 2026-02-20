@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: biomed-scholar-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: "pip install --upgrade pip && pip install -r requirements-minimal.txt"
+    startCommand: "uvicorn app_minimal:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: LOW_MEMORY_MODE
+        value: true
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: API_WORKERS
+        value: 1
+      - key: MODEL_CACHE_DIR
+        value: /opt/render/project/src/models
+      - key: DATABASE_URL
+        fromConfig: DATABASE_URL_SUPABASE
+      - key: ELASTICSEARCH_HOST
+        fromConfig: ELASTICSEARCH_HOST_BONSAI
+      - key: ELASTICSEARCH_USERNAME
+        fromConfig: ELASTICSEARCH_USERNAME_BONSAI
+      - key: ELASTICSEARCH_PASSWORD
+        fromConfig: ELASTICSEARCH_PASSWORD_BONSAI
+      - key: REDIS_HOST
+        fromConfig: REDIS_HOST_CLOUD
+      - key: REDIS_PASSWORD
+        fromConfig: REDIS_PASSWORD_CLOUD
+      # Note: Supabase, Bonsai, and Redis Cloud are external.
+      # Users should set these environment variables in the Render dashboard.

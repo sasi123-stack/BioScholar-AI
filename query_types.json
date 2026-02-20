@@ -1,0 +1,11 @@
+{
+    "size": 0,
+    "aggs": {
+        "types": {
+            "terms": {
+                "field": "metadata.article_type.keyword",
+                "size": 100
+            }
+        }
+    }
+}

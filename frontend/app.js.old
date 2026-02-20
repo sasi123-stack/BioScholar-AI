@@ -1,0 +1,3091 @@
+// BioMed Scholar v1.1.1 - Author Fix Applied
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+/**
+ * Robustly ensures authors data is an array of strings.
+ * Handles strings, JSON-stringified arrays, CSV, and weird objects.
+ */
+function ensureAuthorsArray(authors) {
+    if (authors === null || authors === undefined) return [];
+    if (Array.isArray(authors)) return authors.map(String);
+
+    if (typeof authors === 'string') {
+        let clean = authors.trim();
+        if (clean.startsWith('[') && clean.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(clean.replace(/'/g, '"'));
+                return Array.isArray(parsed) ? parsed.map(String) : [String(parsed)];
+            } catch (e) {
+                clean = clean.substring(1, clean.length - 1);
+            }
+        }
+        if (clean.includes(',')) {
+            return clean.split(',').map(a => a.trim()).filter(a => a.length > 0);
+        }
+        return clean.length > 0 ? [clean] : [];
+    }
+    return [String(authors)];
+}
+
+const isNgrok = window.location.hostname.includes('ngrok-free') || window.location.hostname.includes('ngrok.io');
+const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com');
+const isVercel = window.location.hostname.includes('vercel.app');
+
+// Backend URLs for different environments
+const NGROK_BACKEND_URL = 'https://nonreliably-unaxised-kit.ngrok-free.dev/api/v1';
+const RENDER_BACKEND_URL = 'https://sasidhara123-biomed-scholar-api.hf.space/api/v1'; // Live Hugging Face Space
+
+// API URL configuration
+const API_BASE_URL = (isLocal) ? 'http://localhost:8000/api/v1' :
+    RENDER_BACKEND_URL;
+
+// Firebase Configuration
+// REPLACE THESE VALUES WITH YOUR FIREBASE PROJECT CONFIGURATION
+const firebaseConfig = {
+    apiKey: "AIzaSyAGDU8IdYYVEufji3vTz6xBGCrI4uDmXjE",
+    authDomain: "biomed-scholar.firebaseapp.com",
+    projectId: "biomed-scholar",
+    storageBucket: "biomed-scholar.firebasestorage.app",
+    messagingSenderId: "115477996356",
+    appId: "1:115477996356:web:395f8f1ce760de94812d11",
+    measurementId: "G-CGJ5B74CEQ"
+};
+
+// Initialize Firebase
+let auth;
+if (typeof firebase !== 'undefined') {
+    try {
+        firebase.initializeApp(firebaseConfig);
+        auth = firebase.auth();
+    } catch (e) {
+        console.error("Firebase initialization failed:", e);
+    }
+}
+
+// State
+let currentFilters = {
+    source: 'all',
+    dateRange: 'any',
+    dateFrom: null,
+    dateTo: null,
+    sortBy: 'relevance',
+    useReranking: true,
+    highlightMatches: true,
+    alpha: 50,
+    language: 'any',
+    articleTypes: ['research', 'review', 'meta-analysis', 'case-study']
+};
+
+let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
+let readingList = JSON.parse(localStorage.getItem('readingList') || '[]');
+let currentResults = [];
+let currentQuery = '';
+let currentPage = 1;
+let resultsPerPage = 10;
+let currentView = 'list';
+let currentCitationArticle = null;
+let currentCitationFormat = 'apa';
+
+// Auth State
+let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+
+// Suggestions for autocomplete
+const suggestions = [
+    'COVID-19 vaccine efficacy',
+    'cancer immunotherapy',
+    'diabetes treatment',
+    'Alzheimers disease',
+    'heart disease prevention',
+    'mRNA vaccines',
+    'CRISPR gene editing',
+    'antibiotic resistance',
+    'mental health treatment',
+    'obesity management',
+    'clinical trials phases',
+    'drug interactions'
+];
+
+// Related search mappings
+const relatedSearches = {
+    'covid': ['COVID-19 symptoms', 'COVID-19 treatment', 'COVID-19 long term effects', 'mRNA vaccines'],
+    'vaccine': ['vaccine efficacy', 'vaccine side effects', 'mRNA technology', 'herd immunity'],
+    'cancer': ['cancer immunotherapy', 'chemotherapy', 'cancer prevention', 'oncology research'],
+    'diabetes': ['diabetes type 2', 'insulin resistance', 'diabetes management', 'glucose monitoring'],
+    'heart': ['cardiovascular disease', 'heart attack prevention', 'blood pressure', 'cholesterol']
+};
+
+// DOM Elements
+const headerSearchInput = document.getElementById('header-search-input');
+const headerSearchBtn = document.getElementById('header-search-btn');
+const searchResults = document.getElementById('search-results');
+const resultsCount = document.getElementById('results-count');
+const statusDot = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+const pubmedCount = document.getElementById('pubmed-count');
+const trialsCount = document.getElementById('trials-count');
+const totalDocsCount = document.getElementById('total-docs-count');
+const autocompleteDropdown = document.getElementById('autocomplete-dropdown');
+const historyItems = document.getElementById('history-items');
+const suggestionItems = document.getElementById('suggestion-items');
+
+// QA Elements
+const qaInput = document.getElementById('qa-input');
+const qaButton = document.getElementById('qa-button');
+const qaResults = document.getElementById('qa-results');
+const qaIndex = document.getElementById('qa-index');
+const maxAnswers = document.getElementById('max-answers');
+
+// Filter Elements
+const filterChips = document.querySelectorAll('.filter-chip');
+const dateRadios = document.querySelectorAll('input[name="date-range"]');
+const customDateRange = document.getElementById('custom-date-range');
+const sortBySelect = document.getElementById('sort-by');
+const useRerankingCheckbox = document.getElementById('use-reranking');
+const highlightMatchesCheckbox = document.getElementById('highlight-matches');
+const alphaSlider = document.getElementById('alpha-slider');
+const alphaValue = document.getElementById('alpha-value');
+const languageFilter = document.getElementById('language-filter');
+
+// Pagination Elements
+const pagination = document.getElementById('pagination');
+const prevPageBtn = document.getElementById('prev-page');
+const nextPageBtn = document.getElementById('next-page');
+const currentPageSpan = document.getElementById('current-page');
+const totalPagesSpan = document.getElementById('total-pages');
+
+// ==========================================
+// INITIALIZATION
+// ==========================================
+async function init() {
+    // Start in full width mode (hide sidebar)
+    const mainContainer = document.querySelector('.main-container');
+    if (mainContainer) mainContainer.classList.add('full-width');
+
+    initTheme();
+    initEventListeners();
+    initKeyboardShortcuts();
+    initDynamicScroll();
+    initScrollReveal();
+    updateReadingListCount();
+    updateLoginUI();
+    renderRecentChips();
+    await checkHealth();
+    await loadStatistics();
+    await checkHealth(); // Double check? (kept from original)
+    // await loadStatistics(); // Removed duplicate call
+}
+
+function createModal() {
+    // Modal is now in static HTML
+}
+
+function openArticleModal(resultId) {
+    // Convert resultId to string for comparison to handle numeric vs string IDs
+    const idStr = String(resultId);
+
+    let result = currentResults.find(r => String(r.id) === idStr);
+
+    // Fallback to reading list if not found in current results
+    if (!result) {
+        result = readingList.find(r => String(r.id) === idStr);
+    }
+
+    if (!result) {
+        console.warn('Article not found for ID:', resultId);
+        return;
+    }
+
+    const modal = document.getElementById('article-detail-modal');
+    if (!modal) return;
+
+    // Populate modal content
+    document.getElementById('modal-article-title').textContent = result.title;
+    document.getElementById('modal-article-abstract').textContent = result.abstract || 'No abstract available.';
+
+    // Sanitize authors inline
+    let authors = result.metadata?.authors;
+    if (typeof authors === 'string') {
+        if (authors.trim().startsWith('[') && authors.trim().endsWith(']')) {
+            try {
+                const parsed = JSON.parse(authors.replace(/'/g, '"'));
+                authors = Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+                authors = authors.substring(1, authors.length - 1).split(',').map(a => a.trim());
+            }
+        } else if (authors.includes(',')) {
+            authors = authors.split(',').map(a => a.trim());
+        } else {
+            authors = [authors];
+        }
+    }
+    if (!Array.isArray(authors)) authors = [];
+    authors = authors.filter(a => a && typeof a === 'string');
+
+    // Metadata...
+    const metaHtml = `
+        <div class="meta-item">
+            <span class="meta-label">Source</span>
+            <span class="meta-value">${result.source === 'pubmed' ? 'PubMed' : 'Clinical Trial'}</span>
+        </div>
+        <div class="meta-item">
+             <span class="meta-label">Date</span>
+             <span class="meta-value">${result.metadata?.publication_date || 'N/A'}</span>
+        </div>
+        <div class="meta-item">
+             <span class="meta-label">Authors</span>
+             <span class="meta-value">${authors.length > 0 ? authors.slice(0, 3).join(', ') : (result.source === 'pubmed' ? 'Multiple Authors' : 'Scientific Group')}</span>
+        </div>
+        <div class="meta-item">
+             <span class="meta-label">Journal</span>
+             <span class="meta-value">${result.metadata?.journal || 'N/A'}</span>
+        </div>
+    `;
+
+    const metaGrid = modal.querySelector('.article-meta-grid');
+    if (metaGrid) metaGrid.innerHTML = metaHtml;
+
+    // Update external link
+    const viewSourceBtn = document.getElementById('modal-view-source');
+    const externalUrl = getExternalUrl(result);
+    if (viewSourceBtn) {
+        if (externalUrl) {
+            viewSourceBtn.href = externalUrl;
+            viewSourceBtn.style.display = 'flex';
+        } else {
+            viewSourceBtn.style.display = 'none';
+        }
+    }
+
+    // Show modal
+    const overlay = document.querySelector('.article-modal-overlay');
+    if (overlay) {
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+
+        // Store current ID for comments
+        window.currentArticleId = result.id;
+
+        // Reset tabs to summary
+        switchModalTab('summary');
+
+        // Load Comments
+        renderComments(result.id);
+
+        // Populate Full Text Tab
+        const fulltextPreview = document.getElementById('modal-fulltext-content');
+        if (fulltextPreview) {
+            fulltextPreview.innerHTML = result.abstract || result.full_text || 'No preview available.';
+        }
+
+        const fulltextLink = document.getElementById('modal-fulltext-link');
+        if (fulltextLink) {
+            fulltextLink.href = externalUrl || '#';
+            fulltextLink.style.display = externalUrl ? 'flex' : 'none';
+        }
+    }
+}
+
+function closeArticleModal() {
+    const modal = document.getElementById('article-detail-modal');
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function shareArticleFromModal() {
+    // Simple share implementation
+    const title = document.getElementById('modal-article-title').textContent;
+    const text = `Check out this article: "${title}"`;
+    if (navigator.share) {
+        navigator.share({
+            title: title,
+            text: text,
+            url: window.location.href
+        }).catch(console.error);
+    } else {
+        const url = window.location.href;
+        navigator.clipboard.writeText(`${text} ${url}`).then(() => {
+            showToast('Article info copied to clipboard', 'success');
+        });
+    }
+}
+
+function closeAllModals() {
+    closeArticleModal();
+    closeAdvancedSearch();
+    hideAutocomplete();
+    // Close other panels
+    const readingListPanel = document.getElementById('reading-list-panel');
+    if (readingListPanel && readingListPanel.classList.contains('open')) {
+        toggleReadingList();
+    }
+}
+
+function initDynamicScroll() {
+    const progressBar = document.getElementById('scroll-progress');
+    const backToTopBtn = document.getElementById('back-to-top');
+
+    window.addEventListener('scroll', () => {
+        const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+
+        // Update Progress Bar
+        const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        const scrolled = (winScroll / height) * 100;
+        if (progressBar) progressBar.style.width = scrolled + "%";
+
+        // Show/Hide Back to Top
+        if (backToTopBtn) {
+            if (winScroll > 300) {
+                backToTopBtn.classList.add('show');
+            } else {
+                backToTopBtn.classList.remove('show');
+            }
+        }
+    });
+}
+
+function initScrollReveal() {
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('reveal-active');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, observerOptions);
+
+    window.revealObserver = observer;
+}
+
+function initEventListeners() {
+    // Search
+    headerSearchBtn?.addEventListener('click', performSearch);
+    headerSearchInput?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            hideAutocomplete();
+            performSearch();
+        }
+    });
+
+    // Autocomplete
+    headerSearchInput?.addEventListener('input', handleSearchInput);
+    headerSearchInput?.addEventListener('focus', showAutocomplete);
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.header-search')) {
+            hideAutocomplete();
+        }
+    });
+
+    // Tab Navigation
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    });
+
+    // View Toggle
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentView = btn.dataset.view;
+            applyViewMode();
+        });
+    });
+
+    // Logo Click -> Reset Search
+    const logo = document.querySelector('.scholar-logo');
+    if (logo) {
+        logo.addEventListener('click', (e) => {
+            e.preventDefault();
+            resetSearch();
+        });
+    }
+
+    // Filter Chips
+    filterChips?.forEach(chip => {
+        chip.addEventListener('click', () => {
+            filterChips.forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            currentFilters.source = chip.dataset.filter;
+            // Trigger a new search if there's an active query
+            if (currentQuery) {
+                performSearch();
+            }
+        });
+    });
+
+    // Date Range
+    dateRadios?.forEach(radio => {
+        radio.addEventListener('change', () => {
+            currentFilters.dateRange = radio.value;
+            if (radio.value === 'custom') {
+                customDateRange?.classList.remove('hidden');
+            } else {
+                customDateRange?.classList.add('hidden');
+                // Trigger fresh search for date range
+                if (currentQuery) {
+                    performSearch();
+                }
+            }
+        });
+    });
+
+    sortBySelect?.addEventListener('change', () => {
+        currentFilters.sortBy = sortBySelect.value;
+        if (currentQuery) {
+            performSearch();
+        }
+    });
+
+    // AI Options
+    useRerankingCheckbox?.addEventListener('change', () => {
+        currentFilters.useReranking = useRerankingCheckbox.checked;
+    });
+
+    highlightMatchesCheckbox?.addEventListener('change', () => {
+        currentFilters.highlightMatches = highlightMatchesCheckbox.checked;
+        if (currentResults.length > 0) {
+            displayCurrentResults();
+        }
+    });
+
+    // Alpha Slider
+    alphaSlider?.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        currentFilters.alpha = value;
+        updateAlphaLabel(value);
+    });
+
+    // Language Filter
+    languageFilter?.addEventListener('change', () => {
+        currentFilters.language = languageFilter.value;
+        if (currentResults.length > 0) {
+            displayCurrentResults();
+        }
+    });
+
+    // Article Type Checkboxes
+    const articleTypeCheckboxes = document.querySelectorAll('#article-type-filters input[type="checkbox"]');
+    articleTypeCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            const checkedTypes = Array.from(articleTypeCheckboxes)
+                .filter(cb => cb.checked)
+                .map(cb => cb.value);
+            currentFilters.articleTypes = checkedTypes;
+            if (currentResults.length > 0) {
+                displayCurrentResults();
+            }
+        });
+    });
+
+    // Chatbot
+    document.getElementById('chat-send-btn')?.addEventListener('click', handleChatSubmit);
+    document.getElementById('chat-input')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleChatSubmit();
+        }
+    });
+
+    // Custom date inputs
+    document.getElementById('date-from')?.addEventListener('change', (e) => {
+        currentFilters.dateFrom = e.target.value ? parseInt(e.target.value) : null;
+        if (currentQuery) {
+            performSearch();
+        }
+    });
+    document.getElementById('date-to')?.addEventListener('change', (e) => {
+        currentFilters.dateTo = e.target.value ? parseInt(e.target.value) : null;
+        if (currentQuery) {
+            performSearch();
+        }
+    });
+
+    // Pagination
+    prevPageBtn?.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            displayCurrentResults();
+            scrollToResults();
+        }
+    });
+
+    nextPageBtn?.addEventListener('click', () => {
+        const totalPages = Math.ceil(currentResults.length / resultsPerPage);
+        if (currentPage < totalPages) {
+            currentPage++;
+            displayCurrentResults();
+            scrollToResults();
+        }
+    });
+
+    // Citation tabs
+    document.querySelectorAll('.citation-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.citation-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentCitationFormat = tab.dataset.format;
+            updateCitationText();
+        });
+    });
+}
+
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Ignore if typing in input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            if (e.key === 'Escape') {
+                e.target.blur();
+                hideAutocomplete();
+            }
+            return;
+        }
+
+        // Ctrl+K - Focus search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            headerSearchInput?.focus();
+        }
+
+        // Ctrl+Shift+F - Advanced search
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+            e.preventDefault();
+            openAdvancedSearch();
+        }
+
+        // ? - Show shortcuts
+        if (e.key === '?') {
+            showKeyboardShortcuts();
+        }
+
+        // 1, 2, 3 - Switch tabs
+        if (e.key === '1') switchTab('articles');
+        if (e.key === '2') switchTab('qa');
+        if (e.key === '3') switchTab('trends');
+
+        // B - Toggle reading list
+        if (e.key === 'b' || e.key === 'B') {
+            toggleReadingList();
+        }
+
+        // D - Toggle dark mode
+        if (e.key === 'd' || e.key === 'D') {
+            toggleTheme();
+        }
+
+        // Arrow keys for pagination
+        if (e.key === 'ArrowLeft' && currentPage > 1) {
+            currentPage--;
+            displayCurrentResults();
+        }
+        if (e.key === 'ArrowRight') {
+            const totalPages = Math.ceil(currentResults.length / resultsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                displayCurrentResults();
+            }
+        }
+
+        // Escape - Close modals
+        if (e.key === 'Escape') {
+            closeAllModals();
+        }
+    });
+}
+
+// ==========================================
+// USER PROFILE & AUTH (MOCK)
+// ==========================================
+function updateLoginUI() {
+    const headerRight = document.querySelector('.header-right');
+    const loginBtn = document.querySelector('.login-btn');
+
+    // Remove existing user menu if any
+    const existingMenu = document.getElementById('user-menu-btn');
+    if (existingMenu) existingMenu.remove();
+
+    if (currentUser) {
+        if (loginBtn) loginBtn.style.display = 'none';
+
+        // Add Avatar
+        const userMenu = document.createElement('div');
+        userMenu.id = 'user-menu-btn';
+        userMenu.className = 'header-icon-btn';
+        userMenu.innerHTML = `
+            <div class="user-avatar" style="width: 32px; height: 32px; background: var(--primary-blue); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer;">
+                ${currentUser.name.charAt(0)}
+            </div>
+        `;
+        userMenu.onclick = toggleUserProfile;
+        headerRight.appendChild(userMenu);
+    } else {
+        if (loginBtn) loginBtn.style.display = 'flex';
+    }
+}
+
+function openLoginModal() {
+    // For this demo, we just instant "mock" login
+    // in a real app, show a modal form
+    mockLogin();
+}
+
+function toggleMobileFilters() {
+    const sidebar = document.querySelector('.filters-sidebar');
+    sidebar.classList.toggle('show-mobile');
+
+    // Also toggle overly if we want one
+    document.body.style.overflow = sidebar.classList.contains('show-mobile') ? 'hidden' : '';
+}
+
+function mockLogin() {
+    currentUser = {
+        name: 'Dr. Researcher',
+        email: 'researcher@biomed.edu',
+        role: 'Verified Researcher'
+    };
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    updateLoginUI();
+    showToast('Welcome back, Dr. Researcher!', 'success');
+}
+
+function mockLogout() {
+    currentUser = null;
+    localStorage.setItem('currentUser', 'null');
+    updateLoginUI();
+    showToast('Logged out successfully', 'info');
+}
+
+function toggleUserProfile() {
+    // Create/Show a simple profile dropdown or modal
+    // Reuse the demo concept
+
+    const existingProfile = document.getElementById('profile-dropdown');
+    if (existingProfile) {
+        existingProfile.remove();
+        return;
+    }
+
+    const profile = document.createElement('div');
+    profile.id = 'profile-dropdown';
+    profile.style.cssText = `
+        position: absolute;
+        top: 70px;
+        right: 20px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-xl);\n        width: 280px;\n        padding: 20px;\n        z-index: 2000;\n    `;
+
+    profile.innerHTML = `
+        <div style="text-align: center; margin-bottom: 16px;">
+            <div style="width: 60px; height: 60px; background: var(--primary-blue); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; margin: 0 auto 10px;">
+                ${currentUser.name.charAt(0)}
+            </div>
+            <h3 style="margin: 0; font-size: 16px;">${currentUser.name}</h3>
+            <span style="font-size: 12px; color: var(--text-muted);">${currentUser.role}</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; text-align: center;">
+            <div style="background: var(--bg-tertiary); padding: 8px; border-radius: var(--radius-md);">
+                <div style="font-weight: bold; color: var(--primary-blue);">${readingList.length}</div>
+                <div style="font-size: 11px; color: var(--text-secondary);">Saved</div>
+            </div>
+            <div style="background: var(--bg-tertiary); padding: 8px; border-radius: var(--radius-md);">
+                <div style="font-weight: bold; color: var(--primary-blue);">${searchHistory.length}</div>
+                <div style="font-size: 11px; color: var(--text-secondary);">Searches</div>
+            </div>
+        </div>
+        <button onclick="mockLogout()" style="width: 100%; padding: 8px; background: transparent; border: 1px solid var(--border-color); border-radius: var(--radius-full); cursor: pointer; color: var(--google-red);">Sign Out</button>
+    `;
+
+    document.body.appendChild(profile);
+
+    // Close on click outside
+    const closeHandler = (e) => {
+        if (!profile.contains(e.target) && !e.target.closest('#user-menu-btn')) {
+            profile.remove();
+            document.removeEventListener('click', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 10);
+}
+
+// ==========================================
+// AUTOCOMPLETE
+// ==========================================
+function handleSearchInput() {
+    const query = headerSearchInput.value.trim().toLowerCase();
+
+    if (query.length === 0) {
+        showAutocomplete();
+        return;
+    }
+
+    // Filter suggestions
+    const filteredSuggestions = suggestions.filter(s =>
+        s.toLowerCase().includes(query)
+    ).slice(0, 5);
+
+    // Update suggestions
+    suggestionItems.innerHTML = filteredSuggestions.map(s => `
+        <div class="autocomplete-item" onclick="selectSuggestion('${escapeHtml(s)}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <span>${highlightMatch(s, query)}</span>
+        </div>
+    `).join('');
+
+    showAutocomplete();
+}
+
+function showAutocomplete() {
+    // Update history items with Timeline look
+    if (searchHistory.length === 0) {
+        historyItems.innerHTML = '';
+    } else {
+        historyItems.innerHTML = searchHistory.slice(0, 5).map(h => {
+            const query = typeof h === 'string' ? h : h.query;
+            const timeStr = typeof h === 'object' && h.timestamp ? new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+            return `
+                <div class="autocomplete-item timeline-item" onclick="selectSuggestion('${escapeHtml(query)}')">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                        <span>${escapeHtml(query)}</span>
+                        ${timeStr ? `<span class="timeline-time">${timeStr}</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Show/hide sections
+    const historySection = document.getElementById('search-history-section');
+    if (historySection) {
+        historySection.style.display = searchHistory.length > 0 ? 'block' : 'none';
+    }
+
+    autocompleteDropdown?.classList.remove('hidden');
+}
+
+function hideAutocomplete() {
+    autocompleteDropdown?.classList.add('hidden');
+}
+
+function selectSuggestion(query) {
+    headerSearchInput.value = query;
+    hideAutocomplete();
+    performSearch();
+}
+
+function clearSearchHistory(e) {
+    e.stopPropagation();
+    searchHistory = [];
+    localStorage.setItem('searchHistory', '[]');
+    historyItems.innerHTML = '';
+    showToast('Search history cleared', 'success');
+}
+
+function addToSearchHistory(query) {
+    // Structure: { query: string, timestamp: number }
+    // Remove if exists (to move to top)
+    searchHistory = searchHistory.filter(h => (typeof h === 'string' ? h : h.query).toLowerCase() !== query.toLowerCase());
+
+    // Add to front with timestamp
+    searchHistory.unshift({
+        query: query,
+        timestamp: Date.now()
+    });
+
+    // Keep only last 20
+    searchHistory = searchHistory.slice(0, 20);
+    localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
+    renderRecentChips();
+}
+
+function renderRecentChips() {
+    const bar = document.getElementById('recent-searches-bar');
+    const container = document.getElementById('recent-chips');
+    if (!bar || !container) return;
+
+    if (searchHistory.length === 0) {
+        bar.classList.add('hidden');
+        return;
+    }
+
+    bar.classList.remove('hidden');
+    container.innerHTML = searchHistory.slice(0, 5).map(h => {
+        const q = typeof h === 'string' ? h : h.query;
+        return `<button class="recent-chip" onclick="setExampleQuery('${escapeHtml(q)}')">${escapeHtml(q)}</button>`;
+    }).join('');
+}
+
+function highlightMatch(text, query) {
+    if (!query) return escapeHtml(text);
+    const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+    return escapeHtml(text).replace(regex, '<mark>$1</mark>');
+}
+
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ==========================================
+// TAB & VIEW MANAGEMENT
+// ==========================================
+function switchTab(tabName) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.nav-tab[data-tab="${tabName}"]`)?.classList.add('active');
+
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(`${tabName}-tab`)?.classList.add('active');
+
+    // Handle layout for different tabs
+    const mainContainer = document.querySelector('.main-container');
+    const scholarMain = document.querySelector('.scholar-main');
+
+    // Reset layout classes
+    mainContainer?.classList.remove('full-width', 'articles-layout');
+    scholarMain?.classList.remove('no-padding');
+
+    if (tabName === 'qa') {
+        mainContainer?.classList.add('full-width');
+        scholarMain?.classList.add('no-padding');
+    } else if (tabName === 'articles') {
+        mainContainer?.classList.add('articles-layout');
+    }
+
+    // If switching to Trends, update dashboard
+    if (tabName === 'trends') {
+        updateTrendsDashboard();
+    }
+}
+
+let trendsChart = null;
+
+function updateTrendsDashboard() {
+    const ctx = document.getElementById('trendsChart');
+    if (!ctx) return;
+
+    if (trendsChart) {
+        trendsChart.destroy();
+    }
+
+    const isDark = document.body.classList.contains('dark-theme');
+    const textColor = isDark ? '#e8eaed' : '#3c4043';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+
+    // Mock trend data for demonstration
+    const labels = ['2018', '2019', '2020', '2021', '2022', '2023', '2024'];
+    const pubmedData = [120, 150, 280, 240, 210, 260, 310];
+    const trialsData = [40, 50, 90, 80, 75, 85, 95];
+
+    trendsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'PubMed Articles',
+                    data: pubmedData,
+                    borderColor: '#1a73e8',
+                    backgroundColor: 'rgba(26, 115, 232, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                },
+                {
+                    label: 'Clinical Trials',
+                    data: trialsData,
+                    borderColor: '#34a853',
+                    backgroundColor: 'rgba(52, 168, 83, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        color: textColor,
+                        font: { family: 'Inter', size: 12, weight: '500' }
+                    }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: isDark ? '#202124' : '#ffffff',
+                    titleColor: textColor,
+                    bodyColor: textColor,
+                    borderColor: 'rgba(0,0,0,0.1)',
+                    borderWidth: 1
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { color: textColor }
+                },
+                y: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor },
+                    beginAtZero: true
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            }
+        }
+    });
+}
+
+function applyViewMode() {
+    const resultsList = document.querySelector('.results-list');
+    if (resultsList) {
+        if (currentView === 'compact') {
+            resultsList.classList.add('compact');
+        } else {
+            resultsList.classList.remove('compact');
+        }
+    }
+}
+
+function scrollToResults() {
+    document.getElementById('results-header')?.scrollIntoView({ behavior: 'smooth' });
+}
+
+function updateAlphaLabel(value) {
+    let label = '';
+    if (value < 25) {
+        label = `Keyword-focused (${value}%)`;
+    } else if (value < 75) {
+        label = `Balanced (${value}%)`;
+    } else {
+        label = `Semantic-focused (${value}%)`;
+    }
+    if (alphaValue) alphaValue.textContent = label;
+}
+
+// ==========================================
+// API HEALTH CHECK
+// ==========================================
+async function checkHealth() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' },
+            timeout: 5000
+        });
+        const data = await response.json();
+
+        if (data.status === 'healthy' || data.status === 'degraded') {
+            statusDot?.classList.remove('offline');
+            statusDot?.classList.add('online');
+            if (statusText) statusText.textContent = 'Online';
+            window.isBackendOnline = true;
+
+            // Remove demo banner if present
+            const banner = document.getElementById('demo-banner');
+            if (banner) banner.remove();
+        } else {
+            statusDot?.classList.remove('online');
+            statusDot?.classList.add('offline');
+            if (statusText) statusText.textContent = 'Degraded';
+            window.isBackendOnline = false;
+        }
+    } catch (error) {
+        statusDot?.classList.add('offline');
+        if (statusText) statusText.textContent = 'Offline';
+        window.isBackendOnline = false;
+        console.log('Backend not available - running in demo mode, retrying in 5s...');
+        showDemoBanner();
+
+        // Retry after 5 seconds
+        setTimeout(checkHealth, 5000);
+    }
+}
+
+function showDemoBanner() {
+    if (document.getElementById('demo-banner')) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'demo-banner';
+    banner.innerHTML = `
+        <div class="demo-banner">
+            <span>🎨 <strong>Demo Mode</strong> - This is a UI preview. Connect to a backend server for full functionality.</span>
+            <button onclick="this.parentElement.remove()">×</button>
+        </div>
+    `;
+    document.body.insertBefore(banner, document.body.firstChild);
+}
+
+// ==========================================
+// STATISTICS
+// ==========================================
+async function loadStatistics() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/statistics`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        const data = await response.json();
+
+        const pubmedDocs = data.pubmed_articles?.document_count || 0;
+        const trialsDocs = data.clinical_trials?.document_count || 0;
+        const totalDocs = pubmedDocs + trialsDocs;
+
+        if (pubmedCount) pubmedCount.textContent = pubmedDocs.toLocaleString();
+        if (trialsCount) trialsCount.textContent = trialsDocs.toLocaleString();
+        if (totalDocsCount) {
+            totalDocsCount.textContent = totalDocs > 0 ? totalDocs.toLocaleString() + '+' : '0';
+        }
+    } catch (error) {
+        console.error('Failed to load statistics:', error);
+        if (totalDocsCount) totalDocsCount.textContent = '---';
+    }
+}
+
+// ==========================================
+// ==========================================
+// ZEN MODE & SCROLL TO TOP
+// ==========================================
+function toggleZenMode() {
+    document.body.classList.toggle('zen-mode');
+    const isZen = document.body.classList.contains('zen-mode');
+    showToast(isZen ? 'Focus mode enabled' : 'Focus mode disabled', 'info');
+}
+
+function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Handle Scroll for Scroll-to-Top button
+window.addEventListener('scroll', () => {
+    const scrollBtn = document.getElementById('scroll-to-top');
+    if (scrollBtn) {
+        if (window.scrollY > 500) {
+            scrollBtn.classList.remove('hidden');
+        } else {
+            scrollBtn.classList.add('hidden');
+        }
+    }
+});
+
+async function performSearch() {
+    const query = headerSearchInput?.value.trim();
+    if (!query) return;
+
+    currentQuery = query;
+    currentPage = 1;
+    addToSearchHistory(query);
+
+    if (headerSearchBtn) headerSearchBtn.disabled = true;
+
+    // Remove full-width mode to show sidebar
+    const mainContainer = document.querySelector('.main-container');
+    if (mainContainer) mainContainer.classList.remove('full-width');
+
+    // Show skeleton, hide actual results
+    const skeleton = document.getElementById('skeleton-loader');
+    const searchLoader = document.getElementById('search-loader');
+
+    if (skeleton) skeleton.classList.remove('hidden');
+    if (searchLoader) searchLoader.classList.remove('hidden');
+
+    if (searchResults) {
+        searchResults.innerHTML = ''; // Clear results while loading
+        searchResults.classList.add('hidden');
+    }
+
+    try {
+        let index = 'both';
+        if (currentFilters.source === 'pubmed') index = 'pubmed';
+        else if (currentFilters.source === 'clinical_trials') index = 'clinical_trials';
+
+        let dateFrom = null;
+        let dateTo = null;
+        if (currentFilters.dateRange === 'custom') {
+            dateFrom = currentFilters.dateFrom;
+            dateTo = currentFilters.dateTo;
+        } else if (currentFilters.dateRange !== 'any') {
+            dateFrom = parseInt(currentFilters.dateRange);
+        }
+
+        const response = await fetch(`${API_BASE_URL}/search`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                query: query,
+                index: index,
+                max_results: 100,
+                alpha: currentFilters.alpha / 100,
+                use_reranking: currentFilters.useReranking,
+                sort_by: currentFilters.sortBy,
+                date_from: dateFrom,
+                date_to: dateTo
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server returned server error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        currentResults = data.results || [];
+        displayCurrentResults();
+        showRelatedSearches(query);
+
+    } catch (error) {
+        if (searchResults) {
+            searchResults.classList.remove('hidden');
+            searchResults.innerHTML = showError(`Search failed: ${error.message}. Please try again.`);
+        }
+        console.error('Search failed:', error);
+    } finally {
+        if (headerSearchBtn) headerSearchBtn.disabled = false;
+        // Hide skeleton and loader
+        const skeleton = document.getElementById('skeleton-loader');
+        const searchLoader = document.getElementById('search-loader');
+        if (skeleton) skeleton.classList.add('hidden');
+        if (searchLoader) searchLoader.classList.add('hidden');
+
+        if (searchResults) searchResults.classList.remove('hidden');
+    }
+}
+
+function toggleQuickFilter(type, value) {
+    // Update State
+    if (type === 'source') {
+        currentFilters.source = (currentFilters.source === value) ? 'all' : value;
+    } else if (type === 'dateRange') {
+        currentFilters.dateRange = (currentFilters.dateRange === value) ? 'any' : value;
+    } else if (type === 'articleTypes') {
+        if (currentFilters.articleTypes.length === 1 && currentFilters.articleTypes[0] === value) {
+            currentFilters.articleTypes = ['research', 'review', 'meta-analysis', 'case-study'];
+        } else {
+            currentFilters.articleTypes = [value];
+        }
+    }
+
+    // Update Sidebar UI to match
+    updateSidebarUI();
+
+    // Perform Search
+    const searchInput = document.getElementById('header-search-input');
+    if (searchInput && searchInput.value.trim()) {
+        performSearch();
+    }
+}
+
+function updateSidebarUI() {
+    // Update Chips
+    document.querySelectorAll('.filter-chip').forEach(c => {
+        if (c.dataset.filter === currentFilters.source) c.classList.add('active');
+        else c.classList.remove('active');
+    });
+
+    // Update Date Radio
+    document.querySelectorAll('input[name="date-range"]').forEach(r => {
+        r.checked = (r.value === currentFilters.dateRange);
+    });
+
+    // Update Quick Filter Chips Logic
+    document.querySelectorAll('.quick-filter-chip').forEach(q => {
+        const onclick = q.getAttribute('onclick');
+        let isActive = false;
+        if (onclick.includes(`'${currentFilters.source}'`) && currentFilters.source !== 'all') isActive = true;
+        else if (onclick.includes(`'${currentFilters.dateRange}'`) && currentFilters.dateRange !== 'any') isActive = true;
+        else if (onclick.includes(`'articleTypes'`) && currentFilters.articleTypes.length === 1 && onclick.includes(`'${currentFilters.articleTypes[0]}'`)) isActive = true;
+
+        if (isActive) q.classList.add('active');
+        else q.classList.remove('active');
+    });
+}
+
+function shareSearch() {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+        showToast('Search link copied to clipboard!', 'success');
+    }).catch(err => {
+        console.error('Could not copy text: ', err);
+        showToast('Failed to copy link', 'error');
+    });
+}
+
+function exportResults(format) {
+    if (!currentResults || currentResults.length === 0) {
+        showToast('No results to export', 'info');
+        return;
+    }
+
+    if (format === 'csv') {
+        const headers = ['ID', 'Title', 'Source', 'Publication Date', 'Authors', 'Score'];
+        const rows = currentResults.map(r => [
+            r.id,
+            `"${(r.title || '').replace(/"/g, '""')}"`,
+            r.source,
+            r.metadata?.publication_date || '',
+            `"${ensureAuthorsArray(r.metadata?.authors).join(', ').replace(/"/g, '""')}"`,
+            r.score
+        ]);
+
+        const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `biomed_search_results_${new Date().getTime()}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('Results exported to CSV', 'success');
+    }
+}
+
+function displayCurrentResults() {
+    if (!currentResults || currentResults.length === 0) {
+        if (resultsCount) resultsCount.innerHTML = `No results found for "<strong>${escapeHtml(currentQuery)}</strong>"`;
+        if (searchResults) searchResults.innerHTML = showEmptyState('No results found', 'Try different keywords or adjust filters');
+        pagination?.classList.add('hidden');
+        return;
+    }
+
+    // Apply client-side filtering and sorting
+    let results = filterAndSortResults(currentResults);
+
+    if (results.length === 0) {
+        if (resultsCount) resultsCount.innerHTML = `No results match your filters`;
+        if (searchResults) searchResults.innerHTML = showEmptyState('No matching results', 'Try adjusting your filters or search terms');
+        pagination?.classList.add('hidden');
+        return;
+    }
+
+    // Pagination
+    const totalPages = Math.ceil(results.length / resultsPerPage);
+    const startIdx = (currentPage - 1) * resultsPerPage;
+    const endIdx = startIdx + resultsPerPage;
+    const pageResults = results.slice(startIdx, endIdx);
+
+    if (resultsCount) {
+        resultsCount.innerHTML = `About <strong>${results.length.toLocaleString()}</strong> results`;
+    }
+
+    if (searchResults) {
+        searchResults.innerHTML = pageResults.map(result => createResultCard(result)).join('');
+        applyViewMode();
+
+        // Apply Reveal Observer
+        if (window.revealObserver) {
+            searchResults.querySelectorAll('.result-card').forEach(card => {
+                window.revealObserver.observe(card);
+            });
+        }
+    }
+
+    // Update pagination
+    if (pagination) {
+        if (totalPages > 1) {
+            pagination.classList.remove('hidden');
+            if (currentPageSpan) currentPageSpan.textContent = currentPage;
+            if (totalPagesSpan) totalPagesSpan.textContent = totalPages;
+            if (prevPageBtn) prevPageBtn.disabled = currentPage === 1;
+            if (nextPageBtn) nextPageBtn.disabled = currentPage === totalPages;
+        } else {
+            pagination.classList.add('hidden');
+        }
+    }
+}
+
+
+function filterAndSortResults(results) {
+    let filtered = [...results];
+
+    // Apply date filter
+    if (currentFilters.dateRange !== 'any') {
+        const currentYear = new Date().getFullYear();
+        if (currentFilters.dateRange === 'custom') {
+            const minYear = currentFilters.dateFrom || 1900;
+            const maxYear = currentFilters.dateTo || currentYear;
+            filtered = filtered.filter(r => {
+                const year = extractYear(r.metadata?.publication_date || r.publication_date);
+                // If no date available, include the result (don't filter it out)
+                if (!year) return true;
+                return year >= minYear && year <= maxYear;
+            });
+        } else {
+            const minYear = parseInt(currentFilters.dateRange);
+            filtered = filtered.filter(r => {
+                const year = extractYear(r.metadata?.publication_date || r.publication_date);
+                // If no date available, include the result
+                if (!year) return true;
+                return year >= minYear;
+            });
+        }
+    }
+
+    // Apply Language Filter
+    if (currentFilters.language !== 'any') {
+        filtered = filtered.filter(r => {
+            // Check metadata first, then fall back to detection or default
+            const lang = (r.metadata?.language || r.language || 'en').toLowerCase();
+            return lang.startsWith(currentFilters.language);
+        });
+    }
+
+    // Apply Article Type Filter
+    const allTypes = ['research', 'review', 'meta-analysis', 'case-study'];
+    // Only filter if not all types are selected (optimization)
+    if (currentFilters.articleTypes.length < allTypes.length) {
+        filtered = filtered.filter(r => {
+            // Mock type if missing for demo purposes
+            // In a real app, this would come from the API
+            let type = r.metadata?.article_type || r.article_type;
+
+            // If no type, infer from title (simple heuristic for demo)
+            if (!type) {
+                const titleLower = (r.title || '').toLowerCase();
+                if (titleLower.includes('review') || titleLower.includes('overview')) type = 'review';
+                else if (titleLower.includes('meta-analysis')) type = 'meta-analysis';
+                else if (titleLower.includes('case study') || titleLower.includes('report')) type = 'case-study';
+                else type = 'research';
+            }
+
+            return currentFilters.articleTypes.includes(type);
+        });
+    }
+
+    // Apply sorting
+    if (currentFilters.sortBy === 'date_desc') {
+        filtered.sort((a, b) => {
+            const dateA = extractYear(a.metadata?.publication_date || a.publication_date) || 0;
+            const dateB = extractYear(b.metadata?.publication_date || b.publication_date) || 0;
+            return dateB - dateA;
+        });
+    } else if (currentFilters.sortBy === 'date_asc') {
+        filtered.sort((a, b) => {
+            const dateA = extractYear(a.metadata?.publication_date || a.publication_date) || 0;
+            const dateB = extractYear(b.metadata?.publication_date || b.publication_date) || 0;
+            return dateA - dateB;
+        });
+    } else if (currentFilters.sortBy === 'relevance') {
+        // Default is usually relevance from API, but we ensure it here if client re-sorts
+        filtered.sort((a, b) => (b.score || 0) - (a.score || 0));
+    }
+
+    return filtered;
+}
+
+function extractYear(dateStr) {
+    if (!dateStr) return null;
+    const match = dateStr.match(/\d{4}/);
+    return match ? parseInt(match[0]) : null;
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+
+    // Handle different date formats
+    // Format 1: "YYYY-MM" (e.g., "2024-05")
+    // Format 2: "YYYY" (e.g., "2024")  
+    // Format 3: "Month YYYY" (e.g., "January 2024")
+    // Format 4: "Month Day, YYYY" (e.g., "January 15, 2024")
+    // Format 5: ISO date (e.g., "2024-01-15")
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Try to parse as YYYY-MM format
+    const yyyyMmMatch = dateStr.match(/^(\d{4})-(\d{2})$/);
+    if (yyyyMmMatch) {
+        const year = yyyyMmMatch[1];
+        const monthNum = parseInt(yyyyMmMatch[2]) - 1;
+        if (monthNum >= 0 && monthNum < 12) {
+            return `${monthNames[monthNum]} ${year}`;
+        }
+        return year;
+    }
+
+    // Try to parse as YYYY only
+    const yyyyMatch = dateStr.match(/^(\d{4})$/);
+    if (yyyyMatch) {
+        return yyyyMatch[1];
+    }
+
+    // Try to parse ISO date format (YYYY-MM-DD)
+    const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+        const year = isoMatch[1];
+        const monthNum = parseInt(isoMatch[2]) - 1;
+        if (monthNum >= 0 && monthNum < 12) {
+            return `${monthNames[monthNum]} ${year}`;
+        }
+        return year;
+    }
+
+    // Return as-is if format not recognized (e.g., "January 2024")
+    return dateStr;
+}
+
+function showRelatedSearches(query) {
+    const relatedContainer = document.getElementById('related-searches');
+    const relatedTags = document.getElementById('related-tags');
+
+    if (!relatedContainer || !relatedTags) return;
+
+    // Find related searches
+    const queryLower = query.toLowerCase();
+    let related = [];
+
+    for (const [key, values] of Object.entries(relatedSearches)) {
+        if (queryLower.includes(key)) {
+            related = [...related, ...values];
+        }
+    }
+
+    if (related.length === 0) {
+        relatedContainer.classList.add('hidden');
+        return;
+    }
+
+    // Remove duplicates and limit
+    related = [...new Set(related)].filter(r => r.toLowerCase() !== queryLower).slice(0, 5);
+
+    relatedTags.innerHTML = related.map(r =>
+        `<button class="related-tag" onclick="setExampleQuery('${escapeHtml(r)}')">${escapeHtml(r)}</button>`
+    ).join('');
+
+    relatedContainer.classList.remove('hidden');
+}
+
+function createResultCard(result) {
+    const isPubMed = result.source === 'pubmed';
+    const sourceLabel = isPubMed ? 'PubMed' : 'Clinical Trial';
+    const sourceClass = isPubMed ? 'pubmed' : 'clinical-trial';
+    const externalUrl = getExternalUrl(result);
+    const isBookmarked = readingList.some(item => item.id === result.id);
+    const resultDataB64 = btoa(unescape(encodeURIComponent(JSON.stringify(result))));
+
+    const rawDate = result.metadata?.publication_date || '';
+    const date = formatDate(rawDate);
+
+    // Highlight matches
+    let title = escapeHtml(result.title);
+    let abstract = result.abstract ? truncate(result.abstract, 280) : '';
+
+    if (currentFilters.highlightMatches && currentQuery) {
+        const terms = currentQuery.split(/\s+/).filter(t => t.length > 2);
+        try {
+            terms.forEach(term => {
+                const regex = new RegExp(`(${escapeRegex(term)})`, 'gi');
+                title = title.replace(regex, '<mark>$1</mark>');
+                abstract = abstract.replace(regex, '<mark>$1</mark>');
+            });
+        } catch (e) {
+            console.warn('Highlight regex error', e);
+        }
+    }
+
+    // Sanitize authors inline for maximum reliability
+    const authors = ensureAuthorsArray(result.metadata?.authors || result.authors);
+    const authorText = (authors.length > 0)
+        ? authors.slice(0, 3).join(', ') + (authors.length > 3 ? ' et al.' : '')
+        : (isPubMed ? 'Multiple Authors' : 'Scientific Group');
+
+    // Mock type logic (same as in filter)
+    let type = result.metadata?.article_type || result.article_type;
+    if (!type) {
+        const titleLower = (result.title || '').toLowerCase();
+        if (titleLower.includes('review') || titleLower.includes('overview')) type = 'Review';
+        else if (titleLower.includes('meta-analysis')) type = 'Meta-Analysis';
+        else if (titleLower.includes('case study') || titleLower.includes('report')) type = 'Case Study';
+        else type = 'Research Article';
+    }
+
+    return `
+        <div class="result-card reveal-item ${selectedArticles.has(String(result.id)) ? 'selected' : ''}" data-id="${result.id}">
+            <div class="result-selection">
+                <input type="checkbox" ${selectedArticles.has(String(result.id)) ? 'checked' : ''} 
+                    onclick="event.stopPropagation(); toggleArticleSelection('${result.id}', this.closest('.result-card'))">
+            </div>
+            <div class="result-main">
+                <a href="#" class="result-title" onclick="openArticleModal('${result.id}'); return false;">
+                    ${title}
+                </a>
+                <div class="result-meta">
+                    <span class="meta-source ${sourceClass}">${sourceLabel}</span>
+                    <span class="meta-separator">•</span>
+                    <span class="meta-authors">${authorText}</span>
+                    <span class="meta-separator">•</span>
+                    <span class="meta-date">${date}</span>
+                    <span class="meta-separator">•</span>
+                    <span class="meta-type">${type}</span>
+                </div>
+                <div class="result-snippet">
+                    ${abstract}
+                </div>
+            </div>
+            <div class="result-actions">
+                <button class="result-action-btn bookmark-btn ${isBookmarked ? 'active' : ''}" onclick="toggleBookmark('${resultDataB64}', this)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="${isBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                    </svg>
+                    ${isBookmarked ? 'Saved' : 'Save'}
+                </button>
+                <button class="result-action-btn" onclick="openCitationModal('${resultDataB64}')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 6 9 6 9zM18 9h1.5a2.5 2.5 0 0 0 0-5C17 4 18 9 18 9z" />
+                        <path d="M6 22V9M18 22V9" />
+                    </svg>
+                    Cite
+                </button>
+                ${externalUrl ? `<a href="${externalUrl}" target="_blank" rel="noopener" class="result-action-btn primary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                    View Source
+                </a>` : ''}
+                <div class="result-score-badge" title="Relevance Score">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                       <circle cx="12" cy="12" r="10"/>
+                       <line x1="12" y1="16" x2="12" y2="12"/>
+                       <line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                    ${result.score?.toFixed(2) || 'N/A'}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function getExternalUrl(result) {
+    if (!result) return null;
+
+    // Helper to clean PubMed IDs (digits only)
+    const cleanPmid = (id) => {
+        if (!id) return null;
+        const match = String(id).match(/(\d+)/);
+        return match ? match[1] : null;
+    };
+
+    // Helper to clean Clinical Trial IDs (NCT + 8 digits)
+    const cleanNctId = (id) => {
+        if (!id) return null;
+        let str = String(id).trim().toUpperCase();
+        // Extract NCT number if present
+        const match = str.match(/NCT(\d{8})/);
+        if (match) return match[0];
+
+        // If just 8 digits, prepend NCT
+        const digitsMatch = str.match(/^(\d{8})$/);
+        if (digitsMatch) return `NCT${digitsMatch[1]}`;
+
+        // Fallback: just return trimmed string if it looks like an ID
+        return str.startsWith('NCT') ? str : null;
+    };
+
+    // Check if it's a PubMed Article
+    if (result.source === 'pubmed') {
+        let pmid = result.id || result.pmid || result.metadata?.pmid;
+        pmid = cleanPmid(pmid);
+        if (pmid) return `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
+    }
+    // Check if it's a Clinical Trial
+    else if (result.source === 'clinicaltrials' || result.source === 'clinical_trial' || result.source === 'clinical_trials') {
+        let nctId = result.id || result.nct_id || result.metadata?.nct_id;
+        nctId = cleanNctId(nctId);
+        if (nctId) return `https://clinicaltrials.gov/study/${nctId}`;
+    }
+
+    // Fallback if URL is already in metadata
+    if (result.url) return result.url;
+    if (result.link) return result.link;
+    if (result.metadata?.url) return result.metadata.url;
+
+    return null;
+}
+
+// ==========================================
+// READING LIST / BOOKMARKS
+// ==========================================
+function toggleBookmark(b64Data, button) {
+    try {
+        const jsonStr = decodeURIComponent(escape(atob(b64Data)));
+        const result = JSON.parse(jsonStr);
+
+        const idx = readingList.findIndex(item => item.id === result.id);
+
+        if (idx >= 0) {
+            readingList.splice(idx, 1);
+            button.classList.remove('active');
+            button.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+                Save
+            `;
+            showToast('Removed from reading list', 'info');
+        } else {
+            readingList.push({
+                id: result.id,
+                title: result.title,
+                source: result.source,
+                metadata: result.metadata,
+                abstract: result.abstract,
+                savedAt: new Date().toISOString()
+            });
+            button.classList.add('active');
+            button.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+                Saved
+            `;
+            showToast('Added to reading list', 'success');
+        }
+
+        localStorage.setItem('readingList', JSON.stringify(readingList));
+        updateReadingListCount();
+        renderReadingList();
+    } catch (error) {
+        console.error('Error toggling bookmark:', error);
+    }
+}
+
+function updateReadingListCount() {
+    const countEl = document.getElementById('reading-list-count');
+    if (countEl) {
+        countEl.textContent = readingList.length;
+        countEl.setAttribute('data-count', readingList.length);
+    }
+}
+
+function toggleReadingList() {
+    const panel = document.getElementById('reading-list-panel');
+    panel?.classList.toggle('open');
+    renderReadingList();
+}
+
+function renderReadingList() {
+    const container = document.getElementById('reading-list-items');
+    if (!container) return;
+
+    if (readingList.length === 0) {
+        container.innerHTML = `
+            <div class="empty-reading-list">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+                <p>No saved articles yet</p>
+                <span>Click the bookmark icon on any article to save it</span>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = readingList.map(item => {
+        const externalUrl = getExternalUrl(item);
+        return `
+            <div class="reading-list-item">
+                <a class="reading-list-item-title" href="#" onclick="openArticleModal('${item.id}'); return false;">${escapeHtml(item.title)}</a>
+                <div class="reading-list-item-meta">
+                    ${item.metadata?.publication_date || ''} • ${item.source === 'pubmed' ? 'PubMed' : 'Clinical Trial'}
+                </div>
+                <div class="reading-list-item-actions">
+                    <button onclick="removeFromReadingList('${item.id}')">Remove</button>
+                    <button onclick="openArticleModal('${item.id}')">Details</button>
+                    <button onclick="openCitationModalById('${item.id}')">Cite</button>
+                    ${externalUrl ? `<a href="${externalUrl}" target="_blank" class="text-btn">Source</a>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function removeFromReadingList(id) {
+    readingList = readingList.filter(item => item.id !== id);
+    localStorage.setItem('readingList', JSON.stringify(readingList));
+    updateReadingListCount();
+    renderReadingList();
+    showToast('Removed from reading list', 'info');
+}
+
+function clearReadingList() {
+    if (confirm('Are you sure you want to clear your reading list?')) {
+        readingList = [];
+        localStorage.setItem('readingList', '[]');
+        updateReadingListCount();
+        renderReadingList();
+        showToast('Reading list cleared', 'success');
+    }
+}
+
+function exportReadingList(format) {
+    if (readingList.length === 0) {
+        showToast('Reading list is empty', 'error');
+        return;
+    }
+
+    if (format === 'csv') {
+        const csv = [
+            ['Title', 'Source', 'Date', 'URL'].join(','),
+            ...readingList.map(item => [
+                `"${item.title.replace(/"/g, '""')}"`,
+                item.source,
+                item.metadata?.publication_date || '',
+                getExternalUrl(item) || ''
+            ].join(','))
+        ].join('\n');
+
+        downloadFile(csv, 'reading_list.csv', 'text/csv');
+    } else if (format === 'bibtex') {
+        const bibtex = readingList.map(item => generateBibtex(item)).join('\n\n');
+        downloadFile(bibtex, 'reading_list.bib', 'text/plain');
+    }
+
+    showToast(`Exported ${readingList.length} articles`, 'success');
+}
+
+// ==========================================
+// CITATION SYSTEM
+// ==========================================
+function openCitationModal(b64Data) {
+    try {
+        const jsonStr = decodeURIComponent(escape(atob(b64Data)));
+        currentCitationArticle = JSON.parse(jsonStr);
+        updateCitationText();
+        document.getElementById('citation-modal')?.classList.add('show');
+    } catch (error) {
+        console.error('Error opening citation modal:', error);
+    }
+}
+
+function openCitationModalById(id) {
+    const article = readingList.find(item => item.id === id);
+    if (article) {
+        currentCitationArticle = article;
+        updateCitationText();
+        document.getElementById('citation-modal')?.classList.add('show');
+    }
+}
+
+function closeCitationModal() {
+    document.getElementById('citation-modal')?.classList.remove('show');
+}
+
+function switchModalTab(tabId) {
+    // Update tabs
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll(`.modal-tab[onclick="switchModalTab('${tabId}')"]`).forEach(t => t.classList.add('active'));
+
+    // Update content
+    document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(`modal-tab-${tabId}`)?.classList.add('active');
+}
+
+function updateCitationText() {
+    const citationText = document.getElementById('citation-text');
+    if (!citationText || !currentCitationArticle) return;
+
+    const article = currentCitationArticle;
+    let authors = ensureAuthorsArray(article.metadata?.authors);
+    if (authors.length === 0) authors = ['Multiple Authors'];
+    const year = extractYear(article.metadata?.publication_date) || 'n.d.';
+    const title = article.title;
+    const journal = article.metadata?.journal || 'Unknown Journal';
+    const url = getExternalUrl(article);
+
+    let citation = '';
+
+    switch (currentCitationFormat) {
+        case 'apa':
+            citation = `${formatAuthorsAPA(authors)} (${year}). ${title}. ${journal}. ${url ? `Retrieved from ${url}` : ''}`;
+            break;
+        case 'mla':
+            citation = `${formatAuthorsMLA(authors)}. "${title}." ${journal}, ${year}. ${url ? `Web. ${url}` : ''}`;
+            break;
+        case 'chicago':
+            citation = `${formatAuthorsChicago(authors)}. "${title}." ${journal} (${year}). ${url || ''}`;
+            break;
+        case 'bibtex':
+            citation = generateBibtex(article);
+            break;
+    }
+
+    citationText.textContent = citation.trim();
+}
+
+function formatAuthorsAPA(authors) {
+    if (authors.length === 1) return authors[0];
+    if (authors.length === 2) return `${authors[0]} & ${authors[1]}`;
+    return `${authors[0]} et al.`;
+}
+
+function formatAuthorsMLA(authors) {
+    if (authors.length === 1) return authors[0];
+    if (authors.length === 2) return `${authors[0]}, and ${authors[1]}`;
+    return `${authors[0]}, et al.`;
+}
+
+function formatAuthorsChicago(authors) {
+    if (authors.length <= 3) return authors.join(', ');
+    return `${authors[0]} et al.`;
+}
+
+function generateBibtex(article) {
+    const id = (article.metadata?.pmid || article.metadata?.nct_id || 'article').toString().replace(/\W/g, '');
+    const authors = ensureAuthorsArray(article.metadata?.authors).join(' and ') || 'Unknown';
+    const year = extractYear(article.metadata?.publication_date) || '';
+    const title = article.title.replace(/[{}]/g, '');
+    const journal = article.metadata?.journal || '';
+
+    return `@article{${id},
+  author = {${authors}},
+  title = {${title}},
+  journal = {${journal}},
+  year = {${year}},
+  note = {${getExternalUrl(article) || ''}}
+}`;
+}
+
+function copyCitation() {
+    const citationText = document.getElementById('citation-text')?.textContent;
+    if (citationText) {
+        navigator.clipboard.writeText(citationText).then(() => {
+            showToast('Citation copied to clipboard', 'success');
+        });
+    }
+}
+
+// ==========================================
+// EXPORT & SHARE
+// ==========================================
+function exportResults(format) {
+    if (currentResults.length === 0) {
+        showToast('No results to export', 'error');
+        return;
+    }
+
+    if (format === 'csv') {
+        const csv = [
+            ['Title', 'Source', 'Date', 'Authors', 'Abstract', 'URL'].join(','),
+            ...currentResults.map(r => [
+                `"${r.title.replace(/"/g, '""')}"`,
+                r.source,
+                r.metadata?.publication_date || '',
+                `"${ensureAuthorsArray(r.metadata?.authors).join('; ')}"`,
+                `"${(r.abstract || '').substring(0, 500).replace(/"/g, '""')}"`,
+                getExternalUrl(r) || ''
+            ].join(','))
+        ].join('\n');
+
+        downloadFile(csv, 'search_results.csv', 'text/csv');
+        showToast(`Exported ${currentResults.length} results`, 'success');
+    }
+}
+
+function shareSearch() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('q', currentQuery);
+
+    navigator.clipboard.writeText(url.toString()).then(() => {
+        showToast('Search link copied to clipboard', 'success');
+    });
+}
+
+function downloadFile(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ==========================================
+// ADVANCED SEARCH
+// ==========================================
+function openAdvancedSearch() {
+    document.getElementById('advanced-search-modal')?.classList.add('show');
+}
+
+function closeAdvancedSearch() {
+    document.getElementById('advanced-search-modal')?.classList.remove('show');
+}
+
+function executeAdvancedSearch() {
+    const allWords = document.getElementById('adv-all-words')?.value.trim();
+    const exactPhrase = document.getElementById('adv-exact-phrase')?.value.trim();
+    const anyWords = document.getElementById('adv-any-words')?.value.trim();
+    const noneWords = document.getElementById('adv-none-words')?.value.trim();
+    const author = document.getElementById('adv-author')?.value.trim();
+    const journal = document.getElementById('adv-journal')?.value.trim();
+    const titleContains = document.getElementById('adv-title')?.value.trim();
+
+    let query = '';
+
+    if (allWords) query += allWords + ' ';
+    if (exactPhrase) query += `"${exactPhrase}" `;
+    if (anyWords) query += `(${anyWords.split(/\s+/).join(' OR ')}) `;
+    if (noneWords) query += noneWords.split(/\s+/).map(w => `-${w}`).join(' ') + ' ';
+    if (author) query += `author:${author} `;
+    if (titleContains) query += `title:${titleContains} `;
+
+    query = query.trim();
+
+    if (query) {
+        headerSearchInput.value = query;
+        closeAdvancedSearch();
+        performSearch();
+    } else {
+        showToast('Please enter at least one search term', 'error');
+    }
+}
+
+// ==========================================
+// CHATBOT FUNCTIONALITY
+// ==========================================
+function handleChatSubmit() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+
+    // Add user message
+    addChatMessage('user', message);
+
+    // Clear input and reset height
+    input.value = '';
+    input.style.height = 'auto';
+
+    // Show loading state
+    showChatLoading();
+
+    // Call API
+    fetchAnswer(message)
+        .then(data => {
+            removeChatLoading();
+            if (data.answers && data.answers.length > 0) {
+                // Construct AI response from the best answer
+                // We'll combine the top answer with source citations
+                const bestAnswer = data.answers[0];
+                let aiText = bestAnswer.answer;
+
+                // If we have alternative extractive answers, append them as insights
+                const otherAnswers = data.answers.slice(1).filter(a => a.confidence > 0.2);
+                if (otherAnswers.length > 0) {
+                    aiText += '\n\n**Additional Key Insights from Literature:**\n';
+                    otherAnswers.forEach((ans, idx) => {
+                        aiText += `• ${ans.answer} (Confidence: ${(ans.confidence * 100).toFixed(0)}%)\n`;
+                    });
+                }
+
+                // Create a map of passages for easy lookup
+                const passageMap = {};
+                (data.passages || []).forEach(p => {
+                    passageMap[p.source_id] = p.text;
+                });
+
+                const sources = data.answers
+                    .filter(a => a.source_type !== 'generated' && a.source_type !== 'error')
+                    .map(a => {
+                        // Normalize source type for getExternalUrl if necessary
+                        const normalizedSourceType = a.source_type === 'clinical_trials' ? 'clinical_trials' : a.source_type;
+                        const isPubMed = normalizedSourceType === 'pubmed';
+
+                        return {
+                            title: a.source_title || 'Untitled Research',
+                            url: getExternalUrl({
+                                source: normalizedSourceType,
+                                id: a.source_id,
+                                pmid: isPubMed ? a.source_id : null,
+                                nct_id: !isPubMed ? a.source_id : null
+                            }),
+                            score: a.confidence,
+                            type: normalizedSourceType,
+                            snippet: a.context || passageMap[a.source_id] || '',
+                            journal: a.journal || (a.source_type === 'clinical_trials' ? 'ClinicalTrials.gov' : ''),
+                            date: a.publication_date || ''
+                        };
+                    })
+                    .slice(0, 3); // Take top 3 after processing
+
+                console.group('AI Chat Debug');
+                console.log('Raw data.answers:', data.answers);
+                console.log('Passage map keys:', Object.keys(passageMap));
+                console.log('Final processed sources:', sources);
+                console.groupEnd();
+
+                addChatMessage('ai', aiText, sources);
+            } else {
+                addChatMessage('ai', "I searched the biomedical database but couldn't find a high-confidence answer for your specific question. \n\nYou might try:\n• Rephrasing your question\n• Checking for specific terms\n• Browsing the 'Articles' tab for broader research");
+            }
+        })
+        .catch(err => {
+            removeChatLoading();
+            addChatMessage('ai', "I encountered an error while connecting to the knowledge base. Please try again in a moment.");
+            console.error('Chat error:', err);
+        });
+}
+
+function sendChatMessage(message) {
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = message;
+        handleChatSubmit();
+    }
+}
+
+function addChatMessage(role, text, sources = []) {
+    const history = document.getElementById('chat-history');
+    if (!history) return;
+
+    // Hide welcome message if it's the first message
+    const welcome = history.querySelector('.chat-welcome-message');
+    if (welcome) welcome.style.display = 'none';
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-message ${role}`;
+
+    let avatar = role === 'user' ?
+        `<div class="message-avatar user-avatar-small">U</div>` :
+        `<div class="message-avatar ai-avatar-small">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"/>
+                <path d="M12 16v-4"/><path d="M12 8h.01"/>
+            </svg>
+        </div>`;
+
+    let sourcesHtml = '';
+    if (sources && sources.length > 0) {
+        sourcesHtml = `
+        <div class="chat-sources">
+            <div class="chat-sources-title">Supporting Evidence (Source Details)</div>
+            ${sources.map(s => `
+                <div class="source-item-container" style="margin-bottom: 12px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <a href="${s.url || '#'}" target="_blank" class="source-title" style="display:block; font-weight: 600; color: var(--primary-blue); text-decoration:none; margin-bottom: 4px;">
+                        ${truncate(s.title, 100)}
+                    </a>
+                    <div class="source-meta" style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+                        ${s.type === 'pubmed' ? '📄 PubMed' : '🔬 Clinical Trial'} • 
+                        ${s.journal ? `${truncate(s.journal, 40)} • ` : ''} 
+                        ${s.date ? `${s.date} • ` : ''}
+                        Confidence: ${(s.score * 100).toFixed(0)}%
+                    </div>
+                    ${s.snippet ? `<div class="source-snippet" style="font-size: 13px; color: var(--text-secondary); line-height: 1.4; font-style: italic;">
+                        "${truncate(s.snippet, 250)}"
+                    </div>` : ''}
+                </div>
+            `).join('')}
+        </div>`;
+    }
+
+    // Process text for formatting (simple bolding/newlines)
+    const formattedText = escapeHtml(text)
+        .replace(/\n/g, '<br>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+    msgDiv.innerHTML = `
+        ${avatar}
+        <div class="message-bubble">
+            <div class="chat-answer-content">${formattedText}</div>
+            ${sourcesHtml}
+        </div>
+    `;
+
+    history.appendChild(msgDiv);
+    // Smooth scroll to bottom
+    history.scrollTop = history.scrollHeight;
+}
+
+function showChatLoading() {
+    const history = document.getElementById('chat-history');
+    if (!history) return;
+
+    const loaderDiv = document.createElement('div');
+    loaderDiv.id = 'chat-loading-indicator';
+    loaderDiv.className = 'chat-message ai';
+    loaderDiv.innerHTML = `
+        <div class="message-avatar ai-avatar-small">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"/>
+                <path d="M12 16v-4"/><path d="M12 8h.01"/>
+            </svg>
+        </div>
+        <div class="typing-bubble">
+            <div class="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+    `;
+    history.appendChild(loaderDiv);
+    history.scrollTop = history.scrollHeight;
+}
+
+function removeChatLoading() {
+    const loader = document.getElementById('chat-loading-indicator');
+    if (loader) loader.remove();
+}
+
+function clearChat() {
+    const history = document.getElementById('chat-history');
+    if (history) {
+        // Restore welcome message
+        history.innerHTML = `
+            <div class="chat-welcome-message">
+                <div class="welcome-logo">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </div>
+                <h2>How can I help with your research?</h2>
+                <p>Ask me about biomedical topics, clinical trials, or specific articles.</p>
+                <div class="chat-examples">
+                    <button onclick="sendChatMessage('What are the latest treatments for diabetes?')">Latest diabetes treatments</button>
+                    <button onclick="sendChatMessage('Summarize the side effects of mRNA vaccines')">mRNA vaccine side effects</button>
+                    <button onclick="sendChatMessage('Find clinical trials for Alzheimer\\'s disease')">Alzheimer's clinical trials</button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function autoResizeTextarea(element) {
+    element.style.height = 'auto';
+    element.style.height = (element.scrollHeight) + 'px';
+}
+
+async function fetchAnswer(question) {
+    const response = await fetch(`${API_BASE_URL}/question`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({
+            question: question,
+            index: 'both',
+            max_answers: 3,
+            min_confidence: 0.01
+        })
+    });
+    return await response.json();
+}
+
+// ==========================================
+// MODAL SYSTEM
+// ==========================================
+function createModal() {
+    const modalHtml = `
+        <div id="document-modal" class="modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2 id="modal-title">Document Details</h2>
+                    <button class="modal-close" onclick="closeDocumentModal()">&times;</button>
+                </div>
+                <div class="modal-body" id="modal-body"></div>
+                <div class="modal-footer" id="modal-footer"></div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function openDocumentModalFromB64(b64Data) {
+    try {
+        const jsonStr = decodeURIComponent(escape(atob(b64Data)));
+        const result = JSON.parse(jsonStr);
+        openDocumentModal(result);
+    } catch (error) {
+        console.error('Error decoding result data:', error);
+        showToast('Error opening document details', 'error');
+    }
+}
+
+function openDocumentModal(result) {
+    const modal = document.getElementById('document-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalFooter = document.getElementById('modal-footer');
+
+    if (!modal || !modalTitle || !modalBody || !modalFooter) return;
+
+    const isPubMed = result.source === 'pubmed';
+    const externalUrl = getExternalUrl(result);
+
+    modalTitle.textContent = result.title;
+
+    modalBody.innerHTML = `
+        <div style="margin-bottom: 16px;">
+            <span class="result-source-badge ${isPubMed ? 'pubmed' : 'clinical-trial'}" style="display: inline-block; padding: 6px 12px; font-size: 13px;">
+                ${isPubMed ? '📄 PubMed Article' : '🔬 Clinical Trial'}
+            </span>
+        </div>
+        
+        <div class="modal-section">
+            <h3>📝 Abstract</h3>
+            <p>${result.abstract || 'No abstract available.'}</p>
+        </div>
+        
+        ${ensureAuthorsArray(result.metadata?.authors).length > 0 ? `
+            <div class="modal-section">
+                <h3>👥 Authors</h3>
+                <p>${ensureAuthorsArray(result.metadata.authors).join(', ')}</p>
+            </div>
+        ` : ''}
+        
+        <div class="modal-section">
+            <h3>📊 Metadata</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                ${result.metadata?.pmid ? `
+                    <div style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">PMID</div>
+                        <div style="font-weight: 500; color: var(--primary-blue); cursor: pointer;" onclick="window.open('https://pubmed.ncbi.nlm.nih.gov/${result.metadata.pmid}/', '_blank')">${result.metadata.pmid}</div>
+                    </div>
+                ` : ''}
+                ${result.metadata?.nct_id ? `
+                    <div style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">NCT ID</div>
+                        <div style="font-weight: 500; color: var(--primary-blue); cursor: pointer;" onclick="window.open('https://clinicaltrials.gov/study/${result.metadata.nct_id}', '_blank')">${result.metadata.nct_id}</div>
+                    </div>
+                ` : ''}
+                ${result.metadata?.publication_date ? `
+                    <div style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Publication Date</div>
+                        <div style="font-weight: 500;">${result.metadata.publication_date}</div>
+                    </div>
+                ` : ''}
+                ${result.metadata?.journal ? `
+                    <div style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Journal</div>
+                        <div style="font-weight: 500;">${result.metadata.journal}</div>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+        
+        <div class="modal-section">
+            <h3>🎯 Search Score</h3>
+            <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 12px;">
+                <div style="height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
+                    <div style="height: 100%; width: ${Math.min((result.score || 0) * 100, 100)}%; background: var(--primary-blue); border-radius: 4px;"></div>
+                </div>
+                <div style="font-size: 13px; color: var(--text-secondary);">${result.score?.toFixed(4) || 'N/A'} relevance score</div>
+            </div>
+        </div>
+    `;
+
+    modalFooter.innerHTML = `
+        ${externalUrl ? `
+            <a href="${externalUrl}" target="_blank" rel="noopener" class="modal-btn primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                View on ${isPubMed ? 'PubMed' : 'ClinicalTrials.gov'}
+            </a>
+        ` : ''}
+        <button class="modal-btn secondary" onclick="closeDocumentModal()">Close</button>
+    `;
+
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDocumentModal() {
+    const modal = document.getElementById('document-modal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+}
+
+function showKeyboardShortcuts() {
+    document.getElementById('shortcuts-modal')?.classList.add('show');
+}
+
+function closeShortcutsModal() {
+    document.getElementById('shortcuts-modal')?.classList.remove('show');
+}
+
+function closeAllModals() {
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.classList.remove('show');
+    });
+    document.body.style.overflow = '';
+}
+
+// ==========================================
+// THEME SYSTEM
+// ==========================================
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme');
+    const newTheme = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+}
+
+function updateThemeIcon(theme) {
+    const sunIcon = document.getElementById('theme-icon-sun');
+    const moonIcon = document.getElementById('theme-icon-moon');
+
+    if (theme === 'dark') {
+        sunIcon?.classList.add('hidden');
+        moonIcon?.classList.remove('hidden');
+    } else {
+        sunIcon?.classList.remove('hidden');
+        moonIcon?.classList.add('hidden');
+    }
+}
+
+// ==========================================
+// UTILITY FUNCTIONS
+// ==========================================
+function showLoading() {
+    return `
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Searching...</p>
+        </div>
+    `;
+}
+
+function showEmptyState(title, message) {
+    return `
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <h3>${title}</h3>
+            <p>${message}</p>
+        </div>
+    `;
+}
+
+function showError(message) {
+    return `<div class="error-message">⚠️ ${message}</div>`;
+}
+
+function ensureAuthorsArray(authors) {
+    if (!authors) return [];
+    if (Array.isArray(authors)) return authors.filter(a => a && typeof a === 'string');
+
+    if (typeof authors === 'string') {
+        const clean = authors.trim();
+        if (!clean) return [];
+
+        // Try parsing as JSON if it looks like an array
+        if (clean.startsWith('[') && clean.endsWith(']')) {
+            try {
+                // Try standard JSON first
+                const parsed = JSON.parse(clean);
+                if (Array.isArray(parsed)) return parsed;
+            } catch (e) {
+                // Try replacing single quotes with double quotes (common in Python repr)
+                try {
+                    const parsed = JSON.parse(clean.replace(/'/g, '"'));
+                    if (Array.isArray(parsed)) return parsed;
+                } catch (e2) {
+                    // Fallback to comma splitting
+                    return clean.slice(1, -1).split(',').map(s => s.trim()).filter(s => s);
+                }
+            }
+        }
+
+        // Comma separated list
+        if (clean.includes(',')) {
+            return clean.split(',').map(s => s.trim()).filter(s => s);
+        }
+
+        return [clean];
+    }
+
+    return [];
+}
+
+function truncate(text, length) {
+    if (!text) return '';
+    return text.length > length ? text.substring(0, length) + '...' : text;
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showToast(message, type = 'info') {
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+        if (container.children.length === 0) {
+            container.remove();
+        }
+    }, 4000);
+}
+
+// Example query helpers
+function setExampleQuery(query) {
+    if (headerSearchInput) headerSearchInput.value = query;
+    switchTab('articles');
+    performSearch();
+}
+
+function resetSearch() {
+    if (headerSearchInput) headerSearchInput.value = '';
+
+    // Clear results
+    currentResults = [];
+    currentQuery = '';
+
+    // Reset UI to welcome state
+    const mainContainer = document.querySelector('.main-container');
+    if (mainContainer) mainContainer.classList.add('full-width');
+
+    const searchResults = document.getElementById('search-results');
+    if (searchResults) {
+        // Restore welcome state HTML
+        searchResults.innerHTML = `
+            <div class="welcome-state">
+                <div class="welcome-icon">
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="M21 21l-4.35-4.35" />
+                    </svg>
+                </div>
+                <h2>Search Biomedical Literature</h2>
+                <p>Search millions of PubMed articles and clinical trials with AI-powered semantic search</p>
+                <div class="keyboard-hint">
+                    <span>Pro tip: Press <kbd>Ctrl</kbd> + <kbd>K</kbd> to focus search</span>
+                </div>
+            </div>
+        `;
+        searchResults.classList.remove('hidden');
+    }
+
+    // Switch to articles tab
+    switchTab('articles');
+}
+
+function setExampleQuestion(question) {
+    sendChatMessage(question);
+}
+
+// ==========================================
+// HELP MODAL
+// ==========================================
+function showHelpModal() {
+    const modal = document.getElementById('help-modal');
+    if (modal) {
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+        initHelpTabs();
+    }
+}
+
+function closeHelpModal() {
+    const modal = document.getElementById('help-modal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+}
+
+function initHelpTabs() {
+    document.querySelectorAll('.help-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Update tab buttons
+            document.querySelectorAll('.help-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Update sections
+            const sectionId = `help-${tab.dataset.section}`;
+            document.querySelectorAll('.help-section').forEach(s => s.classList.remove('active'));
+            document.getElementById(sectionId)?.classList.add('active');
+        });
+    });
+}
+
+// ==========================================
+// COMMENTS SYSTEM
+// ==========================================
+function renderComments(articleId) {
+    const list = document.getElementById('comments-list');
+    if (!list) return;
+
+    const allComments = JSON.parse(localStorage.getItem('articleComments') || '{}');
+    const comments = allComments[articleId] || [];
+
+    if (comments.length === 0) {
+        list.innerHTML = `
+            <div class="empty-state small">
+                <p>No comments yet. Be the first to start the discussion!</p>
+            </div>
+        `;
+        return;
+    }
+
+    list.innerHTML = comments.map(c => `
+        <div class="comment-item">
+            <div class="comment-header">
+                <span class="comment-author">${escapeHtml(c.author)}</span>
+                <span class="comment-date">${formatDate(c.date)}</span>
+            </div>
+            <div class="comment-text">${escapeHtml(c.text)}</div>
+        </div>
+    `).join('');
+}
+
+function addComment() {
+    const input = document.getElementById('comment-input');
+    if (!input || !input.value.trim()) return;
+
+    const text = input.value.trim();
+    // Get current article ID from the open modal
+    // We can infer it from the modal title or store it in a global var. 
+    // Best way: check currentResults or readingList for the opened one, 
+    // OR we can make openArticleModal store the currentId globally.
+    // simpler: Let's use a global variable set in openArticleModal
+    if (!window.currentArticleId) {
+        console.error("No article selected");
+        return;
+    }
+
+    const allComments = JSON.parse(localStorage.getItem('articleComments') || '{}');
+    if (!allComments[window.currentArticleId]) {
+        allComments[window.currentArticleId] = [];
+    }
+
+    allComments[window.currentArticleId].unshift({
+        id: Date.now(),
+        text: text,
+        author: currentUser ? (currentUser.displayName || 'User') : 'Guest',
+        date: new Date().toISOString()
+    });
+
+    localStorage.setItem('articleComments', JSON.stringify(allComments));
+    input.value = '';
+    renderComments(window.currentArticleId);
+    showToast('Comment posted!', 'success');
+}
+
+// Add H key shortcut for help
+document.addEventListener('keydown', (e) => {
+    // Only trigger if not in an input field
+    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        if (e.key === 'h' || e.key === 'H') {
+            // Don't trigger if Ctrl/Cmd is pressed
+            if (!e.ctrlKey && !e.metaKey) {
+                showHelpModal();
+            }
+        }
+    }
+});
+
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', init);
+
+function openAdvancedSearch() {
+    const modal = document.getElementById('advanced-search-modal');
+    if (modal) modal.classList.add('show');
+}
+
+function closeAdvancedSearch() {
+    const modal = document.getElementById('advanced-search-modal');
+    if (modal) modal.classList.remove('show');
+}
+
+function applyAdvancedSearch() {
+    const authorInput = document.getElementById('adv-author');
+    const journalInput = document.getElementById('adv-journal');
+    const minYear = document.getElementById('adv-year-from');
+    const maxYear = document.getElementById('adv-year-to');
+
+    // Here we would typically enhance the query or apply complex filters
+    // For now, let's just trigger a search and show a toast
+    showToast('Advanced filters applied!', 'info');
+    closeAdvancedSearch();
+    performSearch();
+}
+
+// Authentication Functions
+let isRegisterMode = false;
+
+function openLoginModal() {
+    const modal = document.getElementById('login-modal');
+    if (modal) modal.classList.add('show');
+    // Reset to login mode
+    isRegisterMode = false;
+    updateAuthModalUI();
+}
+
+function closeLoginModal() {
+    const modal = document.getElementById('login-modal');
+    if (modal) modal.classList.remove('show');
+}
+
+function toggleAuthMode() {
+    isRegisterMode = !isRegisterMode;
+    updateAuthModalUI();
+}
+
+function updateAuthModalUI() {
+    const title = document.querySelector('#login-modal h2');
+    const submitBtn = document.querySelector('#login-form button[type="submit"]');
+    const switchText = document.getElementById('auth-switch-text');
+    const nameGroup = document.getElementById('login-name-group');
+    const nameInput = document.getElementById('login-name');
+
+    if (isRegisterMode) {
+        if (title) title.textContent = '📝 Create Account';
+        if (submitBtn) submitBtn.textContent = 'Sign Up';
+        if (nameGroup) nameGroup.classList.remove('hidden');
+        if (nameInput) nameInput.required = true;
+        if (switchText) {
+            switchText.innerHTML = 'Already have an account? <a href="#" onclick="toggleAuthMode(); return false;" id="auth-switch-link">Sign in</a>';
+        }
+    } else {
+        if (title) title.textContent = '🔐 Login to BioMed Scholar';
+        if (submitBtn) submitBtn.textContent = 'Sign In';
+        if (nameGroup) nameGroup.classList.add('hidden');
+        if (nameInput) nameInput.required = false;
+        if (switchText) {
+            switchText.innerHTML = 'Don\'t have an account? <a href="#" onclick="toggleAuthMode(); return false;" id="auth-switch-link">Sign up</a>';
+        }
+    }
+}
+
+async function handleLogin(e) {
+    if (e) e.preventDefault();
+    const email = document.getElementById('login-email')?.value;
+    const password = document.getElementById('login-password')?.value;
+    const name = document.getElementById('login-name')?.value;
+
+    if (!email || !password) {
+        showToast('Please enter both email and password', 'error');
+        return;
+    }
+
+    if (!auth) {
+        showToast('Firebase not initialized. Please check configuration.', 'error');
+        return;
+    }
+
+    const submitBtn = document.querySelector('#login-form button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+    }
+
+    try {
+        if (isRegisterMode) {
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            if (name && userCredential.user) {
+                await userCredential.user.updateProfile({
+                    displayName: name
+                });
+            }
+            showToast('Account created successfully!', 'success');
+        } else {
+            await auth.signInWithEmailAndPassword(email, password);
+            showToast('Logged in successfully!', 'success');
+        }
+        closeLoginModal();
+    } catch (error) {
+        console.error("Auth error:", error);
+        let msg = error.message;
+        if (error.code === 'auth/wrong-password') msg = 'Invalid password.';
+        if (error.code === 'auth/user-not-found') msg = 'User not found.';
+        if (error.code === 'auth/email-already-in-use') msg = 'Email already in use.';
+        if (error.code === 'auth/weak-password') msg = 'Password should be at least 6 characters.';
+        showToast(msg, 'error');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = isRegisterMode ? 'Sign Up' : 'Sign In';
+        }
+    }
+}
+
+async function handleGoogleLogin() {
+    if (!auth) {
+        showToast('Firebase not initialized', 'error');
+        return;
+    }
+
+    const provider = new firebase.auth.GoogleAuthProvider();
+    try {
+        await auth.signInWithPopup(provider);
+        showToast('Logged in with Google successfully!', 'success');
+        closeLoginModal();
+    } catch (error) {
+        console.error("Google Auth error:", error);
+        showToast(error.message, 'error');
+    }
+}
+
+function updateLoginUI() {
+    const loginBtn = document.querySelector('.login-btn');
+    const existingUserBtn = document.querySelector('.user-profile-btn');
+
+    if (currentUser) {
+        const displayName = currentUser.displayName || currentUser.email.split('@')[0];
+        const initial = displayName[0].toUpperCase();
+
+        const userBtnHtml = `
+            <div class="user-avatar">${initial}</div>
+            <span>${truncate(displayName, 15)}</span>
+        `;
+
+        if (existingUserBtn) {
+            existingUserBtn.innerHTML = userBtnHtml;
+            existingUserBtn.title = `Logged in as ${currentUser.email}`;
+            existingUserBtn.onclick = handleLogout;
+        } else if (loginBtn) {
+            const userBtn = document.createElement('button');
+            userBtn.className = 'header-icon-btn user-profile-btn';
+            userBtn.title = `Logged in as ${currentUser.email}`;
+            userBtn.onclick = handleLogout;
+            userBtn.innerHTML = userBtnHtml;
+            loginBtn.replaceWith(userBtn);
+        }
+    } else {
+        // Show login button
+        if (existingUserBtn) {
+            const newLoginBtn = document.createElement('button');
+            newLoginBtn.className = 'header-icon-btn login-btn';
+            newLoginBtn.onclick = openLoginModal;
+            newLoginBtn.title = 'Login';
+            newLoginBtn.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                </svg>
+                <span>Login</span>
+            `;
+            existingUserBtn.replaceWith(newLoginBtn);
+        }
+    }
+}
+
+async function handleLogout() {
+    if (confirm('Are you sure you want to logout?')) {
+        try {
+            if (auth) await auth.signOut();
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            updateLoginUI();
+            showToast('Logged out successfully', 'info');
+        } catch (error) {
+            console.error("Logout error:", error);
+            showToast('Error logging out', 'error');
+        }
+    }
+}
+
+// Auth State Listener
+if (typeof firebase !== 'undefined' && auth) {
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL
+            };
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        } else {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+        }
+        updateLoginUI();
+    });
+}
+
+// Notification System Logic
+let notifications = [
+    {
+        id: 1,
+        title: 'New Feature: AI Chat',
+        body: 'You can now ask questions about specific papers using our new AI Chat feature!',
+        time: '2 hours ago',
+        read: false,
+        type: 'feature'
+    },
+    {
+        id: 2,
+        title: 'Welcome to BioMed Scholar',
+        body: 'Thanks for joining our beta program. We indexed over 1,800 new articles today.',
+        time: '1 day ago',
+        read: false,
+        type: 'info'
+    }
+];
+
+function toggleNotifications() {
+    const dropdown = document.getElementById('notification-dropdown');
+    dropdown.classList.toggle('hidden');
+}
+
+function updateNotificationUI() {
+    const list = document.getElementById('notification-list');
+    const countBadge = document.getElementById('notification-count');
+
+    // Safety check if elements don't exist yet
+    if (!list || !countBadge) return;
+
+    const unreadCount = notifications.filter(n => !n.read).length;
+
+    // Update Badge
+    if (unreadCount > 0) {
+        countBadge.textContent = unreadCount;
+        countBadge.classList.remove('hidden');
+    } else {
+        countBadge.classList.add('hidden');
+    }
+
+    // Update List
+    if (notifications.length === 0) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <p>No new notifications</p>
+            </div>
+        `;
+        return;
+    }
+
+    list.innerHTML = notifications.map(n => `
+        <div class="notification-item ${n.read ? '' : 'unread'}" onclick="handleNotificationClick(${n.id}, '${n.type}')">
+            <div class="notif-icon">
+                ${getNotificationIcon(n.type)}
+            </div>
+            <div class="notif-content">
+                <div class="notif-title">${n.title}</div>
+                <div class="notif-body">${n.body}</div>
+                <div class="notif-time">${n.time}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getNotificationIcon(type) {
+    if (type === 'feature') {
+        return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>`;
+    }
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="16" x2="12" y2="12"/>
+        <line x1="12" y1="8" x2="12.01" y2="8"/>
+    </svg>`;
+}
+
+function markAllNotificationsRead() {
+    notifications.forEach(n => n.read = true);
+    updateNotificationUI();
+}
+
+function markNotificationRead(id) {
+    const notif = notifications.find(n => n.id === id);
+    if (notif) {
+        notif.read = true;
+        updateNotificationUI();
+    }
+}
+
+function handleNotificationClick(id, type) {
+    markNotificationRead(id);
+
+    // Close dropdown
+    const dropdown = document.getElementById('notification-dropdown');
+    dropdown?.classList.add('hidden');
+
+    if (type === 'feature') {
+        // Navigate to AI Chat (QA) tab
+        switchTab('qa');
+        // Optional: Focus the input
+        setTimeout(() => {
+            const input = document.getElementById('qa-input');
+            if (input) input.focus();
+        }, 100);
+    }
+}
+
+// Close Dropdown on Click Outside
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('notification-dropdown');
+    const btn = document.querySelector('.notification-btn');
+
+    // Close Notification Dropdown
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+        if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+            dropdown.classList.add('hidden');
+        }
+    }
+});
+
+// Initialize Notifications and Health Check on Load
+document.addEventListener('DOMContentLoaded', () => {
+    updateNotificationUI();
+    checkBackendHealth();
+    setInterval(checkBackendHealth, 30000); // Check every 30 seconds
+});
+
+async function checkBackendHealth() {
+    const statusText = document.getElementById('status-text');
+    const statusDot = document.getElementById('status-dot');
+
+    if (!statusText || !statusDot) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        if (response.ok) {
+            statusText.textContent = 'Online';
+            statusDot.className = 'status-dot online';
+        } else {
+            throw new Error('Health check failed');
+        }
+    } catch (error) {
+        console.warn('Backend health check failed:', error);
+        statusText.textContent = 'Offline';
+        statusDot.className = 'status-dot offline';
+    }
+}
+
+// ==========================================
+// SELECTION & LOCAL FILTERING
+// ==========================================
+let selectedArticles = new Set();
+
+function toggleArticleSelection(id, element) {
+    if (selectedArticles.has(id)) {
+        selectedArticles.delete(id);
+        element.classList.remove('selected');
+    } else {
+        selectedArticles.add(id);
+        element.classList.add('selected');
+    }
+    updateSelectionToolbar();
+}
+
+function updateSelectionToolbar() {
+    const toolbar = document.getElementById('selection-toolbar');
+    const count = document.querySelector('.selection-count');
+    if (!toolbar || !count) return;
+
+    if (selectedArticles.size > 0) {
+        toolbar.classList.remove('hidden');
+        count.textContent = `${selectedArticles.size} selected`;
+    } else {
+        toolbar.classList.add('hidden');
+    }
+}
+
+function toggleSelectAll(checkbox) {
+    const isChecked = checkbox.checked;
+    document.querySelectorAll('.result-card').forEach(card => {
+        const id = card.dataset.id;
+        const cardCheckbox = card.querySelector('.result-selection input');
+        if (cardCheckbox) {
+            cardCheckbox.checked = isChecked;
+            if (isChecked) {
+                selectedArticles.add(id);
+                card.classList.add('selected');
+            } else {
+                selectedArticles.delete(id);
+                card.classList.remove('selected');
+            }
+        }
+    });
+    updateSelectionToolbar();
+}
+
+function cancelSelection() {
+    selectedArticles.clear();
+    const selectAll = document.getElementById('select-all-docs');
+    if (selectAll) selectAll.checked = false;
+    document.querySelectorAll('.result-card.selected').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.result-selection input').forEach(i => i.checked = false);
+    updateSelectionToolbar();
+}
+
+function bulkSave() {
+    selectedArticles.forEach(id => {
+        const result = currentResults.find(r => String(r.id) === id);
+        if (result) {
+            const dataB64 = btoa(unescape(encodeURIComponent(JSON.stringify(result))));
+            if (!readingList.some(item => item.id === id)) {
+                addToReadingList(dataB64);
+            }
+        }
+    });
+    showToast(`Saved ${selectedArticles.size} articles to reading list`, 'success');
+    cancelSelection();
+}
+
+function bulkExport() {
+    showToast(`Exporting ${selectedArticles.size} articles...`, 'info');
+    // Implement actual export if needed, or just toast for now
+}
+
+function filterResultsLocally() {
+    const input = document.getElementById('sidebar-filter-input');
+    const query = input?.value.trim().toLowerCase();
+
+    document.querySelectorAll('.result-card').forEach(card => {
+        const text = card.textContent.toLowerCase();
+
+        if (!query || text.includes(query)) {
+            card.style.display = 'flex';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+
+

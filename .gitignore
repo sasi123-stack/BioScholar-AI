@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Data and Models
+data/
+models/
+logs/
+*.log
+
+# Services
+elasticsearch/
+redis/
+PostgreSQL/
+
+# Environment
+.env
+.env.production
+.ngrok_token
+ngrok_log.txt
+ngrok_direct_log.txt
+ngrok_final_log.txt
+ngrok_retry_log.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database Data
+pgdata/
+postgres-data/
+
+# Firebase
+.firebase/
+
+# IDE
+.vscode/
+.idea/
+*.db
+*.sqlite
+
+# Binary/Screenshots (Avoid HF rejection)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.pdf
+tests/screenshots/
+selenium_report.html
