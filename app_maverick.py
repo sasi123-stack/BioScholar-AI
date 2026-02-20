@@ -24,24 +24,47 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- DNS CHECK ---
+# --- DNS CUSTOM RESOLVER ---
+def resolve_hostname(host):
+    """
+    Attempts to resolve hostname using system first, then falls back to custom DNS
+    if dnspython is available.
+    """
+    try:
+        addr = socket.gethostbyname(host)
+        return addr
+    except Exception as e:
+        print(f">>> [SYSTEM DNS FAILED] {host}: {e}. Trying custom DNS...", flush=True)
+        try:
+            import dns.resolver
+            resolver = dns.resolver.Resolver()
+            resolver.nameservers = ['8.8.8.8', '1.1.1.1'] # Google and Cloudflare
+            answers = resolver.resolve(host, 'A')
+            if answers:
+                addr = str(answers[0])
+                print(f">>> [CUSTOM DNS SUCCESS] {host} resolved to {addr}", flush=True)
+                return addr
+        except Exception as e2:
+            print(f">>> [CUSTOM DNS FAILED] {host}: {e2}", flush=True)
+    return None
+
 def check_dns(retries=5):
     print(">>> [2/5] CHECKING NETWORK CONNECTIVITY...", flush=True)
     hosts = ["api.telegram.org", "google.com", "api.groq.com"]
     for host in hosts:
         success = False
         for i in range(retries):
-            try:
-                addr = socket.gethostbyname(host)
+            addr = resolve_hostname(host)
+            if addr:
                 print(f">>> [OK] {host} resolved to {addr}", flush=True)
                 success = True
                 break
-            except Exception as e:
+            else:
                 if i < retries - 1:
-                    print(f">>> [RETRY {i+1}] {host} failed: {e}. Waiting 10s...", flush=True)
+                    print(f">>> [RETRY {i+1}] {host} failed. Waiting 10s...", flush=True)
                     time.sleep(10)
                 else:
-                    print(f">>> [ERROR] Final failure resolving {host}: {e}", flush=True)
+                    print(f">>> [ERROR] Final failure resolving {host}", flush=True)
         if not success and host == "api.telegram.org":
             print(">>> [WARNING] Telegram API unreachable. Space may have restricted egress.", flush=True)
 
@@ -111,7 +134,8 @@ if __name__ == '__main__':
     print(">>> [5/5] CONNECTING TO TELEGRAM...", flush=True)
     try:
         # Robust request settings for potentially restricted/slow networks
-        request = HTTPXRequest(connect_timeout=20, read_timeout=20)
+        # We increase the connection pool size and timeouts
+        request = HTTPXRequest(connect_timeout=30, read_timeout=30, write_timeout=30)
         
         application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
         application.add_handler(CommandHandler('start', start))
