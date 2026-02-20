@@ -30,7 +30,13 @@ class ModelLoader:
             device: Device to load models on ('cuda', 'cpu', or None for auto)
         """
         self.cache_dir = cache_dir or settings.model_cache_dir
-        Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
+        try:
+            Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            # Fallback for Hugging Face Spaces where local dir might be readonly
+            self.cache_dir = "/tmp/models"
+            Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
+            logger.warning(f"⚠️ Permission denied for {settings.model_cache_dir}. Using fallback: {self.cache_dir}")
         
         # Auto-detect device
         if device is None:
