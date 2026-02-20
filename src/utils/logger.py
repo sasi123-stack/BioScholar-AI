@@ -9,7 +9,13 @@ from src.utils.config import PROJECT_ROOT, settings
 
 # Create logs directory
 LOG_DIR = PROJECT_ROOT / "logs"
-LOG_DIR.mkdir(exist_ok=True)
+try:
+    LOG_DIR.mkdir(exist_ok=True)
+except PermissionError:
+    # Fallback for environments with restricted permissions like Hugging Face Spaces
+    LOG_DIR = Path("/tmp/logs")
+    LOG_DIR.mkdir(exist_ok=True, parents=True)
+    print(f"⚠️ Permission denied for local logs. Using fallback: {LOG_DIR}")
 
 # Remove default handler
 logger.remove()

@@ -3,11 +3,10 @@ import sys
 import logging
 import asyncio
 import sqlite3
-import threading
+import socket
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler
 from groq import Groq
-from flask import Flask
 
 # --- PRE-FLIGHT LOGGING ---
 print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
@@ -15,7 +14,7 @@ print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct"
+MODEL_NAME = "llama3-70b-8192" # Standard Groq Model
 DB_FILE = "/tmp/conversation_history.db" # Use /tmp for HF write safety
 
 logging.basicConfig(
@@ -24,9 +23,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- DNS CHECK ---
+def check_dns():
+    print(">>> [2/5] CHECKING NETWORK CONNECTIVITY...", flush=True)
+    for host in ["api.telegram.org", "google.com"]:
+        try:
+            addr = socket.gethostbyname(host)
+            print(f">>> [OK] {host} resolved to {addr}", flush=True)
+        except Exception as e:
+            print(f">>> [ERROR] Could not resolve {host}: {e}", flush=True)
+
 # --- DATABASE ---
 def init_db():
-    print(f">>> [2/5] INITIALIZING DATABASE AT {DB_FILE}...", flush=True)
+    print(f">>> [3/5] INITIALIZING DATABASE AT {DB_FILE}...", flush=True)
     try:
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
@@ -66,15 +75,6 @@ def clear_history(user_id):
         conn.close()
     except: pass
 
-# --- FLASK ---
-app = Flask(__name__)
-@app.route('/')
-def health(): return "MAVERICK IS ALIVE"
-
-def run_flask():
-    print(">>> [3/5] STARTING HEALTH CHECK PORT 7860...", flush=True)
-    app.run(host='0.0.0.0', port=7860)
-
 # --- TELEGRAM HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🦞 *Maverick (Hugging Face Edition) Ready.*\nMemory Active.", parse_mode='Markdown')
@@ -101,10 +101,10 @@ if __name__ == '__main__':
     print(">>> [4/5] CHECKING SECRETS...", flush=True)
     if not TELEGRAM_TOKEN or not GROQ_API_KEY:
         print(">>> [CRITICAL] MISSING API KEYS! Check Settings > Secrets.", flush=True)
-        sys.exit(1)
+        # sys.exit(1) # Don't exit, let's see why it's missing if possible
     
+    check_dns()
     init_db()
-    # threading.Thread(target=run_flask, daemon=True).start() # REMOVED TO AVOID PORT CONFLICT (Backend uses 7860)
     
     print(">>> [5/5] CONNECTING TO TELEGRAM...", flush=True)
     try:
