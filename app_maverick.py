@@ -104,7 +104,7 @@ if __name__ == '__main__':
         sys.exit(1)
     
     init_db()
-    threading.Thread(target=run_flask, daemon=True).start()
+    # threading.Thread(target=run_flask, daemon=True).start() # REMOVED TO AVOID PORT CONFLICT (Backend uses 7860)
     
     print(">>> [5/5] CONNECTING TO TELEGRAM...", flush=True)
     try:
