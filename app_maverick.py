@@ -1,12 +1,13 @@
 import os
 import sys
 import logging
-import asyncio
 import sqlite3
 import socket
+import time
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler
 from groq import Groq
+from telegram.request import HTTPXRequest
 
 # --- PRE-FLIGHT LOGGING ---
 print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
@@ -24,14 +25,25 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --- DNS CHECK ---
-def check_dns():
+def check_dns(retries=5):
     print(">>> [2/5] CHECKING NETWORK CONNECTIVITY...", flush=True)
-    for host in ["api.telegram.org", "google.com"]:
-        try:
-            addr = socket.gethostbyname(host)
-            print(f">>> [OK] {host} resolved to {addr}", flush=True)
-        except Exception as e:
-            print(f">>> [ERROR] Could not resolve {host}: {e}", flush=True)
+    hosts = ["api.telegram.org", "google.com", "api.groq.com"]
+    for host in hosts:
+        success = False
+        for i in range(retries):
+            try:
+                addr = socket.gethostbyname(host)
+                print(f">>> [OK] {host} resolved to {addr}", flush=True)
+                success = True
+                break
+            except Exception as e:
+                if i < retries - 1:
+                    print(f">>> [RETRY {i+1}] {host} failed: {e}. Waiting 10s...", flush=True)
+                    time.sleep(10)
+                else:
+                    print(f">>> [ERROR] Final failure resolving {host}: {e}", flush=True)
+        if not success and host == "api.telegram.org":
+            print(">>> [WARNING] Telegram API unreachable. Space may have restricted egress.", flush=True)
 
 # --- DATABASE ---
 def init_db():
@@ -66,15 +78,6 @@ def get_history(user_id, limit=10):
         return [{"role": r, "content": c} for r, c in reversed(rows)]
     except: return []
 
-def clear_history(user_id):
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute("DELETE FROM history WHERE user_id = ?", (user_id,))
-        conn.commit()
-        conn.close()
-    except: pass
-
 # --- TELEGRAM HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🦞 *Maverick (Hugging Face Edition) Ready.*\nMemory Active.", parse_mode='Markdown')
@@ -101,17 +104,21 @@ if __name__ == '__main__':
     print(">>> [4/5] CHECKING SECRETS...", flush=True)
     if not TELEGRAM_TOKEN or not GROQ_API_KEY:
         print(">>> [CRITICAL] MISSING API KEYS! Check Settings > Secrets.", flush=True)
-        # sys.exit(1) # Don't exit, let's see why it's missing if possible
     
     check_dns()
     init_db()
     
     print(">>> [5/5] CONNECTING TO TELEGRAM...", flush=True)
     try:
-        application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+        # Robust request settings for potentially restricted/slow networks
+        request = HTTPXRequest(connect_timeout=20, read_timeout=20)
+        
+        application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
         application.add_handler(CommandHandler('start', start))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+        
         print(">>> 🚀 MAVERICK IS FULLY OPERATIONAL!", flush=True)
         application.run_polling(drop_pending_updates=True)
     except Exception as e:
         print(f">>> [FATAL] BOT CRASHED: {e}", flush=True)
+        sys.exit(1)

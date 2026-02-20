@@ -11,7 +11,7 @@ from src.utils.config import PROJECT_ROOT, settings
 LOG_DIR = PROJECT_ROOT / "logs"
 try:
     LOG_DIR.mkdir(exist_ok=True)
-except PermissionError:
+except (PermissionError, OSError):
     # Fallback for environments with restricted permissions like Hugging Face Spaces
     LOG_DIR = Path("/tmp/logs")
     LOG_DIR.mkdir(exist_ok=True, parents=True)
