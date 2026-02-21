@@ -1,5 +1,39 @@
+import socket
 import os
 import sys
+
+# --- DNS GLOBAL MONKEYPATCH ---
+# Hugging Face Spaces often have flaky DNS resolution for external APIs.
+_original_getaddrinfo = socket.getaddrinfo
+
+DNS_PRIORITY_HOSTS = ["api.telegram.org", "api.groq.com", "google.com", "huggingface.co"]
+TELEGRAM_IPS = ["149.154.167.220", "149.154.167.219", "149.154.167.221"]
+
+def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    host_str = host.decode('utf-8') if isinstance(host, bytes) else str(host)
+    host_clean = host_str.lower().strip('.')
+    if any(h in host_clean for h in DNS_PRIORITY_HOSTS):
+        try:
+            import dns.resolver
+            resolver = dns.resolver.Resolver()
+            resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+            resolver.timeout = 2
+            resolver.lifetime = 2
+            answers = resolver.resolve(host_clean, 'A')
+            if answers:
+                ips = [str(ans) for ans in answers]
+                return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (ip, int(port) if port else 443)) for ip in ips]
+        except: pass
+        if "telegram" in host_clean:
+            return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (ip, int(port) if port else 443)) for ip in TELEGRAM_IPS]
+    try:
+        return _original_getaddrinfo(host, port, family, type, proto, flags)
+    except Exception as e:
+        raise e
+
+socket.getaddrinfo = custom_getaddrinfo
+print(">>> [DNS PATCH] Priority-based socket monkeypatch applied.", flush=True)
+
 import logging
 import asyncio
 import sqlite3
@@ -8,6 +42,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler
 from groq import Groq
 from flask import Flask
+from telegram.request import HTTPXRequest
 
 # --- PRE-FLIGHT LOGGING ---
 print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
@@ -15,8 +50,8 @@ print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct"
-DB_FILE = "/tmp/conversation_history.db" # Use /tmp for HF write safety
+MODEL_NAME = "llama3-70b-8192" 
+DB_FILE = "/tmp/conversation_history.db" 
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -108,7 +143,8 @@ if __name__ == '__main__':
     
     print(">>> [5/5] CONNECTING TO TELEGRAM...", flush=True)
     try:
-        application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+        request = HTTPXRequest(connect_timeout=30, read_timeout=30, write_timeout=30)
+        application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
         application.add_handler(CommandHandler('start', start))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
         print(">>> 🚀 MAVERICK IS FULLY OPERATIONAL!", flush=True)
