@@ -53,9 +53,14 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MODEL_NAME = "llama3-70b-8192" 
 DB_FILE = "/tmp/conversation_history.db" 
 
+LOG_FILE = "/tmp/maverick_bot.log"
 logging.basicConfig(
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(sys.stdout)
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -105,6 +110,16 @@ def clear_history(user_id):
 app = Flask(__name__)
 @app.route('/')
 def health(): return "MAVERICK IS ALIVE"
+
+@app.route('/logs')
+def get_logs():
+    try:
+        if os.path.exists("/tmp/maverick_bot.log"):
+            with open("/tmp/maverick_bot.log", "r") as f:
+                return f.read(), 200, {'Content-Type': 'text/plain'}
+        return "Log file not found", 404
+    except Exception as e:
+        return str(e), 500
 
 def run_flask():
     print(">>> [3/5] STARTING HEALTH CHECK PORT 7860...", flush=True)
