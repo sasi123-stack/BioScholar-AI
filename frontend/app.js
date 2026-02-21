@@ -61,11 +61,12 @@ var firebaseConfig = {
 };
 
 // Initialize Firebase
-var auth;
+var auth, db;
 if (typeof firebase !== 'undefined') {
     try {
         firebase.initializeApp(firebaseConfig);
         auth = firebase.auth();
+        db = firebase.firestore();
     } catch (e) {
         console.error("Firebase initialization failed:", e);
     }
@@ -216,7 +217,7 @@ function createModal() {
     // Modal is now in static HTML
 }
 
-function openArticleModal(resultId) {
+function openArticleModal(resultId, fallbackTitle = null) {
     // Convert resultId to string for comparison to handle numeric vs string IDs
     const idStr = String(resultId);
 
@@ -228,7 +229,30 @@ function openArticleModal(resultId) {
     }
 
     if (!result) {
-        console.warn('Article not found for ID:', resultId);
+        console.warn('Article not found in local memory, attempting external redirect:', resultId);
+        let type = 'pubmed';
+        if (idStr.toUpperCase().startsWith('NCT')) type = 'clinical_trials';
+
+        const url = getExternalUrl({
+            source: type,
+            id: resultId,
+            pmid: type === 'pubmed' ? resultId : null,
+            nct_id: type !== 'pubmed' ? resultId : null
+        });
+
+        if (url) {
+            window.open(url, '_blank');
+        } else if (fallbackTitle && fallbackTitle !== 'undefined') {
+            window.open(`https://scholar.google.com/scholar?q=${encodeURIComponent(fallbackTitle)}`, '_blank');
+        } else {
+            // Last resort if ID contains some digits at least
+            const match = idStr.match(/\d+/);
+            if (match) {
+                window.open(`https://pubmed.ncbi.nlm.nih.gov/${match[0]}/`, '_blank');
+            } else {
+                showToast('Article details not available locally.', 'info');
+            }
+        }
         return;
     }
 
@@ -598,7 +622,35 @@ function initEventListeners() {
             sDot.classList.remove('online');
             sDot.classList.add('offline');
         }
-        if (sText) sText.textContent = 'Offline';
+    });
+
+    // Header Menu Toggle
+    window.toggleHeaderMenu = function (e) {
+        if (e) e.stopPropagation();
+        document.getElementById('header-menu')?.classList.toggle('hidden');
+    };
+
+    // Results Actions Menu Toggle
+    window.toggleResultsMenu = function (e) {
+        if (e) e.stopPropagation();
+        document.getElementById('results-menu')?.classList.toggle('hidden');
+    };
+
+    // Close menu when clicking outside
+    window.addEventListener('click', (e) => {
+        const headerMenu = document.getElementById('header-menu');
+        const resultsMenu = document.getElementById('results-menu');
+
+        if (headerMenu && !headerMenu.classList.contains('hidden')) {
+            if (!headerMenu.contains(e.target) && !e.target.closest('.menu-trigger')) {
+                headerMenu.classList.add('hidden');
+            }
+        }
+        if (resultsMenu && !resultsMenu.classList.contains('hidden')) {
+            if (!resultsMenu.contains(e.target) && !e.target.closest('.menu-trigger')) {
+                resultsMenu.classList.add('hidden');
+            }
+        }
     });
 }
 
@@ -700,9 +752,9 @@ function initKeyboardShortcuts() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // G - Toggle sidebar/filters (mobile)
+        // G - Toggle sidebar/filters
         if (e.key.toLowerCase() === 'g' && !isMod) {
-            toggleMobileFilters();
+            toggleSidebar();
         }
 
         // F - Toggle fullscreen
@@ -777,13 +829,7 @@ function updateLoginUI() {
 
 // function openLoginModal moved to auth section
 
-function toggleMobileFilters() {
-    const sidebar = document.querySelector('.filters-sidebar');
-    sidebar.classList.toggle('show-mobile');
 
-    // Also toggle overly if we want one
-    document.body.style.overflow = sidebar.classList.contains('show-mobile') ? 'hidden' : '';
-}
 
 /**
  * Handles Google Sign-In using Firebase Auth
@@ -990,7 +1036,6 @@ function switchTab(tabName) {
     document.querySelector(`.nav-tab[data-tab="${tabName}"]`)?.classList.add('active');
 
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.getElementById(`${tabName}-tab`)?.classList.add('active');
 
     // Handle layout for different tabs
@@ -998,24 +1043,13 @@ function switchTab(tabName) {
     const scholarMain = document.querySelector('.scholar-main');
 
     scholarMain?.classList.remove('no-padding');
-    document.body.classList.remove('chat-mode');
 
-    if (tabName === 'qa' || tabName === 'trends') {
+    if (tabName === 'trends') {
         mainContainer?.classList.add('full-width');
         scholarMain?.classList.add('no-padding');
-        if (tabName === 'qa') document.body.classList.add('chat-mode');
+        updateTrendsDashboard();
     } else {
         mainContainer?.classList.remove('full-width');
-    }
-
-    // If switching to Trends, update dashboard
-    if (tabName === 'trends') {
-        updateTrendsDashboard();
-    }
-
-    // NEW: Sync with Maverick History
-    if (tabName === 'qa') {
-        loadMaverickHistory();
     }
 }
 
@@ -1829,19 +1863,19 @@ async function fetchMaverickInsight(query) {
         const data = await response.json();
 
         if (data.status === 'success') {
-            // Process bold text and newlines
-            const formattedText = data.answer
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\n/g, '<br>');
+            // Process specialized markdown
+            const formattedText = formatMaverickResponse(data.answer);
 
             insightContent.innerHTML = formattedText;
 
             // Render sources as chips
             if (data.sources && data.sources.length > 0) {
-                insightSources.innerHTML = data.sources.map(s => {
-                    const sid = s.source_id || s.id;
-                    return `
-                        <a href="#" class="insight-source-chip" onclick="openArticleModal('${sid}'); return false;">
+                insightSources.innerHTML = data.sources
+                    .filter(a => a.source_type !== 'generated' && a.source_type !== 'error')
+                    .map(s => {
+                        const sid = s.doc_id || s.source_id || s.id;
+                        return `
+                        <a href="#" class="insight-source-chip" onclick="openArticleModal('${sid}', '${(s.title || s.source_title || 'Research Source').replace(/'/g, "\\'")}'); return false;">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                                 <polyline points="14 2 14 8 20 8"/>
@@ -1849,10 +1883,10 @@ async function fetchMaverickInsight(query) {
                                 <line x1="16" y1="17" x2="8" y2="17"/>
                                 <polyline points="10 9 9 9 8 9"/>
                             </svg>
-                            ${truncate(s.source_title || 'Source', 30)}
+                            ${truncate(s.title || s.source_title || 'Source', 30)}
                         </a>
                     `;
-                }).join('');
+                    }).join('');
             }
         } else {
             insightBox.classList.add('hidden');
@@ -2950,6 +2984,55 @@ function executeAdvancedSearch() {
 // ==========================================
 // CHATBOT FUNCTIONALITY (Maverick Synchronized)
 // ==========================================
+/**
+ * Robust markdown parser for Maverick responses
+ * Supports bold, italic, lists, code, and basic underline
+ */
+function formatMaverickResponse(text) {
+    if (!text) return "";
+
+    // Escape HTML but allow <u> and <b> tags if strictly formatted
+    let html = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    // Standard Markdown formatting
+    html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
+    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/__(.*?)__/g, "<strong>$1</strong>");
+    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+    html = html.replace(/_(.*?)_/g, "<em>$1</em>");
+    html = html.replace(/`(.*?)`/g, "<code class='inline-code'>$1</code>");
+
+    // Handle LaTeX-style \boxed{...} or $\boxed{...}$
+    // Strip Math delimiters if they surround the boxed content
+    html = html.replace(/\$+\s*\\boxed\{([\s\S]*?)\}\s*\$+/g, '<span class="maverick-boxed">$1</span>');
+    html = html.replace(/\\boxed\{([\s\S]*?)\}/g, '<span class="maverick-boxed">$1</span>');
+
+    // Revive <u> tags if they were in the original response
+    html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/g, "<u>$1</u>");
+
+    // Line blocks and basic lists
+    html = html.replace(/^\s*[-*+]\s+(.*)$/gm, "<li>$1</li>");
+
+    // Check if we produced <li> items, if so wrap them
+    if (html.includes("<li>")) {
+        // This is a simple wrapper; complex nested lists would need a real lexer
+        // but this works for most AI-generated responses
+        html = html.replace(/(?:<li>.*<\/li>\s*)+/g, (match) => `<ul>${match}</ul>`);
+    }
+
+    // Convert newlines to breaks (careful not to double-break in lists)
+    html = html.replace(/\n/g, "<br>");
+
+    // Cleanup double breaks around lists
+    html = html.replace(/<\/ul><br>/g, "</ul>");
+    html = html.replace(/<br><ul>/g, "<ul>");
+
+    return html;
+}
+
 function handleChatSubmit() {
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
@@ -2969,29 +3052,37 @@ function handleChatSubmit() {
     fetch(`${API_BASE_URL}/maverick/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: message })
+        body: JSON.stringify({
+            question: message,
+            context: getHistoryForAPI() // For long term memory
+        })
     })
         .then(res => res.json())
         .then(data => {
             removeChatLoading();
             if (data.status === 'success') {
                 const aiText = data.answer;
-                const sources = (data.sources || []).map(a => ({
-                    title: a.source_title || 'Research Source',
-                    url: getExternalUrl({
-                        source: a.source_type,
-                        id: a.source_id,
-                        pmid: a.source_type === 'pubmed' ? a.source_id : null,
-                        nct_id: a.source_type !== 'pubmed' ? a.source_id : null
-                    }),
-                    score: a.confidence,
-                    type: a.source_type,
-                    snippet: a.context || '',
-                    journal: a.journal || '',
-                    date: a.publication_date || ''
-                })).slice(0, 2);
+                const reasoning = data.reasoning || "Analyzing biomedical patterns and cross-referencing indexed literature...";
+                const sources = (data.sources || [])
+                    .filter(a => a.source_type !== 'generated' && a.source_type !== 'error')
+                    .map(a => {
+                        const sid = a.doc_id || a.source_id || a.id;
+                        return {
+                            title: a.title || a.source_title || 'Research Source',
+                            url: getExternalUrl({
+                                source: a.source_type,
+                                id: sid,
+                                pmid: a.source_type === 'pubmed' ? sid : null,
+                                nct_id: a.source_type !== 'pubmed' ? sid : null
+                            }),
+                            score: a.confidence,
+                            type: a.source_type,
+                            snippet: a.context || '',
+                            id: sid
+                        };
+                    }).slice(0, 3);
 
-                addChatMessage('ai', aiText, sources);
+                addChatMessage('ai', aiText, sources, reasoning);
             } else {
                 addChatMessage('ai', "I encountered a sync error. Please check if Maverick is online.");
             }
@@ -3011,9 +3102,14 @@ function sendChatMessage(message) {
     }
 }
 
-function addChatMessage(role, text, sources = [], shouldScroll = true) {
+function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll = true, isHistoryLoad = false) {
     const history = document.getElementById('chat-history');
     if (!history) return;
+
+    // Save to Firestore if it's a new message (not loading history)
+    if (!isHistoryLoad && currentUser) {
+        saveChatToFirestore(role, text);
+    }
 
     // Hide welcome message if it's the first message
     const welcome = history.querySelector('.chat-welcome-message');
@@ -3024,8 +3120,10 @@ function addChatMessage(role, text, sources = [], shouldScroll = true) {
 
     let avatar = role === 'user' ?
         `<div class="message-avatar user-avatar-small">U</div>` :
-        `<div class="message-avatar ai-avatar-small" style="background-color: #0056D2; color: white;">
-            <span>M</span>
+        `<div class="message-avatar ai-avatar-small">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
         </div>`;
 
     let sourcesHtml = '';
@@ -3034,7 +3132,7 @@ function addChatMessage(role, text, sources = [], shouldScroll = true) {
         <div class="chat-sources">
             <div class="chat-sources-title">Supporting Evidence (Source Details)</div>
             ${sources.map(s => `
-                <div class="source-item-container insight-source-card" style="cursor: pointer;" onclick="openArticleModal('${s.id || s.source_id}')">
+                <div class="source-item-container insight-source-card" style="cursor: pointer;" onclick="openArticleModal('${s.id || s.source_id}', '${(s.title || '').replace(/'/g, "\\'")}')">
                     <div class="source-card-header">
                         <span class="meta-source ${s.type === 'pubmed' ? 'pubmed' : 'clinical-trial'}">${s.type === 'pubmed' ? 'PubMed' : 'Trial'}</span>
                         <span class="source-card-confidence">Confidence: ${(s.score * 100).toFixed(0)}%</span>
@@ -3046,17 +3144,40 @@ function addChatMessage(role, text, sources = [], shouldScroll = true) {
         </div>`;
     }
 
-    // Process text for formatting (simple bolding/newlines)
-    const formattedText = escapeHtml(text)
-        .replace(/\n/g, '<br>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Process text for formatting (Rich Markdown)
+    const formattedText = formatMaverickResponse(text);
 
     msgDiv.innerHTML = `
         ${avatar}
         <div class="message-bubble">
+            ${reasoning ? `
+                <div class="thinking-process">
+                    <button class="thinking-toggle" onclick="toggleThinking(this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                        Thinking Process
+                    </button>
+                    <div class="thinking-content hidden">${reasoning}</div>
+                </div>
+            ` : ''}
             <div class="chat-answer-content">${formattedText}</div>
             ${sourcesHtml}
+            <div class="message-actions">
+                <button class="msg-action-btn" onclick="copyToClipboard('${text.replace(/'/g, "\\'")}')" title="Copy message">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+                ${role === 'user' ? `
+                    <button class="msg-action-btn" onclick="editUserMessage(this)" title="Edit message">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                ` : `
+                    <button class="msg-action-btn" onclick="sendFeedback(this, 'up')" title="Helpful">
+                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                    </button>
+                    <button class="msg-action-btn" onclick="sendFeedback(this, 'down')" title="Not helpful">
+                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>
+                    </button>
+                `}
+            </div>
         </div>
     `;
 
@@ -3093,6 +3214,128 @@ function showChatLoading() {
     history.scrollTop = history.scrollHeight;
 }
 
+/**
+ * Long Term Memory for API
+ */
+function getHistoryForAPI() {
+    const history = document.getElementById('chat-history');
+    if (!history) return [];
+
+    const messages = Array.from(history.querySelectorAll('.chat-message'))
+        .filter(m => !m.id || m.id !== 'chat-loading-indicator')
+        .map(m => ({
+            role: m.classList.contains('user') ? 'user' : 'assistant',
+            content: m.querySelector('.chat-answer-content')?.innerText || ""
+        }));
+
+    return messages.slice(-10); // Last 10 messages for context
+}
+
+function toggleThinking(btn) {
+    const content = btn.nextElementSibling;
+    if (content) {
+        content.classList.toggle('hidden');
+        btn.classList.toggle('active');
+    }
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Message copied to clipboard', 'success');
+    });
+}
+
+function editUserMessage(btn) {
+    const bubble = btn.closest('.message-bubble');
+    const contentDiv = bubble.querySelector('.chat-answer-content');
+    const oldText = contentDiv.innerText;
+
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = oldText;
+        input.focus();
+        input.style.height = 'auto';
+        input.style.height = input.scrollHeight + 'px';
+        showToast('Message loaded into input for editing', 'info');
+    }
+}
+
+function sendFeedback(btn, type) {
+    const parent = btn.parentElement;
+    parent.querySelectorAll('.msg-action-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    showToast(`Feedback submitted: ${type === 'up' ? 'Helpful' : 'Not helpful'}`, 'success');
+
+    // In a real app, you would POST this to an analytics endpoint
+}
+
+/**
+ * Handle File Uploads (Multi-modality)
+ */
+let currentAttachments = [];
+
+function handleChatFileUpload(input) {
+    const files = Array.from(input.files);
+    const preview = document.getElementById('chat-attachment-preview');
+    if (!preview) return;
+
+    files.forEach(file => {
+        if (currentAttachments.some(a => a.name === file.name)) return;
+
+        currentAttachments.push(file);
+
+        const chip = document.createElement('div');
+        chip.className = 'attachment-chip';
+        chip.innerHTML = `
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            ${truncate(file.name, 15)}
+            <span class="attachment-remove" onclick="removeAttachment('${file.name}', this)">×</span>
+        `;
+        preview.appendChild(chip);
+    });
+
+    preview.classList.remove('hidden');
+    input.value = ""; // Reset input
+}
+
+function removeAttachment(fileName, el) {
+    currentAttachments = currentAttachments.filter(a => a.name !== fileName);
+    el.closest('.attachment-chip').remove();
+
+    const preview = document.getElementById('chat-attachment-preview');
+    if (currentAttachments.length === 0) {
+        preview.classList.add('hidden');
+    }
+}
+
+function sendChatMessage(text) {
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = text;
+        input.style.height = 'auto';
+        input.style.height = (input.scrollHeight) + 'px';
+        handleChatSubmit();
+    }
+}
+
+// Floating Maverick Chat Toggle
+function toggleMaverickChat() {
+    const chat = document.getElementById('maverick-floating-chat');
+    if (!chat) return;
+
+    const isOpen = !chat.classList.contains('hidden');
+
+    if (isOpen) {
+        chat.classList.add('hidden');
+    } else {
+        chat.classList.remove('hidden');
+        // Auto-load history on first open if needed
+        if (document.getElementById('chat-history').children.length <= 1) {
+            loadMaverickHistory();
+        }
+    }
+}
+
 function removeChatLoading() {
     const loader = document.getElementById('chat-loading-indicator');
     if (loader) loader.remove();
@@ -3101,21 +3344,45 @@ function removeChatLoading() {
 function clearChat() {
     const history = document.getElementById('chat-history');
     if (history) {
-        // Restore welcome message
         history.innerHTML = `
-            <div class="chat-welcome-message" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: 100%;">
-                <div class="welcome-logo" style="background: #0088cc; color: white; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; margin: 0 auto 20px auto;">
-                    M
+            <div class="chat-welcome-message">
+                <div class="welcome-logo" style="background: linear-gradient(135deg, var(--primary-blue), #0d47a1); color: white; border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto; box-shadow: 0 4px 12px rgba(0, 86, 210, 0.3);">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
                 </div>
-                <h2>Hello, I'm Maverick</h2>
-                <p>Your Groq Llama 4 Maverick research engine. Ask me about biomedical topics, clinical trials, or specific articles.</p>
-                <div class="chat-examples">
-                    <button onclick="sendChatMessage('What are the latest treatments for diabetes?')">Latest diabetes treatments</button>
-                    <button onclick="sendChatMessage('Summarize the side effects of mRNA vaccines')">mRNA vaccine side effects</button>
-                    <button onclick="sendChatMessage('Find clinical trials for Alzheimer\\'s disease')">Alzheimer's clinical trials</button>
+                <h2>Maverick AI v4.0</h2>
+                <p>Chat cleared. Ask me a new research question or upload a file to begin.</p>
+                <div class="chat-examples" style="display: flex; flex-direction: column; gap: 8px; margin-top: 15px;">
+                    <button class="menu-item" style="font-size: 12px; justify-content: center;" onclick="sendChatMessage('Summarize latest CRISPR breakthroughs')">Summarize CRISPR breakthroughs</button>
+                    <button class="menu-item" style="font-size: 12px; justify-content: center;" onclick="sendChatMessage('Compare mRNA vaccine side effects')">mRNA vs Traditional Vaccines</button>
                 </div>
             </div>
         `;
+    }
+}
+
+async function deleteChatHistory() {
+    if (!currentUser || !db) {
+        showToast("Please login to clear cloud history", "info");
+        return;
+    }
+
+    if (confirm("Permanently wipe your Maverick cloud memory? This cannot be undone.")) {
+        try {
+            const snapshot = await db.collection("users").doc(currentUser.uid).collection("chat_history").get();
+            const batch = db.batch();
+            snapshot.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+
+            showToast("Cloud history wiped successfully", "success");
+            clearChat();
+        } catch (err) {
+            console.error("Firestore delete error:", err);
+            showToast("Error clearing cloud history", "error");
+        }
     }
 }
 
@@ -3712,12 +3979,55 @@ if (typeof firebase !== 'undefined' && auth) {
                 photoURL: user.photoURL
             };
             localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            loadChatHistoryFromFirestore();
         } else {
             currentUser = null;
             localStorage.removeItem('currentUser');
+            // Optionally clear chat on logout
+            // clearChat(); 
         }
         updateLoginUI();
     });
+}
+
+/**
+ * Cloud Firebase Storage for Chat History
+ */
+function saveChatToFirestore(role, text) {
+    if (!currentUser || !db) return;
+
+    db.collection("users").doc(currentUser.uid).collection("chat_history").add({
+        role: role,
+        text: text,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(err => console.error("Error saving chat to Firestore:", err));
+}
+
+function loadChatHistoryFromFirestore() {
+    if (!currentUser || !db) return;
+
+    db.collection("users").doc(currentUser.uid).collection("chat_history")
+        .orderBy("timestamp", "asc")
+        .limit(50)
+        .get()
+        .then(querySnapshot => {
+            const history = document.getElementById('chat-history');
+            if (!history) return;
+
+            // If there's history, clear the welcome message once
+            if (!querySnapshot.empty) {
+                const welcome = history.querySelector('.chat-welcome-message');
+                if (welcome) welcome.style.display = 'none';
+            }
+
+            querySnapshot.forEach(doc => {
+                const data = doc.data();
+                // Pass false for shouldScroll to avoid jumping, then scroll once at the end
+                addChatMessage(data.role, data.text, [], null, false, true);
+            });
+            history.scrollTop = history.scrollHeight;
+        })
+        .catch(err => console.error("Error loading chat history:", err));
 }
 
 
@@ -5069,6 +5379,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Notification initialization
     initNotifications();
 
+    // Initialize Chat Resizer
+    initChatResizer();
+
     // Close notification dropdown when clicking outside
     document.addEventListener('click', function (e) {
         const notificationContainer = document.querySelector('.notification-container');
@@ -5105,3 +5418,60 @@ document.addEventListener('DOMContentLoaded', function () {
     setInterval(checkSystemStatus, 30000);
 });
 
+function openIntelligenceModal() {
+    const modal = document.getElementById('intelligence-modal');
+    if (modal) {
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeIntelligenceModal() {
+    const modal = document.getElementById('intelligence-modal');
+    if (modal) {
+        modal.classList.remove('open');
+        document.body.style.overflow = 'auto';
+    }
+}
+
+/**
+ * Handle floating chat resizing
+ */
+function initChatResizer() {
+    const chat = document.getElementById('maverick-floating-chat');
+    const resizer = document.getElementById('chat-resizer');
+
+    if (!resizer || !chat) return;
+
+    let startX, startY, startWidth, startHeight;
+
+    resizer.addEventListener('mousedown', initDrag, false);
+
+    function initDrag(e) {
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = parseInt(document.defaultView.getComputedStyle(chat).width, 10);
+        startHeight = parseInt(document.defaultView.getComputedStyle(chat).height, 10);
+        document.documentElement.addEventListener('mousemove', doDrag, false);
+        document.documentElement.addEventListener('mouseup', stopDrag, false);
+        chat.classList.add('resizing');
+    }
+
+    function doDrag(e) {
+        const newWidth = startWidth - (e.clientX - startX);
+        const newHeight = startHeight - (e.clientY - startY);
+
+        if (newWidth > 320 && newWidth < 800) {
+            chat.style.width = newWidth + 'px';
+        }
+        if (newHeight > 400 && newHeight < window.innerHeight - 100) {
+            chat.style.height = newHeight + 'px';
+        }
+    }
+
+    function stopDrag(e) {
+        document.documentElement.removeEventListener('mousemove', doDrag, false);
+        document.documentElement.removeEventListener('mouseup', stopDrag, false);
+        chat.classList.remove('resizing');
+    }
+}

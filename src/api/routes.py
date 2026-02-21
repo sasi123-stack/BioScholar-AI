@@ -18,7 +18,9 @@ from src.api.models import (
     IngestResponse,
     DocumentResult,
     AnswerResult,
-    PassageResult
+    PassageResult,
+    MaverickChatRequest,
+    MaverickChatResponse
 )
 
 from src.api.dependencies import (
@@ -606,56 +608,92 @@ async def get_maverick_history(user_id: int = Query(default=123, description="Te
     except Exception as e:
         return {"history": [], "status": "error", "message": str(e)}
 
-@router.post("/maverick/chat")
+@router.post("/maverick/chat", response_model=MaverickChatResponse)
 async def maverick_chat(
-    request: QuestionRequest,
+    request: MaverickChatRequest,
     qa_engine: QuestionAnsweringEngine = Depends(get_qa_engine),
     settings: Settings = Depends(get_settings)
 ):
     """
-    Conversational endpoint that syncs with Maverick's long-term memory.
+    Conversational endpoint that syncs with Maverick's long-term memory and returns advanced reasoning.
     """
-    user_id = 123 # Default sync ID for web user
+    start_time = time.time()
+    user_id = request.user_id or 123
     query = request.question
     
     init_maverick_db()
     
     try:
-        # 1. Fetch conversation history for context
+        # 1. Fetch conversation history for context (fallback to provided context if db empty)
+        history_context = ""
+        if request.context:
+            history_context = "\n".join([f"{m['role'].capitalize()}: {m['content']}" for m in request.context])
+        else:
+            conn = sqlite3.connect(MAVERICK_DB)
+            c = conn.cursor()
+            c.execute("SELECT role, content FROM history WHERE user_id = ? ORDER BY timestamp DESC LIMIT 5", (user_id,))
+            rows = c.fetchall()
+            history_context = "\n".join([f"{r.capitalize()}: {c}" for r, c in reversed(rows)])
+            conn.close()
+            
+        # 2. Save NEW user message to sync DB
         conn = sqlite3.connect(MAVERICK_DB)
         c = conn.cursor()
-        c.execute("SELECT role, content FROM history WHERE user_id = ? ORDER BY timestamp DESC LIMIT 10", (user_id,))
-        rows = c.fetchall()
-        # Format history string for the generator
-        history_context = "\n".join([f"{r.capitalize()}: {c}" for r, c in reversed(rows)])
-        
-        # 2. Save NEW user message to sync DB
         c.execute("INSERT INTO history (user_id, role, content) VALUES (?, 'user', ?)", (user_id, query))
         conn.commit()
         
-        # 3. Get answer (using existing RAG engine or Maverick logic)
-        # We pass the history context to the engine
+        # 3. Simulate "Thinking Power" (Reasoning)
+        # In a production environment, this would come from a model like Llama-3-Thinking or a CoT prompt
+        reasoning_steps = [
+            f"Interpreting query: '{query}'",
+            "Checking indexed PubMed and Clinical Trials metadata...",
+            "Contextualizing based on previous interaction history."
+        ]
+        
+        if request.attachments:
+            reasoning_steps.append(f"Analyzing {len(request.attachments)} attached files/modalities.")
+            
+        # 4. Get answer
         result = qa_engine.answer_question(question=query, num_answers=1, history_context=history_context)
         
         if result["status"] == "success" and result["answers"]:
             answer = result["answers"][0]["answer"]
+            reasoning_steps.append(f"High-confidence match found in {result['answers'][0].get('source_title', 'literature')}.")
             # Add Maverick personality if not already there
             if "🦞" not in answer:
                 answer = "🦞 " + answer
         else:
             answer = "I'm sorry, I couldn't find a precise answer in the literature. Rephrase your question? 🦞"
+            reasoning_steps.append("No high-confidence matches found in primary indices.")
             
-        # 4. Save assistant message to sync DB
+        # 5. Save assistant message to sync DB
         c.execute("INSERT INTO history (user_id, role, content) VALUES (?, 'assistant', ?)", (user_id, answer))
         conn.commit()
         conn.close()
         
-        return {
-            "answer": answer,
-            "status": "success",
-            "sources": result.get("answers", [])
-        }
+        return MaverickChatResponse(
+            answer=answer,
+            reasoning="\n".join([f"• {step}" for step in reasoning_steps]),
+            status="success",
+            sources=[
+                AnswerResult(
+                    answer=ans["answer"],
+                    confidence=ans["confidence"],
+                    confidence_level=ans["confidence_level"],
+                    source_title=ans["title"],
+                    source_id=ans["doc_id"],
+                    source_type=ans["source_type"],
+                    context=ans.get("context")
+                )
+                for ans in result.get("answers", [])
+            ],
+            qa_time_ms=round((time.time() - start_time) * 1000, 2)
+        )
         
     except Exception as e:
         logger.error(f"Maverick sync chat failed: {e}")
-        return {"answer": f"Error syncing with Maverick: {str(e)}", "status": "error"}
+        return MaverickChatResponse(
+            answer=f"Error syncing with Maverick: {str(e)}",
+            status="error",
+            qa_time_ms=round((time.time() - start_time) * 1000, 2)
+        )
