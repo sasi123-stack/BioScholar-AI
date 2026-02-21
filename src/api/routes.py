@@ -572,18 +572,35 @@ async def get_maverick_history(user_id: int = Query(default=123, description="Te
     """
     init_maverick_db()
     
-    if not os.path.exists(MAVERICK_DB):
-        return {"history": [], "message": f"Database not found at {MAVERICK_DB}"}
-    
     try:
         conn = sqlite3.connect(MAVERICK_DB)
         c = conn.cursor()
-        c.execute("SELECT role, content, timestamp FROM history WHERE user_id = ? ORDER BY timestamp ASC", (user_id,))
+        
+        # Debug: Get table info
+        c.execute("SELECT COUNT(*) FROM history")
+        total_count = c.fetchone()[0]
+        
+        # Get history for specific user
+        c.execute("SELECT role, content, timestamp, user_id FROM history WHERE user_id = ? ORDER BY timestamp ASC", (user_id,))
         rows = c.fetchall()
+        
+        # Get last 5 overall for debug
+        c.execute("SELECT role, content, user_id FROM history ORDER BY timestamp DESC LIMIT 5")
+        recent_all = [{"role": r, "content": c, "uid": uid} for r, c, uid in c.fetchall()]
+        
         conn.close()
         
-        history = [{"role": r, "content": c, "timestamp": ts} for r, c, ts in rows]
-        return {"history": history, "status": "success"}
+        history = [{"role": r, "content": c, "timestamp": ts} for r, c, ts, uid in rows]
+        return {
+            "history": history, 
+            "status": "success", 
+            "debug": {
+                "db_path": MAVERICK_DB,
+                "total_records": total_count,
+                "recent_overall": recent_all,
+                "queried_user_id": user_id
+            }
+        }
     except Exception as e:
         return {"history": [], "status": "error", "message": str(e)}
 
