@@ -109,7 +109,132 @@ def clear_history(user_id):
 # --- FLASK ---
 app = Flask(__name__)
 @app.route('/')
-def health(): return "MAVERICK IS ALIVE"
+def landing():
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Maverick AI | BioMedScholar</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+        <style>
+            :root {
+                --primary: #0088cc;
+                --bg: #0f172a;
+                --text: #f8fafc;
+                --accent: #38bdf8;
+            }
+            body {
+                margin: 0;
+                padding: 0;
+                font-family: 'Inter', sans-serif;
+                background-color: var(--bg);
+                color: var(--text);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                text-align: center;
+                overflow: hidden;
+            }
+            .background {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: radial-gradient(circle at 50% 50%, #1e293b 0%, #0f172a 100%);
+                z-index: -1;
+            }
+            .lobster-icon {
+                font-size: 80px;
+                margin-bottom: 20px;
+                filter: drop-shadow(0 0 20px rgba(0, 136, 204, 0.4));
+                animation: float 3s ease-in-out infinite;
+            }
+            @keyframes float {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-10px); }
+            }
+            h1 {
+                font-size: 3.5rem;
+                font-weight: 800;
+                margin: 0;
+                letter-spacing: -1px;
+                background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+            p {
+                font-size: 1.2rem;
+                color: #94a3b8;
+                max-width: 500px;
+                margin: 20px 0 40px;
+                line-height: 1.6;
+            }
+            .cta-button {
+                display: inline-flex;
+                align-items: center;
+                gap: 12px;
+                padding: 16px 32px;
+                background-color: var(--primary);
+                color: white;
+                text-decoration: none;
+                font-weight: 700;
+                font-size: 1.1rem;
+                border-radius: 50px;
+                box-shadow: 0 10px 25px rgba(0, 136, 204, 0.4);
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            .cta-button:hover {
+                transform: translateY(-3px) scale(1.02);
+                box-shadow: 0 15px 35px rgba(0, 136, 204, 0.6);
+                background-color: #0099e6;
+            }
+            .badge {
+                padding: 6px 12px;
+                background: rgba(56, 189, 248, 0.15);
+                color: var(--accent);
+                border-radius: 20px;
+                font-size: 0.8rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                margin-bottom: 30px;
+                border: 1px solid rgba(56, 189, 248, 0.2);
+            }
+            .footer {
+                position: absolute;
+                bottom: 40px;
+                color: #475569;
+                font-size: 0.9rem;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="background"></div>
+        <div class="badge">Experimental Research AI</div>
+        <div class="lobster-icon">🦞</div>
+        <h1>Maverick AI</h1>
+        <p>Advanced Biomedical Intelligence powered by Llama 4. Persistent research memory on your favorite messaging platform.</p>
+        
+        <a href="https://web.telegram.org/a/#8513211167" target="_blank" class="cta-button">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            Open in Telegram
+        </a>
+
+        <div class="footer">
+            &copy; 2026 BioMedScholar AI • Maverick Standalone Instance
+        </div>
+    </body>
+    </html>
+    """
+
 
 @app.route('/logs')
 def get_logs():
