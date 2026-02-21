@@ -31,13 +31,13 @@ logger = logging.getLogger(__name__)
 _original_getaddrinfo = socket.getaddrinfo
 
 def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-    host_clean = host.strip('.')
     try:
         return _original_getaddrinfo(host, port, family, type, proto, flags)
     except Exception as system_err:
-        # If system DNS fails, try custom resolution for known important hosts
+        host_clean = host.strip('.') if isinstance(host, str) else ""
         if any(h in host_clean.lower() for h in ["telegram", "groq", "google"]):
             print(f">>> [DNS PATCH] System failed for {host}: {system_err}. Using fallback...", flush=True)
+            first_ip = None
             try:
                 import dns.resolver
                 resolver = dns.resolver.Resolver()
@@ -48,30 +48,45 @@ def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
                 if answers:
                     first_ip = str(answers[0])
                     print(f">>> [DNS PATCH] Custom DNS resolved {host} to {first_ip}", flush=True)
-                    return [(socket.AF_INET, type, proto, '', (first_ip, port))]
             except Exception as e:
                 print(f">>> [DNS PATCH] Custom DNS also failed for {host}: {e}", flush=True)
                 
-            # LAST RESORT: Hardcoded IP for Telegram if everything else fails
-            if "telegram" in host_clean.lower():
-                hardcoded_ip = "149.154.167.220" # A known stable IP for api.telegram.org
-                print(f">>> [DNS PATCH] CRITICAL FALLBACK: Using hardcoded IP {hardcoded_ip} for {host}", flush=True)
-                return [(socket.AF_INET, type, proto, '', (hardcoded_ip, port))]
+            # LAST RESORT: Hardcoded IP for Telegram
+            if not first_ip and "telegram" in host_clean.lower():
+                first_ip = "149.154.167.220" # A known stable IP for api.telegram.org
+                print(f">>> [DNS PATCH] CRITICAL FALLBACK: Using hardcoded IP {first_ip} for {host}", flush=True)
+            
+            if first_ip:
+                # Ensure port is an integer
+                try:
+                    res_port = int(port)
+                except (ValueError, TypeError):
+                    res_port = 443 if "telegram" in host_clean else 80
+                
+                # Use standard values for type/proto if they are 0
+                res_type = type if type != 0 else socket.SOCK_STREAM
+                res_proto = proto if proto != 0 else 6 # TCP
+                
+                # Strictly compliant return format: (family, type, proto, canonname, sockaddr)
+                # sockaddr for AF_INET is (str, int)
+                return [(socket.AF_INET, res_type, res_proto, '', (first_ip, res_port))]
         
         raise system_err
 
 # Apply the patch immediately
 socket.getaddrinfo = custom_getaddrinfo
-socket.gethostbyname = lambda host: custom_getaddrinfo(host, 0)[0][4][0]
-print(">>> [DNS PATCH] Aggressive global socket monkeypatch applied.", flush=True)
+print(">>> [DNS PATCH] Refined global socket monkeypatch applied.", flush=True)
 
 def resolve_hostname(host):
     """Simple wrapper for logging/checking resolution."""
     try:
-        addr = socket.gethostbyname(host)
-        return addr
+        # Use our patched getaddrinfo to get the IP
+        res = socket.getaddrinfo(host, 443)
+        if res:
+            return res[0][4][0]
     except:
-        return None
+        pass
+    return None
 
 def check_dns(retries=5):
     print(">>> [2/5] CHECKING NETWORK CONNECTIVITY...", flush=True)

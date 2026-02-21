@@ -16,11 +16,12 @@ import socket
 _original_getaddrinfo = socket.getaddrinfo
 
 def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-    host_clean = host.strip('.')
     try:
         return _original_getaddrinfo(host, port, family, type, proto, flags)
     except Exception:
+        host_clean = host.strip('.') if isinstance(host, str) else ""
         if any(h in host_clean.lower() for h in ["telegram", "groq", "google", "huggingface"]):
+            first_ip = None
             try:
                 import dns.resolver
                 resolver = dns.resolver.Resolver()
@@ -30,10 +31,20 @@ def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
                 answers = resolver.resolve(host_clean, 'A')
                 if answers:
                     first_ip = str(answers[0])
-                    return [(socket.AF_INET, type, proto, '', (first_ip, port))]
             except Exception:
-                if "telegram" in host_clean.lower():
-                    return [(socket.AF_INET, type, proto, '', ("149.154.167.220", port))]
+                pass
+            
+            if not first_ip and "telegram" in host_clean.lower():
+                first_ip = "149.154.167.220"
+                
+            if first_ip:
+                try:
+                    res_port = int(port)
+                except (ValueError, TypeError):
+                    res_port = 443
+                res_type = type if type != 0 else socket.SOCK_STREAM
+                res_proto = proto if proto != 0 else 6
+                return [(socket.AF_INET, res_type, res_proto, '', (first_ip, res_port))]
         raise
 
 socket.getaddrinfo = custom_getaddrinfo
