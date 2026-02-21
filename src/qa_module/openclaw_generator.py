@@ -34,7 +34,7 @@ class OpenClawGenerator:
             logger.error(f"Failed to initialize OpenClaw client: {e}")
             self.client = None
 
-    def generate_answer(self, question: str, passages: List[Dict]) -> Dict:
+    def generate_answer(self, question: str, passages: List[Dict], history_context: Optional[str] = None) -> Dict:
         """Generate answer using OpenClaw/OpenAI."""
         if not self.client:
              return {
@@ -58,7 +58,7 @@ class OpenClawGenerator:
             "Use clear reasoning to connect concepts and identify patterns across sources."
         )
 
-        user_content = f"Question: {question}\n\nContext:\n{context_text}"
+        user_content = f"Conversation History:\n{history_context if history_context else 'No previous history.'}\n\nQuestion: {question}\n\nContext:\n{context_text}"
 
         try:
             logger.info(f"Requesting OpenClaw completion for: {question[:50]}...")

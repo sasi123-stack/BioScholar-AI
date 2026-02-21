@@ -621,15 +621,21 @@ async def maverick_chat(
     init_maverick_db()
     
     try:
-        # 1. Save user message to sync DB
+        # 1. Fetch conversation history for context
         conn = sqlite3.connect(MAVERICK_DB)
         c = conn.cursor()
+        c.execute("SELECT role, content FROM history WHERE user_id = ? ORDER BY timestamp DESC LIMIT 10", (user_id,))
+        rows = c.fetchall()
+        # Format history string for the generator
+        history_context = "\n".join([f"{r.capitalize()}: {c}" for r, c in reversed(rows)])
+        
+        # 2. Save NEW user message to sync DB
         c.execute("INSERT INTO history (user_id, role, content) VALUES (?, 'user', ?)", (user_id, query))
         conn.commit()
         
-        # 2. Get answer (using existing RAG engine or Maverick logic)
-        # We can use the qa_engine but style it as Maverick 🦞
-        result = qa_engine.answer_question(question=query, num_answers=1)
+        # 3. Get answer (using existing RAG engine or Maverick logic)
+        # We pass the history context to the engine
+        result = qa_engine.answer_question(question=query, num_answers=1, history_context=history_context)
         
         if result["status"] == "success" and result["answers"]:
             answer = result["answers"][0]["answer"]
@@ -639,7 +645,7 @@ async def maverick_chat(
         else:
             answer = "I'm sorry, I couldn't find a precise answer in the literature. Rephrase your question? 🦞"
             
-        # 3. Save assistant message to sync DB
+        # 4. Save assistant message to sync DB
         c.execute("INSERT INTO history (user_id, role, content) VALUES (?, 'assistant', ?)", (user_id, answer))
         conn.commit()
         conn.close()

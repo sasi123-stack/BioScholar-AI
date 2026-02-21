@@ -31,12 +31,13 @@ class GeminiGenerator:
         except Exception as e:
             logger.error(f"Failed to initialize Gemini model: {e}")
 
-    def generate_answer(self, question: str, passages: List[Dict]) -> Dict:
+    def generate_answer(self, question: str, passages: List[Dict], history_context: Optional[str] = None) -> Dict:
         """Generate an answer based on the question and retrieved passages.
         
         Args:
             question: User's question
             passages: List of retrieved passage dictionaries
+            history_context: String containing previous conversation turns
             
         Returns:
             Dictionary containing the generated answer and confidence
@@ -67,7 +68,7 @@ class GeminiGenerator:
             "Cite your sources using [1], [2], etc., corresponding to the provided passages."
         )
 
-        prompt = f"{system_prompt}\n\nQuestion: {question}\n\nContext Passages:\n{context_text}"
+        prompt = f"{system_prompt}\n\nConversation History:\n{history_context if history_context else 'No previous history.'}\n\nQuestion: {question}\n\nContext Passages:\n{context_text}"
 
         try:
             logger.info(f"Requesting Gemini completion for: {question[:50]}...")

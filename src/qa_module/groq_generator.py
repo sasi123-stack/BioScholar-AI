@@ -33,12 +33,13 @@ class GroqGenerator:
         # Default model to Llama 4 Maverick for cutting-edge performance
         self.model_name = 'meta-llama/llama-4-maverick-17b-128e-instruct'
 
-    def generate_answer(self, question: str, passages: List[Dict]) -> Dict:
+    def generate_answer(self, question: str, passages: List[Dict], history_context: Optional[str] = None) -> Dict:
         """Generate an answer based on the question and retrieved passages.
         
         Args:
             question: User's question
             passages: List of retrieved passage dictionaries
+            history_context: String containing previous conversation turns
             
         Returns:
             Dictionary containing the generated answer and confidence
@@ -80,7 +81,7 @@ class GroqGenerator:
                     },
                     {
                         "role": "user",
-                        "content": f"Question: {question}\n\nContext Passages:\n{context_text}"
+                        "content": f"Conversation History:\n{history_context if history_context else 'No previous history.'}\n\nQuestion: {question}\n\nContext Passages:\n{context_text}"
                     }
                 ],
                 model=self.model_name,
