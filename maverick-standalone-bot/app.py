@@ -50,7 +50,7 @@ print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "llama-3.3-70b-versatile" 
+MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct" 
 DB_FILE = "/tmp/conversation_history.db" 
 
 LOG_FILE = "/tmp/maverick_bot.log"
