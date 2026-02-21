@@ -16,25 +16,28 @@ import socket
 _original_getaddrinfo = socket.getaddrinfo
 
 def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    host_clean = host.strip('.')
     try:
         return _original_getaddrinfo(host, port, family, type, proto, flags)
-    except socket.gaierror:
-        if host in ["api.telegram.org", "api.groq.com", "google.com", "huggingface.co", "download.pytorch.org"]:
+    except Exception:
+        if any(h in host_clean.lower() for h in ["telegram", "groq", "google", "huggingface"]):
             try:
                 import dns.resolver
                 resolver = dns.resolver.Resolver()
-                resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+                resolver.nameservers = ['1.1.1.1', '8.8.8.8']
                 resolver.timeout = 5
                 resolver.lifetime = 5
-                answers = resolver.resolve(host, 'A')
+                answers = resolver.resolve(host_clean, 'A')
                 if answers:
                     first_ip = str(answers[0])
                     return [(socket.AF_INET, type, proto, '', (first_ip, port))]
             except Exception:
-                pass
+                if "telegram" in host_clean.lower():
+                    return [(socket.AF_INET, type, proto, '', ("149.154.167.220", port))]
         raise
 
 socket.getaddrinfo = custom_getaddrinfo
+socket.gethostbyname = lambda host: custom_getaddrinfo(host, 0)[0][4][0]
 
 
 @asynccontextmanager
