@@ -24,29 +24,47 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- DNS CUSTOM RESOLVER ---
+# --- DNS GLOBAL MONKEYPATCH ---
+# Hugging Face Spaces often have flaky DNS resolution for external APIs.
+# We override the system's low-level address resolution to use custom DNS if it fails.
+
+_original_getaddrinfo = socket.getaddrinfo
+
+def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    try:
+        return _original_getaddrinfo(host, port, family, type, proto, flags)
+    except socket.gaierror:
+        # If system DNS fails, try custom resolution for known important hosts
+        if host in ["api.telegram.org", "api.groq.com", "google.com"]:
+            print(f">>> [DNS PATCH] System resolution failed for {host}. Trying custom...", flush=True)
+            try:
+                import dns.resolver
+                resolver = dns.resolver.Resolver()
+                resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+                resolver.timeout = 5
+                resolver.lifetime = 5
+                answers = resolver.resolve(host, 'A')
+                if answers:
+                    first_ip = str(answers[0])
+                    print(f">>> [DNS PATCH] Custom resolved {host} to {first_ip}", flush=True)
+                    # Return in the format getaddrinfo expects: (family, type, proto, canonname, sockaddr)
+                    # We usually want AF_INET (2) for 'A' records
+                    return [(socket.AF_INET, type, proto, '', (first_ip, port))]
+            except Exception as e:
+                print(f">>> [DNS PATCH] Custom resolution also failed for {host}: {e}", flush=True)
+        raise
+
+# Apply the patch immediately
+socket.getaddrinfo = custom_getaddrinfo
+print(">>> [DNS PATCH] Global socket monkeypatch applied.", flush=True)
+
 def resolve_hostname(host):
-    """
-    Attempts to resolve hostname using system first, then falls back to custom DNS
-    if dnspython is available.
-    """
+    """Simple wrapper for logging/checking resolution."""
     try:
         addr = socket.gethostbyname(host)
         return addr
-    except Exception as e:
-        print(f">>> [SYSTEM DNS FAILED] {host}: {e}. Trying custom DNS...", flush=True)
-        try:
-            import dns.resolver
-            resolver = dns.resolver.Resolver()
-            resolver.nameservers = ['8.8.8.8', '1.1.1.1'] # Google and Cloudflare
-            answers = resolver.resolve(host, 'A')
-            if answers:
-                addr = str(answers[0])
-                print(f">>> [CUSTOM DNS SUCCESS] {host} resolved to {addr}", flush=True)
-                return addr
-        except Exception as e2:
-            print(f">>> [CUSTOM DNS FAILED] {host}: {e2}", flush=True)
-    return None
+    except:
+        return None
 
 def check_dns(retries=5):
     print(">>> [2/5] CHECKING NETWORK CONNECTIVITY...", flush=True)
