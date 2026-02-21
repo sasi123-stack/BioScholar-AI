@@ -64,6 +64,11 @@ from groq import Groq
 from telegram.request import HTTPXRequest
 import json
 import httpx
+import subprocess
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 # --- PRE-FLIGHT LOGGING ---
 print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
@@ -176,6 +181,49 @@ async def search_internet(query: str):
         print(f">>> [ERROR] Serper search failed: {e}", flush=True)
         return None
 
+async def test_website(url: str):
+    """Test a website using Selenium headless mode and return the results."""
+    print(f">>> [BROWSER TEST] Testing URL: {url}", flush=True)
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1280,720")
+    
+    # Path handling for HF Spaces / Debian
+    if os.path.exists("/usr/bin/chromium"):
+        chrome_options.binary_location = "/usr/bin/chromium"
+    
+    try:
+        # We use a standard driver init; on HF/Linux we might need more config but this is the baseline
+        driver = webdriver.Chrome(options=chrome_options)
+        driver.get(url)
+        time.sleep(5) # Wait for JS
+        
+        title = driver.title
+        final_url = driver.current_url
+        page_source_len = len(driver.page_source)
+        
+        # Take a peek at the main heading if possible
+        heading = "Could not find h1"
+        try:
+            h1 = driver.find_element("tag name", "h1")
+            heading = h1.text
+        except: pass
+        
+        driver.quit()
+        
+        return {
+            "status": "success",
+            "title": title,
+            "final_url": final_url,
+            "heading": heading,
+            "size": page_source_len
+        }
+    except Exception as e:
+        print(f">>> [ERROR] Browser test failed: {e}", flush=True)
+        return {"status": "error", "message": str(e)}
+
 # --- TELEGRAM HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🦞 *Maverick (Hugging Face Edition) Ready.*\nMemory Active.", parse_mode='Markdown')
@@ -191,10 +239,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Save user message to the shared DB
         save_message(user_id, "user", user_text)
         
-        # 1. BRAIN SKILL: Internet Search
+        # 1. BRAIN SKILLS: Internet Search & Browser Testing
         internet_knowledge = None
-        if len(user_text) > 5:
-            # Only search if it's not a tiny command
+        browser_report = None
+        
+        # Detect "test URL" intent
+        if "test " in user_text.lower() and "http" in user_text.lower():
+            # Extract URL
+            parts = user_text.split()
+            target_url = next((p for p in parts if "http" in p), None)
+            if target_url:
+                browser_report = await test_website(target_url)
+        
+        # Only search internet if NOT doing a browser test (to avoid delay)
+        if not browser_report and len(user_text) > 8:
             internet_knowledge = await search_internet(user_text)
         
         # Initialize client
@@ -203,19 +261,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Get history for this specific Telegram user
         history = get_history(user_id)
         
-        # 2. STRONG SYSTEM PROMPT - Maverick Unleashed with Internet Skills
+        # 2. STRONG SYSTEM PROMPT - Maverick Unleashed with Multi-Skills
         system_content = (
             "You are Maverick (🦞), a sharp, precise, and analytical biomedical research assistant with LONG-TERM MEMORY. "
             "You are conversing with a researcher. Always utilize the 'Conversation History' to maintain context. "
-            "You also have the SKILL to search the internet. Use the provided 'Internet Search Results' (if any) "
-            "to provide the most accurate, up-to-date, and evidence-based answer. "
+            "You have multiple SKILLS:\n"
+            "1. INTERNET SEARCH: Use provided results to give up-to-date answers.\n"
+            "2. BROWSER TESTING: You can run headless Selenium tests. Use the 'Browser Test Report' to verify a site's status.\n\n"
             "Your personality is scientific, highly efficient, and professional. "
-            "If you use information from the search results, cite the source or URL. "
             "Never claim you do not have memory; instead, use the history to provide continuous support."
         )
         
         if internet_knowledge:
             system_content += f"\n\n[INTERNET SEARCH RESULTS]:\n{internet_knowledge}"
+            
+        if browser_report:
+            system_content += f"\n\n[BROWSER TEST REPORT]:\n{json.dumps(browser_report, indent=2)}"
         
         messages = [{"role": "system", "content": system_content}]
         
