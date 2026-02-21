@@ -152,18 +152,59 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     user_id = update.effective_user.id
     if not user_text: return
+    
     try:
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        
+        # Save user message to the shared DB
         save_message(user_id, "user", user_text)
+        
+        # Initialize client (re-use if possible, but fine for now)
         client = Groq(api_key=GROQ_API_KEY)
+        
+        # Get history for this specific Telegram user
         history = get_history(user_id)
-        messages = [{"role": "system", "content": "You are Maverick 🦞."}] + history
-        response = client.chat.completions.create(model=MODEL_NAME, messages=messages)
+        
+        # STRONG SYSTEM PROMPT - Maverick Unleashed
+        system_content = (
+            "You are Maverick (🦞), a sharp, precise, and analytical biomedical research assistant with LONG-TERM MEMORY. "
+            "You are conversing with a researcher. Always utilize the 'Conversation History' to maintain context. "
+            "Your personality is scientific, highly efficient, and professional. "
+            "Never claim you do not have memory; instead, use the history to provide continuous support."
+        )
+        
+        messages = [{"role": "system", "content": system_content}]
+        
+        # Convert our DB format to OpenAI/Groq format
+        for entry in history:
+            messages.append({"role": entry["role"], "content": entry["content"]})
+            
+        # Add the current query
+        messages.append({"role": "user", "content": user_text})
+        
+        # Generate completion
+        response = client.chat.completions.create(
+            model=MODEL_NAME, 
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2048
+        )
+        
         answer = response.choices[0].message.content
+        
+        # Personality check: Ensure the lobster is present
+        if "🦞" not in answer[:10]:
+            answer = "🦞 " + answer
+            
+        # Save assistant message back to DB
         save_message(user_id, "assistant", answer)
+        
+        # Reply to user
         await update.message.reply_text(answer)
+        
     except Exception as e:
-        await update.message.reply_text(f"Error: {e}")
+        print(f">>> [ERROR] Handler failed: {e}", flush=True)
+        await update.message.reply_text(f"🦞 Maverick encountered a connection blip: {str(e)}")
 
 # --- MAIN ---
 if __name__ == '__main__':
