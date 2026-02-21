@@ -1,33 +1,10 @@
+import socket
 import os
 import sys
-import logging
-import sqlite3
-import socket
-import time
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler
-from groq import Groq
-from telegram.request import HTTPXRequest
-
-# --- PRE-FLIGHT LOGGING ---
-print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
-
-# Configuration
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "llama3-70b-8192" # Standard Groq Model
-DB_FILE = "/tmp/conversation_history.db" # Use /tmp for HF write safety
-
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
 
 # --- DNS GLOBAL MONKEYPATCH ---
 # Hugging Face Spaces often have flaky DNS resolution for external APIs.
 # We override the system's low-level address resolution to use custom DNS if it fails.
-
 _original_getaddrinfo = socket.getaddrinfo
 
 def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
@@ -51,31 +28,45 @@ def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
             except Exception as e:
                 print(f">>> [DNS PATCH] Custom DNS also failed for {host}: {e}", flush=True)
                 
-            # LAST RESORT: Hardcoded IP for Telegram
             if not first_ip and "telegram" in host_clean.lower():
                 first_ip = "149.154.167.220" # A known stable IP for api.telegram.org
                 print(f">>> [DNS PATCH] CRITICAL FALLBACK: Using hardcoded IP {first_ip} for {host}", flush=True)
             
             if first_ip:
-                # Ensure port is an integer
-                try:
-                    res_port = int(port)
-                except (ValueError, TypeError):
-                    res_port = 443 if "telegram" in host_clean else 80
-                
-                # Use standard values for type/proto if they are 0
+                try: res_port = int(port)
+                except: res_port = 443 if "telegram" in host_clean else 80
                 res_type = type if type != 0 else socket.SOCK_STREAM
                 res_proto = proto if proto != 0 else 6 # TCP
-                
-                # Strictly compliant return format: (family, type, proto, canonname, sockaddr)
-                # sockaddr for AF_INET is (str, int)
                 return [(socket.AF_INET, res_type, res_proto, '', (first_ip, res_port))]
-        
         raise system_err
 
-# Apply the patch immediately
 socket.getaddrinfo = custom_getaddrinfo
-print(">>> [DNS PATCH] Refined global socket monkeypatch applied.", flush=True)
+print(">>> [DNS PATCH] Global socket monkeypatch applied at startup.", flush=True)
+
+import logging
+import sqlite3
+import time
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler
+from groq import Groq
+from telegram.request import HTTPXRequest
+
+# --- PRE-FLIGHT LOGGING ---
+print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
+
+# Configuration
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+MODEL_NAME = "llama3-70b-8192" # Standard Groq Model
+DB_FILE = "/tmp/conversation_history.db" # Use /tmp for HF write safety
+
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Apply the patch was moved to the top of the file.
 
 def resolve_hostname(host):
     """Simple wrapper for logging/checking resolution."""

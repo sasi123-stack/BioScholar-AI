@@ -10,7 +10,7 @@ echo "🦞 Initializing Maverick Telegram Bot background process..."
         echo "🦞 Attempting to start Maverick Bot..."
         python3 app_maverick.py >> /tmp/maverick_bot.log 2>&1
         echo "🦞 Bot process exited. Logs last few lines:"
-        tail -n 10 /tmp/maverick_bot.log
+        tail -n 100 /tmp/maverick_bot.log
         echo "🦞 Restarting Bot in 30s..."
         sleep 30
     done
