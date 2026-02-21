@@ -7,38 +7,45 @@ import sys
 # We override the system's low-level address resolution to use custom DNS if it fails.
 _original_getaddrinfo = socket.getaddrinfo
 
+# Known flaky hosts that we want to handle with priority
+DNS_PRIORITY_HOSTS = ["api.telegram.org", "api.groq.com", "google.com", "huggingface.co"]
+TELEGRAM_HARDCODED_IP = "149.154.167.220"
+
 def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    host_str = str(host).lower().strip('.') if host else ""
+    
+    # Priority handling for known flaky hosts
+    if any(h in host_str for h in DNS_PRIORITY_HOSTS):
+        print(f">>> [DNS PATCH] Priority resolving: {host}", flush=True)
+        # Attempt custom DNS (Google/Cloudflare)
+        try:
+            import dns.resolver
+            resolver = dns.resolver.Resolver()
+            resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+            resolver.timeout = 2
+            resolver.lifetime = 2
+            answers = resolver.resolve(host, 'A')
+            if answers:
+                ip = str(answers[0])
+                print(f">>> [DNS PATCH] Custom DNS resolved {host} to {ip}", flush=True)
+                return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (ip, int(port) if port else 443))]
+        except Exception as e:
+            print(f">>> [DNS PATCH] Custom DNS failed for {host}: {e}", flush=True)
+
+        # Hardcoded fallback for Telegram
+        if "telegram" in host_str:
+            print(f">>> [DNS PATCH] HARDCODED FALLBACK: {host} -> {TELEGRAM_HARDCODED_IP}", flush=True)
+            return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (TELEGRAM_HARDCODED_IP, int(port) if port else 443))]
+
+    # For all other hosts, or if custom resolution failed, try original (system) DNS
     try:
         return _original_getaddrinfo(host, port, family, type, proto, flags)
-    except Exception as system_err:
-        host_clean = host.strip('.') if isinstance(host, str) else ""
-        if any(h in host_clean.lower() for h in ["telegram", "groq", "google"]):
-            print(f">>> [DNS PATCH] System failed for {host}: {system_err}. Using fallback...", flush=True)
-            first_ip = None
-            try:
-                import dns.resolver
-                resolver = dns.resolver.Resolver()
-                resolver.nameservers = ['1.1.1.1', '8.8.8.8', '8.8.4.4']
-                resolver.timeout = 5
-                resolver.lifetime = 5
-                answers = resolver.resolve(host_clean, 'A')
-                if answers:
-                    first_ip = str(answers[0])
-                    print(f">>> [DNS PATCH] Custom DNS resolved {host} to {first_ip}", flush=True)
-            except Exception as e:
-                print(f">>> [DNS PATCH] Custom DNS also failed for {host}: {e}", flush=True)
-                
-            if not first_ip and "telegram" in host_clean.lower():
-                first_ip = "149.154.167.220" # A known stable IP for api.telegram.org
-                print(f">>> [DNS PATCH] CRITICAL FALLBACK: Using hardcoded IP {first_ip} for {host}", flush=True)
-            
-            if first_ip:
-                try: res_port = int(port)
-                except: res_port = 443 if "telegram" in host_clean else 80
-                res_type = type if type != 0 else socket.SOCK_STREAM
-                res_proto = proto if proto != 0 else 6 # TCP
-                return [(socket.AF_INET, res_type, res_proto, '', (first_ip, res_port))]
-        raise system_err
+    except Exception as e:
+        # If system fails, it would normally raise here, but we already tried fallbacks for priority hosts
+        raise e
+
+socket.getaddrinfo = custom_getaddrinfo
+print(">>> [DNS PATCH] Priority-based socket monkeypatch applied.", flush=True)
 
 socket.getaddrinfo = custom_getaddrinfo
 print(">>> [DNS PATCH] Global socket monkeypatch applied at startup.", flush=True)
