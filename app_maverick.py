@@ -69,7 +69,7 @@ print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "llama3-70b-8192" # Standard Groq Model
+MODEL_NAME = "llama-3.3-70b-versatile" # Successor to decommissioned Llama 3 70B
 DB_FILE = "/tmp/conversation_history.db" # Use /tmp for HF write safety
 
 logging.basicConfig(
