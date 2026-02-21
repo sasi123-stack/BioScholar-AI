@@ -149,29 +149,21 @@
                     </svg>
                 </button>
                 <div class="menu-dropdown hidden" id="header-menu">
-                    <button class="menu-item" onclick="toggleReadingList()">
+                    <button class="menu-item" onclick="toggleReadingList(event)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                         </svg>
                         <span>Reading List</span>
                     </button>
-                    <button class="menu-item" onclick="toggleNotifications()">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                        </svg>
-                        <span>Notifications</span>
-                    </button>
-                    <button class="menu-item" onclick="toggleHistoryDropdown()">
+                    <button class="menu-item" onclick="toggleHistoryDropdown(event)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span>History</span>
                     </button>
-                    <button class="menu-item" onclick="showKeyboardShortcuts()">
+                    <button class="menu-item" onclick="showKeyboardShortcuts(event)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <rect x="2" y="4" width="20" height="16" rx="2" ry="2" />
@@ -179,7 +171,7 @@
                         </svg>
                         <span>Shortcuts</span>
                     </button>
-                    <button class="menu-item" onclick="openIntelligenceModal()">
+                    <button class="menu-item" onclick="openIntelligenceModal(event)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" />
@@ -189,7 +181,7 @@
                         <span>System Intelligence</span>
                     </button>
                     <div class="menu-divider"></div>
-                    <button class="menu-item" onclick="showHelpModal()">
+                    <button class="menu-item" onclick="showHelpModal(event)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <circle cx="12" cy="12" r="10" />

@@ -651,15 +651,24 @@ function initEventListeners() {
     window.addEventListener('click', (e) => {
         const headerMenu = document.getElementById('header-menu');
         const resultsMenu = document.getElementById('results-menu');
+        const notificationMenu = document.getElementById('notification-dropdown');
 
         if (headerMenu && !headerMenu.classList.contains('hidden')) {
-            if (!headerMenu.contains(e.target) && !e.target.closest('.menu-trigger')) {
+            if ((!headerMenu.contains(e.target) || e.target.closest('.menu-item')) && !e.target.closest('.menu-trigger')) {
+                // If it's the notification button, let the toggle run, but hide header
                 headerMenu.classList.add('hidden');
             }
         }
         if (resultsMenu && !resultsMenu.classList.contains('hidden')) {
-            if (!resultsMenu.contains(e.target) && !e.target.closest('.menu-trigger')) {
+            if ((!resultsMenu.contains(e.target) || e.target.closest('.menu-item')) && !e.target.closest('.menu-trigger')) {
                 resultsMenu.classList.add('hidden');
+            }
+        }
+        if (notificationMenu && !notificationMenu.classList.contains('hidden')) {
+            // Close notification dropdown if clicked outside
+            // (Exclude clicks on the notification icon itself if it has a specific trigger, though here we open it via header menu)
+            if (!notificationMenu.contains(e.target) && !e.target.closest('.menu-item[onclick*="toggleNotifications"]')) {
+                notificationMenu.classList.add('hidden');
             }
         }
     });
@@ -5161,6 +5170,63 @@ function filterNotifications(category, btn) {
     btn.classList.add('active');
 
     updateNotificationList();
+}
+
+function groupNotificationsByDate(notificationsList) {
+    const grouped = {};
+    const today = new Date().toDateString();
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+    notificationsList.forEach(notif => {
+        const notifDate = new Date(notif.timestamp).toDateString();
+        let groupName = notifDate;
+
+        if (notifDate === today) groupName = 'Today';
+        else if (notifDate === yesterday) groupName = 'Yesterday';
+
+        if (!grouped[groupName]) {
+            grouped[groupName] = [];
+        }
+        grouped[groupName].push(notif);
+    });
+    return grouped;
+}
+
+function formatNotificationTime(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function handleNotificationClick(id) {
+    const notif = notifications.find(n => n.id === id);
+    if (notif && !notif.read) {
+        notif.read = true;
+        saveNotifications();
+        updateNotificationBadge();
+        updateNotificationList();
+    }
+}
+
+function handleNotificationAction(id, actionLabel) {
+    // Basic placeholder for custom actions on notifications
+    console.log(`Action ${actionLabel} on notification ${id}`);
+    showToast(`Action: ${actionLabel}`, 'info');
+}
+
+function dismissNotification(id) {
+    notifications = notifications.filter(n => n.id !== id);
+    saveNotifications();
+    updateNotificationBadge();
+    updateNotificationList();
+}
+
+function markAllNotificationsRead() {
+    notifications.forEach(n => n.read = true);
+    saveNotifications();
+    updateNotificationBadge();
+    updateNotificationList();
+    showToast('All notifications marked as read', 'success');
 }
 
 /**
