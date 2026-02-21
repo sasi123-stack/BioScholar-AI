@@ -177,6 +177,14 @@
             </button>
 
             <!-- Help Button -->
+            <!-- Telegram Link -->
+            <a href="https://web.telegram.org/a/#8513211167" target="_blank" class="header-icon-btn telegram-btn"
+                title="Chat with Maverick on Telegram" style="margin-right: 8px; color: #0088cc;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+            </a>
+
             <button class="header-icon-btn help-btn" onclick="showHelpModal()" title="Help & Guide (H)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10" />
@@ -236,7 +244,8 @@
                         <line x1="16" y1="13" x2="8" y2="13" />
                         <line x1="16" y1="17" x2="8" y2="17" />
                     </svg>
-                    <span>Articles</span>
+                    <span>Research Desk</span>
+                    <span class="tab-badge tab-badge-beta">BETA</span>
                 </button>
                 <button class="nav-tab" data-tab="qa">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -244,14 +253,16 @@
                         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
                         <line x1="12" y1="17" x2="12.01" y2="17" />
                     </svg>
-                    <span>AI Chat</span>
+                    <span>Research AI Chat</span>
+                    <span class="tab-badge tab-badge-testing">Yet to Test</span>
                 </button>
                 <button class="nav-tab" data-tab="trends">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
                         <polyline points="17 6 23 6 23 12" />
                     </svg>
-                    <span>Trends</span>
+                    <span>Research Trends</span>
+                    <span class="tab-badge tab-badge-testing">Yet to Test</span>
                 </button>
             </div>
             <div class="nav-info">
@@ -617,6 +628,18 @@
                             <h2>Search Biomedical Literature</h2>
                             <p>Search millions of PubMed articles and clinical trials with AI-powered semantic search
                             </p>
+                            <div class="welcome-cta" style="margin: 24px 0; text-align: center;">
+                                <a href="https://web.telegram.org/a/#8513211167" target="_blank"
+                                    class="welcome-telegram-btn"
+                                    style="display: inline-flex; align-items: center; gap: 10px; padding: 12px 24px; background: #0088cc; color: white; border-radius: 30px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 15px rgba(0, 136, 204, 0.3); transition: all 0.3s ease;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                    </svg>
+                                    Try Maverick on Telegram
+                                </a>
+                            </div>
+
                             <div class="keyboard-hint">
                                 <span>Pro tip: Press <kbd>Ctrl</kbd> + <kbd>K</kbd> to focus search</span>
                             </div>
