@@ -630,6 +630,17 @@ function initEventListeners() {
         document.getElementById('header-menu')?.classList.toggle('hidden');
     };
 
+    window.toggleHistoryDropdown = function (e) {
+        if (e) e.stopPropagation();
+        const searchInput = document.getElementById('header-search-input');
+        if (searchInput) {
+            searchInput.focus();
+            showAutocomplete(); // this implicitly shows search history if autocomplete is built
+        }
+        // Force header menu to close
+        document.getElementById('header-menu')?.classList.add('hidden');
+    };
+
     // Results Actions Menu Toggle
     window.toggleResultsMenu = function (e) {
         if (e) e.stopPropagation();
