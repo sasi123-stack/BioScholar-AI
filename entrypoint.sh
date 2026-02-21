@@ -3,18 +3,18 @@
 # Ensure /tmp/logs exists for our fallback logger
 mkdir -p /tmp/logs
 
-# Start the Maverick Telegram Bot in the background with a restart loop
-echo "🦞 Initializing Maverick Telegram Bot background process..."
-(
-    while true; do
-        echo "🦞 Attempting to start Maverick Bot..."
-        python3 app_maverick.py >> /tmp/maverick_bot.log 2>&1
-        echo "🦞 Bot process exited. Logs last few lines:"
-        tail -n 100 /tmp/maverick_bot.log
-        echo "🦞 Restarting Bot in 30s..."
-        sleep 30
-    done
-) &
+# Start the Maverick Telegram Bot in the background (DISABLED to prevent conflict with standalone space)
+# echo "🦞 Initializing Maverick Telegram Bot background process..."
+# (
+#     while true; do
+#         echo "🦞 Attempting to start Maverick Bot..."
+#         python3 app_maverick.py >> /tmp/maverick_bot.log 2>&1
+#         echo "🦞 Bot process exited. Logs last few lines:"
+#         tail -n 100 /tmp/maverick_bot.log
+#         echo "🦞 Restarting Bot in 30s..."
+#         sleep 30
+#     done
+# ) &
 
 # Start the FastAPI Backend in the foreground
 # Exec ensures that it receives signals (like SIGTERM) from Hugging Face
