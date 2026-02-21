@@ -1012,6 +1012,57 @@ function switchTab(tabName) {
     if (tabName === 'trends') {
         updateTrendsDashboard();
     }
+
+    // NEW: Sync with Maverick History
+    if (tabName === 'qa') {
+        loadMaverickHistory();
+    }
+}
+
+async function loadMaverickHistory() {
+    const historyContainer = document.getElementById('chat-history');
+    if (!historyContainer) return;
+
+    // Show initial loading if it's empty
+    if (historyContainer.children.length <= 1) {
+        historyContainer.innerHTML = '<div class="chat-welcome-message">⚡ Connecting to Maverick Sync...</div>';
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/maverick/history?user_id=123`);
+        const data = await response.json();
+
+        if (data.status === 'success' && data.history.length > 0) {
+            historyContainer.innerHTML = '';
+            data.history.forEach(msg => {
+                // Determine sources - we might not have them in simple history
+                const role = msg.role === 'assistant' ? 'ai' : 'user';
+                addChatMessage(role, msg.content, [], false);
+            });
+            historyContainer.scrollTop = historyContainer.scrollHeight;
+        } else if (data.history.length === 0) {
+            // Keep welcome message
+            renderChatWelcome();
+        }
+    } catch (error) {
+        console.warn('Maverick Sync Error:', error);
+    }
+}
+
+function renderChatWelcome() {
+    const history = document.getElementById('chat-history');
+    if (!history) return;
+    history.innerHTML = `
+        <div class="chat-welcome-message">
+            <div class="welcome-logo">🦞</div>
+            <h2>Research AI Chat (Maverick Sync)</h2>
+            <p>I am Maverick, your synchronized research assistant. Ask me anything about the biomedical database.</p>
+            <div class="chat-examples">
+                <button onclick="document.getElementById('chat-input').value = this.innerText; handleChatSubmit();">Latest trials on CRISPR?</button>
+                <button onclick="document.getElementById('chat-input').value = this.innerText; handleChatSubmit();">mRNA vaccine safety profiles</button>
+            </div>
+        </div>
+    `;
 }
 
 if (typeof trendsChart === 'undefined') {
@@ -2825,7 +2876,7 @@ function executeAdvancedSearch() {
 }
 
 // ==========================================
-// CHATBOT FUNCTIONALITY
+// CHATBOT FUNCTIONALITY (Maverick Synchronized)
 // ==========================================
 function handleChatSubmit() {
     const input = document.getElementById('chat-input');
@@ -2842,70 +2893,41 @@ function handleChatSubmit() {
     // Show loading state
     showChatLoading();
 
-    // Call API
-    fetchAnswer(message)
+    // Call Synchronized Maverick API
+    fetch(`${API_BASE_URL}/maverick/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: message })
+    })
+        .then(res => res.json())
         .then(data => {
             removeChatLoading();
-            if (data.answers && data.answers.length > 0) {
-                // Construct AI response from the best answer
-                // We'll combine the top answer with source citations
-                const bestAnswer = data.answers[0];
-                let aiText = bestAnswer.answer;
-
-                // If we have alternative extractive answers, append them as insights
-                const otherAnswers = data.answers.slice(1).filter(a => a.confidence > 0.2);
-                if (otherAnswers.length > 0) {
-                    aiText += '\n\n**Additional Key Insights from Literature:**\n';
-                    otherAnswers.forEach((ans, idx) => {
-                        aiText += `• ${ans.answer} (Confidence: ${(ans.confidence * 100).toFixed(0)}%)\n`;
-                    });
-                }
-
-                // Create a map of passages for easy lookup
-                const passageMap = {};
-                (data.passages || []).forEach(p => {
-                    passageMap[p.source_id] = p.text;
-                });
-
-                const sources = data.answers
-                    .filter(a => a.source_type !== 'generated' && a.source_type !== 'error')
-                    .map(a => {
-                        // Normalize source type for getExternalUrl if necessary
-                        const normalizedSourceType = a.source_type === 'clinical_trials' ? 'clinical_trials' : a.source_type;
-                        const isPubMed = normalizedSourceType === 'pubmed';
-
-                        return {
-                            title: a.source_title || 'Untitled Research',
-                            url: getExternalUrl({
-                                source: normalizedSourceType,
-                                id: a.source_id,
-                                pmid: isPubMed ? a.source_id : null,
-                                nct_id: !isPubMed ? a.source_id : null
-                            }),
-                            score: a.confidence,
-                            type: normalizedSourceType,
-                            snippet: a.context || passageMap[a.source_id] || '',
-                            journal: a.journal || (a.source_type === 'clinical_trials' ? 'ClinicalTrials.gov' : ''),
-                            date: a.publication_date || ''
-                        };
-                    })
-                    .slice(0, 3); // Take top 3 after processing
-
-                console.group('AI Chat Debug');
-                console.log('Raw data.answers:', data.answers);
-                console.log('Passage map keys:', Object.keys(passageMap));
-                console.log('Final processed sources:', sources);
-                console.groupEnd();
+            if (data.status === 'success') {
+                const aiText = data.answer;
+                const sources = (data.sources || []).map(a => ({
+                    title: a.source_title || 'Research Source',
+                    url: getExternalUrl({
+                        source: a.source_type,
+                        id: a.source_id,
+                        pmid: a.source_type === 'pubmed' ? a.source_id : null,
+                        nct_id: a.source_type !== 'pubmed' ? a.source_id : null
+                    }),
+                    score: a.confidence,
+                    type: a.source_type,
+                    snippet: a.context || '',
+                    journal: a.journal || '',
+                    date: a.publication_date || ''
+                })).slice(0, 2);
 
                 addChatMessage('ai', aiText, sources);
             } else {
-                addChatMessage('ai', "I searched the biomedical database but couldn't find a high-confidence answer for your specific question. \n\nYou might try:\n• Rephrasing your question\n• Checking for specific terms\n• Browsing the 'Articles' tab for broader research");
+                addChatMessage('ai', "I encountered a sync error. Please check if Maverick is online.");
             }
         })
         .catch(err => {
             removeChatLoading();
-            addChatMessage('ai', "I encountered an error while connecting to the knowledge base. Please try again in a moment.");
-            console.error('Chat error:', err);
+            addChatMessage('ai', "Error connecting to Maverick Brain.");
+            console.error('Maverick error:', err);
         });
 }
 
@@ -2917,7 +2939,7 @@ function sendChatMessage(message) {
     }
 }
 
-function addChatMessage(role, text, sources = []) {
+function addChatMessage(role, text, sources = [], shouldScroll = true) {
     const history = document.getElementById('chat-history');
     if (!history) return;
 
@@ -2974,7 +2996,9 @@ function addChatMessage(role, text, sources = []) {
 
     history.appendChild(msgDiv);
     // Smooth scroll to bottom
-    history.scrollTop = history.scrollHeight;
+    if (shouldScroll) {
+        history.scrollTop = history.scrollHeight;
+    }
 }
 
 function showChatLoading() {

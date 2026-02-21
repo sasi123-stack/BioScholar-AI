@@ -37,7 +37,13 @@ from src.utils.logger import logger
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 
+import sqlite3
+import os
+
 router = APIRouter(prefix="/api/v1", tags=["api"])
+
+# Shared Maverick DB - Must match app_maverick.py
+MAVERICK_DB = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "local_memory.db"
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -547,3 +553,69 @@ async def add_documents_batch(
     except Exception as e:
         logger.error(f"Batch document ingestion failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/maverick/history")
+async def get_maverick_history(user_id: int = Query(default=123, description="Telegram user ID")):
+    """
+    Sycnronize chat history from Maverick Telegram bot database.
+    """
+    if not os.path.exists(MAVERICK_DB):
+        return {"history": [], "message": f"Database not found at {MAVERICK_DB}"}
+    
+    try:
+        conn = sqlite3.connect(MAVERICK_DB)
+        c = conn.cursor()
+        c.execute("SELECT role, content, timestamp FROM history WHERE user_id = ? ORDER BY timestamp ASC", (user_id,))
+        rows = c.fetchall()
+        conn.close()
+        
+        history = [{"role": r, "content": c, "timestamp": ts} for r, c, ts in rows]
+        return {"history": history, "status": "success"}
+    except Exception as e:
+        return {"history": [], "status": "error", "message": str(e)}
+
+@router.post("/maverick/chat")
+async def maverick_chat(
+    request: QuestionRequest,
+    qa_engine: QuestionAnsweringEngine = Depends(get_qa_engine),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Conversational endpoint that syncs with Maverick's long-term memory.
+    """
+    user_id = 123 # Default sync ID for web user
+    query = request.question
+    
+    try:
+        # 1. Save user message to sync DB
+        conn = sqlite3.connect(MAVERICK_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO history (user_id, role, content) VALUES (?, 'user', ?)", (user_id, query))
+        conn.commit()
+        
+        # 2. Get answer (using existing RAG engine or Maverick logic)
+        # We can use the qa_engine but style it as Maverick 🦞
+        result = qa_engine.answer_question(question=query, num_answers=1)
+        
+        if result["status"] == "success" and result["answers"]:
+            answer = result["answers"][0]["answer"]
+            # Add Maverick personality if not already there
+            if "🦞" not in answer:
+                answer = "🦞 " + answer
+        else:
+            answer = "I'm sorry, I couldn't find a precise answer in the literature. Rephrase your question? 🦞"
+            
+        # 3. Save assistant message to sync DB
+        c.execute("INSERT INTO history (user_id, role, content) VALUES (?, 'assistant', ?)", (user_id, answer))
+        conn.commit()
+        conn.close()
+        
+        return {
+            "answer": answer,
+            "status": "success",
+            "sources": result.get("answers", [])
+        }
+        
+    except Exception as e:
+        logger.error(f"Maverick sync chat failed: {e}")
+        return {"answer": f"Error syncing with Maverick: {str(e)}", "status": "error"}
