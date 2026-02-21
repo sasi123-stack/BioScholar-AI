@@ -62,6 +62,8 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler
 from groq import Groq
 from telegram.request import HTTPXRequest
+import json
+import httpx
 
 # --- PRE-FLIGHT LOGGING ---
 print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
@@ -71,6 +73,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct" # User requested Maverick Llama 4
 DB_FILE = "/tmp/conversation_history.db" # Use /tmp for HF write safety
+SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -144,6 +147,35 @@ def get_history(user_id, limit=10):
         return [{"role": r, "content": c} for r, c in reversed(rows)]
     except: return []
 
+async def search_internet(query: str):
+    """Search Google via Serper API for real-time information."""
+    if not SERPER_API_KEY:
+        print(">>> [WARNING] SERPER_API_KEY not found. Skipping internet search.", flush=True)
+        return None
+    
+    print(f">>> [SEARCH] Querying Serper for: {query}", flush=True)
+    url = "https://google.serper.dev/search"
+    payload = json.dumps({"q": query})
+    headers = {
+        'X-API-KEY': SERPER_API_KEY,
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, content=payload, timeout=10.0)
+            results = response.json()
+            
+            snippets = []
+            # Gather top 4 organic results
+            for result in results.get("organic", [])[:4]:
+                snippets.append(f"Source: {result.get('title')}\nSnippet: {result.get('snippet')}\nURL: {result.get('link')}")
+                
+            return "\n\n".join(snippets) if snippets else "No external results found."
+    except Exception as e:
+        print(f">>> [ERROR] Serper search failed: {e}", flush=True)
+        return None
+
 # --- TELEGRAM HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🦞 *Maverick (Hugging Face Edition) Ready.*\nMemory Active.", parse_mode='Markdown')
@@ -159,19 +191,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Save user message to the shared DB
         save_message(user_id, "user", user_text)
         
-        # Initialize client (re-use if possible, but fine for now)
+        # 1. BRAIN SKILL: Internet Search
+        internet_knowledge = None
+        if len(user_text) > 5:
+            # Only search if it's not a tiny command
+            internet_knowledge = await search_internet(user_text)
+        
+        # Initialize client
         client = Groq(api_key=GROQ_API_KEY)
         
         # Get history for this specific Telegram user
         history = get_history(user_id)
         
-        # STRONG SYSTEM PROMPT - Maverick Unleashed
+        # 2. STRONG SYSTEM PROMPT - Maverick Unleashed with Internet Skills
         system_content = (
             "You are Maverick (🦞), a sharp, precise, and analytical biomedical research assistant with LONG-TERM MEMORY. "
             "You are conversing with a researcher. Always utilize the 'Conversation History' to maintain context. "
+            "You also have the SKILL to search the internet. Use the provided 'Internet Search Results' (if any) "
+            "to provide the most accurate, up-to-date, and evidence-based answer. "
             "Your personality is scientific, highly efficient, and professional. "
+            "If you use information from the search results, cite the source or URL. "
             "Never claim you do not have memory; instead, use the history to provide continuous support."
         )
+        
+        if internet_knowledge:
+            system_content += f"\n\n[INTERNET SEARCH RESULTS]:\n{internet_knowledge}"
         
         messages = [{"role": "system", "content": system_content}]
         
@@ -182,7 +226,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Add the current query
         messages.append({"role": "user", "content": user_text})
         
-        # Generate completion
+        # 3. Generate completion
         response = client.chat.completions.create(
             model=MODEL_NAME, 
             messages=messages,
@@ -193,7 +237,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         answer = response.choices[0].message.content
         
         # Personality check: Ensure the lobster is present
-        if "🦞" not in answer[:10]:
+        if "🦞" not in answer[:15]:
             answer = "🦞 " + answer
             
         # Save assistant message back to DB
