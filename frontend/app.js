@@ -1798,6 +1798,71 @@ function toggleClearButton() {
     // but kept as a no-op to prevent ReferenceErrors if called elsewhere
 }
 
+/**
+ * Fetches synthesized AI insight using Maverick RAG
+ */
+async function fetchMaverickInsight(query) {
+    const insightBox = document.getElementById('maverick-insight-box');
+    const insightContent = document.getElementById('insight-content');
+    const insightSources = document.getElementById('insight-sources');
+
+    if (!insightBox || !insightContent) return;
+
+    // Show box with loading skeleton
+    insightBox.classList.remove('hidden');
+    insightContent.innerHTML = `
+        <div class="insight-loading">
+            <div class="insight-loading-line" style="width: 100%"></div>
+            <div class="insight-loading-line" style="width: 90%"></div>
+            <div class="insight-loading-line" style="width: 70%"></div>
+        </div>
+    `;
+    if (insightSources) insightSources.innerHTML = '';
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/maverick/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: query })
+        });
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            // Process bold text and newlines
+            const formattedText = data.answer
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+
+            insightContent.innerHTML = formattedText;
+
+            // Render sources as chips
+            if (data.sources && data.sources.length > 0) {
+                insightSources.innerHTML = data.sources.map(s => {
+                    const sid = s.source_id || s.id;
+                    return `
+                        <a href="#" class="insight-source-chip" onclick="openArticleModal('${sid}'); return false;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                                <polyline points="10 9 9 9 8 9"/>
+                            </svg>
+                            ${truncate(s.source_title || 'Source', 30)}
+                        </a>
+                    `;
+                }).join('');
+            }
+        } else {
+            insightBox.classList.add('hidden');
+        }
+    } catch (error) {
+        console.warn('Maverick Insight failed:', error);
+        insightBox.classList.add('hidden');
+    }
+}
+
 function clearAllQuickFilters() {
     currentFilters = {
         source: 'all',
@@ -1911,6 +1976,13 @@ function displayCurrentResults() {
     const totalPagesSpan = document.getElementById('total-pages');
     const prevPageBtn = document.getElementById('prev-page');
     const nextPageBtn = document.getElementById('next-page');
+
+    // Trigger AI Insight synthesize if it's page 1
+    if (currentPage === 1 && currentQuery) {
+        fetchMaverickInsight(currentQuery);
+    } else if (!currentQuery) {
+        document.getElementById('maverick-insight-box')?.classList.add('hidden');
+    }
 
     if (!currentResults || currentResults.length === 0) {
         if (resultsCount) resultsCount.innerHTML = `No results found for "<strong>${escapeHtml(currentQuery)}</strong>"`;
@@ -2962,19 +3034,13 @@ function addChatMessage(role, text, sources = [], shouldScroll = true) {
         <div class="chat-sources">
             <div class="chat-sources-title">Supporting Evidence (Source Details)</div>
             ${sources.map(s => `
-                <div class="source-item-container" style="margin-bottom: 12px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
-                    <a href="${s.url || '#'}" target="_blank" class="source-title" style="display:block; font-weight: 600; color: var(--primary-blue); text-decoration:none; margin-bottom: 4px;">
-                        ${truncate(s.title, 100)}
-                    </a>
-                    <div class="source-meta" style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
-                        ${s.type === 'pubmed' ? '📄 PubMed' : '🔬 Clinical Trial'} • 
-                        ${s.journal ? `${truncate(s.journal, 40)} • ` : ''} 
-                        ${s.date ? `${s.date} • ` : ''}
-                        Confidence: ${(s.score * 100).toFixed(0)}%
+                <div class="source-item-container insight-source-card" style="cursor: pointer;" onclick="openArticleModal('${s.id || s.source_id}')">
+                    <div class="source-card-header">
+                        <span class="meta-source ${s.type === 'pubmed' ? 'pubmed' : 'clinical-trial'}">${s.type === 'pubmed' ? 'PubMed' : 'Trial'}</span>
+                        <span class="source-card-confidence">Confidence: ${(s.score * 100).toFixed(0)}%</span>
                     </div>
-                    ${s.snippet ? `<div class="source-snippet" style="font-size: 13px; color: var(--text-secondary); line-height: 1.4; font-style: italic;">
-                        "${truncate(s.snippet, 250)}"
-                    </div>` : ''}
+                    <div class="source-card-title">${truncate(s.title, 90)}</div>
+                    ${s.snippet ? `<div class="source-card-snippet">"${truncate(s.snippet, 180)}"</div>` : ''}
                 </div>
             `).join('')}
         </div>`;
