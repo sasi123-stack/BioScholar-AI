@@ -554,11 +554,24 @@ async def add_documents_batch(
         logger.error(f"Batch document ingestion failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def init_maverick_db():
+    try:
+        conn = sqlite3.connect(MAVERICK_DB)
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS history
+                     (user_id INTEGER, role TEXT, content TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Failed to initialize Maverick DB: {e}")
+
 @router.get("/maverick/history")
 async def get_maverick_history(user_id: int = Query(default=123, description="Telegram user ID")):
     """
     Sycnronize chat history from Maverick Telegram bot database.
     """
+    init_maverick_db()
+    
     if not os.path.exists(MAVERICK_DB):
         return {"history": [], "message": f"Database not found at {MAVERICK_DB}"}
     
@@ -585,6 +598,8 @@ async def maverick_chat(
     """
     user_id = 123 # Default sync ID for web user
     query = request.question
+    
+    init_maverick_db()
     
     try:
         # 1. Save user message to sync DB
