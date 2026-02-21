@@ -106,7 +106,7 @@ class HealthResponse(BaseModel):
     elasticsearch: bool = Field(..., description="Elasticsearch connection status")
     models_loaded: bool = Field(..., description="ML models loaded status")
     version: str = Field(..., description="API version")
-    features: Optional[Dict[str, bool]] = Field(None, description="Feature availability flags")
+    features: Optional[Dict[str, Any]] = Field(None, description="Feature availability flags and diagnostic info")
 
 
 class BatchQuestionRequest(BaseModel):
