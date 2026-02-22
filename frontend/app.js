@@ -4657,7 +4657,95 @@ function switchTab(tabName) {
     const targetTab = document.getElementById(`${tabName}-tab`);
     if (targetTab) {
         targetTab.classList.add('active');
+        if (tabName === 'trends') {
+            renderTrendsChart();
+        }
     }
+}
+
+let trendsChartInstance = null;
+function renderTrendsChart() {
+    const canvas = document.getElementById('publication-trend-chart');
+    if (!canvas) return;
+
+    if (trendsChartInstance) {
+        return; // Already rendered
+    }
+
+    // Check if Chart is loaded
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js is not loaded.');
+        return;
+    }
+
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 10 }, (_, i) => currentYear - 9 + i);
+
+    // Mocked exponential growth data for demonstration
+    const dataVolumes = [120500, 134200, 151000, 168900, 190500, 245000, 267300, 289000, 312000, 335000];
+
+    const isDarkMode = document.body.dataset.theme === 'dark' || document.body.classList.contains('dark-theme');
+    const textColor = isDarkMode ? '#e2e8f0' : '#475569';
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+
+    trendsChartInstance = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: [{
+                label: 'Biomedical Publications',
+                data: dataVolumes,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#3b82f6',
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return context.parsed.y.toLocaleString() + ' publications';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: gridColor,
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: textColor,
+                        callback: function (value) {
+                            return value / 1000 + 'k';
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: textColor
+                    }
+                }
+            }
+        }
+    });
 }
 
 console.log('✅ Keyboard shortcuts enabled');

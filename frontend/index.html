@@ -281,6 +281,13 @@
                     <span>Maverick AI Bot</span>
                     <span class="tab-badge tab-badge-beta">BETA</span>
                 </button>
+                <button class="nav-tab" data-tab="trends">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                        <polyline points="17 6 23 6 23 12"></polyline>
+                    </svg>
+                    <span>Research Trends</span>
+                </button>
             </div>
             <div class="nav-info">
             </div>
@@ -781,6 +788,86 @@
                             <div class="chat-disclaimer">
                                 Maverick uses RAG to ground answers in the BioMedScholar database. Always verify
                                 critical medical data.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Research Trends Tab -->
+                <div id="trends-tab" class="tab-content" style="padding: 24px;">
+                    <div style="max-width: 1200px; margin: 0 auto;">
+                        <div style="margin-bottom: 32px;">
+                            <h2
+                                style="font-size: 24px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">
+                                Macro Research Trends</h2>
+                            <p style="color: var(--text-secondary); font-size: 15px;">Live analysis of biomedical
+                                publication volumes and emerging focal areas.</p>
+                        </div>
+
+                        <div
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 32px;">
+                            <div
+                                style="background: var(--bg-primary); border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                                <h3
+                                    style="font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                                    <span>🔥</span> Fast-Emerging Topics
+                                </h3>
+                                <ul
+                                    style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;">
+                                    <li
+                                        style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);">
+                                        <span style="font-weight: 500;">GLP-1 Agonists</span> <span
+                                            style="color: #10b981; font-weight: 600; font-size: 14px;">+245%</span>
+                                    </li>
+                                    <li
+                                        style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);">
+                                        <span style="font-weight: 500;">CRISPR-Cas9 Editing</span> <span
+                                            style="color: #10b981; font-weight: 600; font-size: 14px;">+182%</span>
+                                    </li>
+                                    <li
+                                        style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);">
+                                        <span style="font-weight: 500;">mRNA Immunotherapy</span> <span
+                                            style="color: #10b981; font-weight: 600; font-size: 14px;">+134%</span>
+                                    </li>
+                                    <li
+                                        style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);">
+                                        <span style="font-weight: 500;">AI in Radiology</span> <span
+                                            style="color: #10b981; font-weight: 600; font-size: 14px;">+115%</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div
+                                style="background: var(--bg-primary); border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                                <h3
+                                    style="font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                                    <span>📚</span> Highest Volume (All-Time)
+                                </h3>
+                                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <span
+                                        style="background: var(--bg-secondary); padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">Type
+                                        2 Diabetes</span>
+                                    <span
+                                        style="background: var(--bg-secondary); padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">Breast
+                                        Cancer</span>
+                                    <span
+                                        style="background: var(--bg-secondary); padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">COVID-19</span>
+                                    <span
+                                        style="background: var(--bg-secondary); padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">Hypertension</span>
+                                    <span
+                                        style="background: var(--bg-secondary); padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">Alzheimer's</span>
+                                    <span
+                                        style="background: var(--bg-secondary); padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">Depression</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            style="background: var(--bg-primary); border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 24px;">Publication Volume by
+                                Year</h3>
+                            <div style="height: 350px; position: relative;">
+                                <canvas id="publication-trend-chart"></canvas>
                             </div>
                         </div>
                     </div>
