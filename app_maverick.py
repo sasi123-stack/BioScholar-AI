@@ -69,6 +69,10 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+from src.qa_module.qa_engine import QuestionAnsweringEngine
+
+# Global QA Engine
+qa_engine = None
 
 # --- PRE-FLIGHT LOGGING ---
 print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
@@ -228,12 +232,11 @@ async def test_website(url: str):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "💠 *Maverick Suite — Unified Research Engine*\n\n"
-        "You are now connected to the Maverick AI Suite. I am an advanced specialized engine designed for deep biomedical discovery:\n\n"
-        "• *Discovery Engine*: Llama 4 Maverick (MoE) Architecture.\n"
-        "• *RAG Systems*: Real-time scholarly cross-referencing.\n"
-        "• *Knowledge Memory*: Context-aware research threads.\n"
-        "• *Multimodal*: Support for document & image analysis.\n\n"
-        "How can the Suite assist your research today?"
+        "Greetings Sasidhara. You are now connected to the Maverick AI Suite. I am an advanced specialized engine designed for deep biomedical discovery:\n\n"
+        "• *Domain*: Exclusively Biomedical & Clinical Trial Research.\n"
+        "• *Expertise*: Llama 4 Maverick (MoE) Architecture.\n"
+        "• *Skills*: Internet Search, Browser Testing, and Computer Use (biomed-scholar.web.app).\n\n"
+        "How can I assist your discovery process today, Sasidhara?"
     )
     await update.message.reply_text(welcome_text, parse_mode='Markdown')
 
@@ -302,35 +305,72 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not browser_report and len(user_text) > 8:
             internet_knowledge = await search_internet(user_text)
         
-        client = Groq(api_key=GROQ_API_KEY)
+        global qa_engine
         history = get_history(user_id)
-        
-        system_content = (
-            "You are the Maverick Suite (💠), a premium analytical biomedical research engine. "
-            "Your personality is highly technical, authoritative, yet efficient. "
-            "You have integrated SKILLS: Internet Search for live data and Browser Testing for technical audits. "
-            "Always maintain a professional, scientific tone."
-        )
-        
+        history_context = ""
+        for h in history:
+            history_context += f"{h['role'].capitalize()}: {h['content']}\n"
+            
         if internet_knowledge:
-            system_content += f"\n\n[INTERNET SEARCH RESULTS]:\n{internet_knowledge}"
+            history_context += f"\n[INTERNET SEARCH RESULTS for context]:\n{internet_knowledge}"
             
         if browser_report:
-            system_content += f"\n\n[BROWSER TEST REPORT]:\n{json.dumps(browser_report, indent=2)}"
-        
-        messages = [{"role": "system", "content": system_content}]
-        for entry in history:
-            messages.append({"role": entry["role"], "content": entry["content"]})
-        messages.append({"role": "user", "content": user_text})
-        
-        response = client.chat.completions.create(
-            model=MODEL_NAME, 
-            messages=messages,
-            temperature=0.3,
-            max_tokens=2048
+            history_context += f"\n[BROWSER TEST REPORT for context]:\n{json.dumps(browser_report, indent=2)}"
+
+        if qa_engine is None:
+            qa_engine = QuestionAnsweringEngine()
+
+        # Attempt to answer using the RAG Engine (PubMed / Clinical Trials)
+        result = qa_engine.answer_question(
+            question=user_text,
+            num_passages=5,
+            num_answers=1,
+            history_context=history_context
         )
         
-        answer = response.choices[0].message.content
+        if result.get("status") == "success" and result.get("answers"):
+            answer = result["answers"][0]["answer"]
+        else:
+            # Fallback to direct Groq call for conversational queries (no documents found)
+            client = Groq(api_key=GROQ_API_KEY)
+            
+            system_content = (
+                "You are the Maverick Suite (💠), a premium analytical and highly intelligent biomedical research engine. "
+                "The user's name is Sasidhara. You MUST greet Sasidhara by name in your responses when appropriate (e.g., 'Greetings Sasidhara', 'Hello Sasidhara'). "
+                "Your personality is highly technical, authoritative, yet efficient. "
+                "STRICT DOMAIN: Your primary mission is to research ONLY Biomedical literature and Clinical Trials. "
+                "If a query is outside this domain, politely redirect the user to biomedical research. "
+                "INTEGRATED SKILLS:\n"
+                "1. **Internet Search**: For real-time clinical and academic data.\n"
+                "2. **Browser Testing**: For technical audits of research papers.\n"
+                "3. **Computer Use**: You have the specialized ability to navigate and interact with the primary interface at https://biomed-scholar.web.app/ for deep result synthesis.\n"
+                "Always maintain a professional, scientific tone. "
+                "IMPORTANT FORMATTING INSTRUCTIONS: You MUST use rich markdown formatting. "
+                "Use **bold** for primary medical terms or strong emphasis, *italic* for secondary emphasis or Latin names, "
+                "and <u>underline</u> (using the HTML <u> tag exactly) for critical takeaways, genes, or key numerical results. "
+                "Never use '__' for underline."
+            )
+            
+            messages = [{"role": "system", "content": system_content}]
+            for entry in history:
+                messages.append({"role": entry["role"], "content": entry["content"]})
+                
+            if internet_knowledge:
+                messages.append({"role": "system", "content": f"[INTERNET SEARCH RESULTS]:\n{internet_knowledge}"})
+            if browser_report:
+                messages.append({"role": "system", "content": f"[BROWSER TEST REPORT]:\n{json.dumps(browser_report, indent=2)}"})
+                
+            messages.append({"role": "user", "content": user_text})
+            
+            response = client.chat.completions.create(
+                model=MODEL_NAME, 
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2048
+            )
+            
+            answer = response.choices[0].message.content
+
         if "💠" not in answer[:15]:
             answer = "💠 " + answer
             

@@ -345,14 +345,11 @@ function openArticleModal(resultId, fallbackTitle = null) {
         overlay.classList.add('open');
         document.body.style.overflow = 'hidden';
 
-        // Store current ID for comments
+        // Store current ID for reference
         window.currentArticleId = result.id;
 
         // Reset tabs to summary
         switchModalTab('summary');
-
-        // Load Comments
-        renderComments(result.id);
 
         // Populate Full Text Tab
         const fulltextPreview = document.getElementById('modal-fulltext-content');
@@ -379,7 +376,6 @@ function closeArticleModal() {
 
 function closeAllModals() {
     closeArticleModal();
-    closeAdvancedSearch();
     hideAutocomplete();
     // Close other panels
     const readingListPanel = document.getElementById('reading-list-panel');
@@ -452,7 +448,9 @@ function initEventListeners() {
 
     // Tab Navigation
     document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+        if (tab.dataset.tab) {
+            tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+        }
     });
 
     // View Toggle
@@ -694,11 +692,10 @@ function initKeyboardShortcuts() {
             headerSearchInput?.focus();
         }
 
-        // Ctrl+Shift+F - Advanced search
-        if (isMod && e.shiftKey && e.key === 'F') {
-            e.preventDefault();
-            openAdvancedSearch();
-        }
+        // Ctrl+Shift+F - Reserved for future use
+        // if (isMod && e.shiftKey && e.key === 'F') {
+        //     e.preventDefault();
+        // }
 
         // Ctrl+E - Export results
         if (isMod && e.key === 'e') {
@@ -720,10 +717,8 @@ function initKeyboardShortcuts() {
             showHelpModal();
         }
 
-        // 1, 2, 3 - Switch tabs
+        // 1 - Switch tabs (only Research Desk remains)
         if (e.key === '1' && !isMod) switchTab('articles');
-        if (e.key === '2' && !isMod) switchTab('qa');
-        if (e.key === '3' && !isMod) switchTab('trends');
 
         // B - Toggle reading list
         if ((e.key.toLowerCase() === 'b') && !isMod) {
@@ -810,7 +805,6 @@ function initKeyboardShortcuts() {
                 document.getElementById('autocomplete-dropdown')?.classList.add('hidden');
                 closeArticleModal();
                 closeShortcutsModal();
-                closeAdvancedSearch();
             }
         }
     });
@@ -1063,14 +1057,21 @@ function switchTab(tabName) {
     const scholarMain = document.querySelector('.scholar-main');
 
     scholarMain?.classList.remove('no-padding');
+    document.body.classList.remove('chat-mode');
 
-    if (tabName === 'trends') {
+    if (tabName === 'chat') {
+        document.body.classList.add('chat-mode');
         mainContainer?.classList.add('full-width');
         scholarMain?.classList.add('no-padding');
-        updateTrendsDashboard();
-    } else {
-        mainContainer?.classList.remove('full-width');
+        // Auto-load history on first open if needed
+        const historyContainer = document.getElementById('chat-history');
+        if (historyContainer && historyContainer.children.length <= 1) {
+            loadMaverickHistory();
+        }
+        return; // Exit early to avoid removing classes at the end
     }
+
+    mainContainer?.classList.remove('full-width');
 }
 
 async function loadMaverickHistory() {
@@ -1843,6 +1844,7 @@ function clearSearchInput() {
             renderSuggestedQueries(); // Change cards every time search is cleared
             resultsCount.textContent = 'Ready for research';
             pagination.classList.add('hidden');
+            hideFloatingChatButton();
         }
     }
 }
@@ -2042,6 +2044,7 @@ function displayCurrentResults() {
         if (resultsCount) resultsCount.innerHTML = `No results found for "<strong>${escapeHtml(currentQuery)}</strong>"`;
         if (searchResults) searchResults.innerHTML = showEmptyState('No results found', 'Try different keywords or adjust filters');
         pagination?.classList.add('hidden');
+        hideFloatingChatButton();
         return;
     }
 
@@ -2059,6 +2062,7 @@ function displayCurrentResults() {
         if (resultsCount) resultsCount.innerHTML = `No results match your filters`;
         if (searchResults) searchResults.innerHTML = showEmptyState('No matching results', 'Try adjusting your filters or search terms');
         pagination?.classList.add('hidden');
+        hideFloatingChatButton();
         return;
     }
 
@@ -2097,6 +2101,9 @@ function displayCurrentResults() {
         // No longer needed for sidebar
         // searchResults.style.paddingBottom = '80px';
     }
+
+    // Show floating chat button when there are results
+    showFloatingChatButton();
 
 
 
@@ -2467,7 +2474,7 @@ function createResultCard(result) {
                         </svg>
                         Source
                     </a>` : ''}
-                    <button class="result-action-btn primary" style="background: var(--primary-blue); color: white;" onclick="askMaverickAbout('${result.title.replace(/'/g, "\\'")}')">
+                    <button class="result-action-btn primary" onclick="askMaverickAbout(currentQuery)" style="background: var(--primary-blue); color: white; border: none; cursor: pointer;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
                         </svg>
@@ -2532,19 +2539,23 @@ function getExternalUrl(result) {
     return null;
 }
 
-function askMaverickAbout(title) {
+function askMaverickAbout(queryText) {
     // Switch to Chat tab
-    const chatTab = document.querySelector('[data-tab="qa"]');
-    if (chatTab) chatTab.click();
+    switchTab('chat');
 
     // Set chat input and focus
-    const input = document.getElementById('chat-input');
-    if (input) {
-        input.value = `Tell me more about this research: "${title}"`;
-        input.focus();
-        // Trigger resize
-        autoResizeTextarea(input);
-    }
+    setTimeout(() => {
+        const input = document.getElementById('chat-input');
+        if (input) {
+            input.value = queryText;
+            input.focus();
+            input.style.height = 'auto';
+            input.style.height = input.scrollHeight + 'px';
+
+            // Auto-submit the query to Maverick
+            handleChatSubmit();
+        }
+    }, 100);
 }
 
 /**
@@ -2671,9 +2682,11 @@ function toggleSidebar() {
     const sidebar = document.getElementById('quick-filters');
     const showBtn = document.getElementById('show-sidebar-btn');
 
-    if (sidebar && showBtn) {
+    if (sidebar) {
         sidebar.classList.toggle('hidden');
-        showBtn.classList.toggle('hidden');
+        if (showBtn) {
+            showBtn.classList.toggle('hidden');
+        }
 
         // Save preference if needed
         const isHidden = sidebar.classList.contains('hidden');
@@ -2829,6 +2842,43 @@ function closeCitationModal() {
     document.getElementById('citation-modal')?.classList.remove('open');
 }
 
+function openAdvancedSearch() {
+    document.getElementById('advanced-search-modal')?.classList.add('open');
+}
+
+function closeAdvancedSearch() {
+    document.getElementById('advanced-search-modal')?.classList.remove('open');
+}
+
+function executeAdvancedSearch() {
+    const allWords = document.getElementById('adv-all-words')?.value.trim();
+    const exactPhrase = document.getElementById('adv-exact-phrase')?.value.trim();
+    const anyWords = document.getElementById('adv-any-words')?.value.trim();
+    const noneWords = document.getElementById('adv-none-words')?.value.trim();
+    const author = document.getElementById('adv-author')?.value.trim();
+    const journal = document.getElementById('adv-journal')?.value.trim();
+    const titleContains = document.getElementById('adv-title')?.value.trim();
+
+    let query = '';
+
+    if (allWords) query += allWords + ' ';
+    if (exactPhrase) query += `"${exactPhrase}" `;
+    if (anyWords) query += `(${anyWords.split(/\s+/).join(' OR ')}) `;
+    if (noneWords) query += noneWords.split(/\s+/).map(w => `-${w}`).join(' ') + ' ';
+    if (author) query += `author:${author} `;
+    if (titleContains) query += `title:${titleContains} `;
+
+    query = query.trim();
+
+    if (query) {
+        headerSearchInput.value = query;
+        closeAdvancedSearch();
+        performSearch();
+    } else {
+        alert('Please enter at least one search criterion');
+    }
+}
+
 function switchModalTab(tabId) {
     // Update tabs
     document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
@@ -2964,43 +3014,6 @@ function downloadFile(content, filename, mimeType) {
 // ==========================================
 // ADVANCED SEARCH
 // ==========================================
-function openAdvancedSearch() {
-    document.getElementById('advanced-search-modal')?.classList.add('open');
-}
-
-function closeAdvancedSearch() {
-    document.getElementById('advanced-search-modal')?.classList.remove('open');
-}
-
-function executeAdvancedSearch() {
-    const allWords = document.getElementById('adv-all-words')?.value.trim();
-    const exactPhrase = document.getElementById('adv-exact-phrase')?.value.trim();
-    const anyWords = document.getElementById('adv-any-words')?.value.trim();
-    const noneWords = document.getElementById('adv-none-words')?.value.trim();
-    const author = document.getElementById('adv-author')?.value.trim();
-    const journal = document.getElementById('adv-journal')?.value.trim();
-    const titleContains = document.getElementById('adv-title')?.value.trim();
-
-    let query = '';
-
-    if (allWords) query += allWords + ' ';
-    if (exactPhrase) query += `"${exactPhrase}" `;
-    if (anyWords) query += `(${anyWords.split(/\s+/).join(' OR ')}) `;
-    if (noneWords) query += noneWords.split(/\s+/).map(w => `-${w}`).join(' ') + ' ';
-    if (author) query += `author:${author} `;
-    if (titleContains) query += `title:${titleContains} `;
-
-    query = query.trim();
-
-    if (query) {
-        headerSearchInput.value = query;
-        closeAdvancedSearch();
-        performSearch();
-    } else {
-        showToast('Please enter at least one search term', 'error');
-    }
-}
-
 // ==========================================
 // CHATBOT FUNCTIONALITY (Maverick Synchronized)
 // ==========================================
@@ -3338,23 +3351,7 @@ function sendChatMessage(text) {
     }
 }
 
-// Floating Maverick Chat Toggle
-function toggleMaverickChat() {
-    const chat = document.getElementById('maverick-floating-chat');
-    if (!chat) return;
 
-    const isOpen = !chat.classList.contains('hidden');
-
-    if (isOpen) {
-        chat.classList.add('hidden');
-    } else {
-        chat.classList.remove('hidden');
-        // Auto-load history on first open if needed
-        if (document.getElementById('chat-history').children.length <= 1) {
-            loadMaverickHistory();
-        }
-    }
-}
 
 function removeChatLoading() {
     const loader = document.getElementById('chat-loading-indicator');
@@ -3403,6 +3400,40 @@ async function deleteChatHistory() {
             console.error("Firestore delete error:", err);
             showToast("Error clearing cloud history", "error");
         }
+    }
+}
+
+async function saveChatToFirestore(role, text) {
+    if (!currentUser || !db) return;
+    try {
+        await db.collection("users").doc(currentUser.uid).collection("chat_history").add({
+            role: role,
+            content: text,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (e) {
+        console.error("Error saving chat:", e);
+    }
+}
+
+async function loadMaverickHistory() {
+    if (!currentUser || !db) return;
+    try {
+        const snapshot = await db.collection("users").doc(currentUser.uid).collection("chat_history").orderBy("timestamp", "asc").get();
+        if (snapshot.empty) return;
+
+        const history = document.getElementById('chat-history');
+        if (history) {
+            const welcome = history.querySelector('.chat-welcome-message');
+            if (welcome) welcome.style.display = 'none';
+        }
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            addChatMessage(data.role, data.content, [], null, true, true);
+        });
+    } catch (e) {
+        console.error("Error loading chat history:", e);
     }
 }
 
@@ -3769,68 +3800,6 @@ function switchHelpTab(sectionName, btn) {
 }
 
 // ==========================================
-// COMMENTS SYSTEM
-// ==========================================
-function renderComments(articleId) {
-    const list = document.getElementById('comments-list');
-    if (!list) return;
-
-    const allComments = JSON.parse(localStorage.getItem('articleComments') || '{}');
-    const comments = allComments[articleId] || [];
-
-    if (comments.length === 0) {
-        list.innerHTML = `
-            <div class="empty-state small">
-                <p>No comments yet. Be the first to start the discussion!</p>
-            </div>
-        `;
-        return;
-    }
-
-    list.innerHTML = comments.map(c => `
-        <div class="comment-item">
-            <div class="comment-header">
-                <span class="comment-author">${escapeHtml(c.author)}</span>
-                <span class="comment-date">${formatDate(c.date)}</span>
-            </div>
-            <div class="comment-text">${escapeHtml(c.text)}</div>
-        </div>
-    `).join('');
-}
-
-function addComment() {
-    const input = document.getElementById('comment-input');
-    if (!input || !input.value.trim()) return;
-
-    const text = input.value.trim();
-    // Get current article ID from the open modal
-    // We can infer it from the modal title or store it in a global var. 
-    // Best way: check currentResults or readingList for the opened one, 
-    // OR we can make openArticleModal store the currentId globally.
-    // simpler: Let's use a global variable set in openArticleModal
-    if (!window.currentArticleId) {
-        console.error("No article selected");
-        return;
-    }
-
-    const allComments = JSON.parse(localStorage.getItem('articleComments') || '{}');
-    if (!allComments[window.currentArticleId]) {
-        allComments[window.currentArticleId] = [];
-    }
-
-    allComments[window.currentArticleId].unshift({
-        id: Date.now(),
-        text: text,
-        author: currentUser ? (currentUser.displayName || 'User') : 'Guest',
-        date: new Date().toISOString()
-    });
-
-    localStorage.setItem('articleComments', JSON.stringify(allComments));
-    input.value = '';
-    renderComments(window.currentArticleId);
-    showToast('Comment posted!', 'success');
-}
-
 // Add H key shortcut for help
 // Keyboard Shortcuts and Initialization logic consolidated in initKeyboardShortcuts
 
@@ -3839,19 +3808,6 @@ function addComment() {
 document.addEventListener('DOMContentLoaded', init);
 
 // Initialized on load section functions removed or moved
-
-function applyAdvancedSearch() {
-    const authorInput = document.getElementById('adv-author');
-    const journalInput = document.getElementById('adv-journal');
-    const minYear = document.getElementById('adv-year-from');
-    const maxYear = document.getElementById('adv-year-to');
-
-    // Here we would typically enhance the query or apply complex filters
-    // For now, let's just trigger a search and show a toast
-    showToast('Advanced filters applied!', 'info');
-    closeAdvancedSearch();
-    performSearch();
-}
 
 // Authentication Functions
 if (typeof isRegisterMode === 'undefined') {
@@ -4594,13 +4550,6 @@ document.addEventListener('keydown', function (e) {
         return;
     }
 
-    // Ctrl+Shift+F: Open advanced search
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
-        e.preventDefault();
-        openAdvancedSearch();
-        return;
-    }
-
     // Escape: Close modals or clear search
     if (e.key === 'Escape') {
         // Close any open modals
@@ -4630,9 +4579,6 @@ document.addEventListener('keydown', function (e) {
     } else if (e.key === '2') {
         e.preventDefault();
         switchTab('qa');
-    } else if (e.key === '3') {
-        e.preventDefault();
-        switchTab('trends');
     }
 
     // Arrow keys: Navigate pages
@@ -5552,3 +5498,49 @@ function initChatResizer() {
         chat.classList.remove('resizing');
     }
 }
+
+function initFloatingChatButton() {
+    const floatingBtn = document.getElementById('floating-chat-btn');
+    if (floatingBtn) {
+        floatingBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openTelegramBot();
+            return false;
+        });
+        console.log('✓ Floating chat button initialized and clickable');
+    } else {
+        console.warn('⚠ Floating chat button element not found');
+    }
+}
+
+function showFloatingChatButton() {
+    const floatingBtn = document.getElementById('floating-chat-btn');
+    if (floatingBtn) {
+        floatingBtn.classList.add('visible');
+    }
+}
+
+function hideFloatingChatButton() {
+    const floatingBtn = document.getElementById('floating-chat-btn');
+    if (floatingBtn) {
+        floatingBtn.classList.remove('visible');
+    }
+}
+
+function openTelegramBot() {
+    const telegramBotUrl = 'https://web.telegram.org/a/#8513211167';
+    window.open(telegramBotUrl, 'telegram-bot', 'width=800,height=600,resizable=yes');
+}
+
+// Initialize floating button on page load
+document.addEventListener('DOMContentLoaded', function () {
+    initFloatingChatButton();
+});
+
+// Integrated Desk Assistant functionality removed in favor of Telegram redirection
+
+function jsonStringify(obj) {
+    return JSON.stringify(obj);
+}
+

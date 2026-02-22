@@ -7,56 +7,71 @@
 }
 
 :root {
-    /* Google Scholar-inspired Color Palette */
-    --primary-blue: #1a73e8;
-    --primary-blue-hover: #1557b0;
-    --primary-blue-light: #e8f0fe;
-    --google-red: #ea4335;
-    --google-yellow: #fbbc05;
-    --google-green: #34a853;
-    --google-blue: #4285f4;
+    /* Modern React-inspired Color Palette (Tailwind-like) */
+    --primary-blue: #3b82f6;
+    /* Blue 500 */
+    --primary-blue-hover: #2563eb;
+    /* Blue 600 */
+    --primary-blue-light: #eff6ff;
+    /* Blue 50 */
+    --google-red: #ef4444;
+    /* Red 500 */
+    --google-yellow: #f59e0b;
+    /* Amber 500 */
+    --google-green: #10b981;
+    /* Emerald 500 */
+    --google-blue: #3b82f6;
+    /* Blue 500 */
 
     /* Backgrounds */
     --bg-primary: #ffffff;
-    --bg-secondary: #f8f9fa;
-    --bg-tertiary: #f1f3f4;
-    --bg-hover: #e8eaed;
+    --bg-secondary: #f4f4f5;
+    /* Zinc 100 */
+    --bg-tertiary: #e4e4e7;
+    /* Zinc 200 */
+    --bg-hover: #f4f4f5;
 
     /* Text Colors */
-    --text-primary: #202124;
-    --text-secondary: #5f6368;
-    --text-muted: #80868b;
-    --text-link: #1a0dab;
-    --text-link-visited: #660099;
+    --text-primary: #09090b;
+    /* Zinc 950 */
+    --text-secondary: #52525b;
+    /* Zinc 600 */
+    --text-muted: #71717a;
+    /* Zinc 500 */
+    --text-link: #2563eb;
+    --text-link-visited: #7c3aed;
+    /* Violet 600 */
 
     /* Borders */
-    --border-color: #dadce0;
-    --border-light: #e8eaed;
+    --border-color: #e4e4e7;
+    /* Zinc 200 */
+    --border-light: #f4f4f5;
+    /* Zinc 100 */
 
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 rgba(60, 64, 67, 0.1);
-    --shadow-md: 0 2px 6px 0 rgba(60, 64, 67, 0.15);
-    --shadow-lg: 0 4px 12px 0 rgba(60, 64, 67, 0.2);
-    --shadow-xl: 0 8px 24px 0 rgba(60, 64, 67, 0.25);
-    --shadow-focus: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    /* Shadows (Tailwind style) */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    --shadow-focus: 0 0 0 2px var(--bg-primary), 0 0 0 4px rgba(59, 130, 246, 0.5);
 
     /* Spacing */
-    --header-height: 80px;
-    /* Reduced slightly for better fit */
+    --header-height: 72px;
+    /* Cleaner, slightly smaller header */
     --nav-height: 48px;
     --sidebar-width: 280px;
 
-    /* Border Radius */
-    --radius-sm: 4px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
+    /* Border Radius - More rounded for modern feel */
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
     --radius-xl: 24px;
     --radius-full: 9999px;
 
     /* Transitions */
-    --transition-fast: 0.15s ease;
-    --transition-normal: 0.2s ease;
-    --transition-slow: 0.3s ease;
+    --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     --footer-height: 60px;
 }
 
@@ -90,27 +105,38 @@
 }
 
 
-/* Dark Theme */
+/* Dark Theme - Modern React/Vercel styling */
 [data-theme="dark"] {
-    --bg-primary: #202124;
-    --bg-secondary: #292a2d;
-    --bg-tertiary: #35363a;
-    --bg-hover: #3c4043;
+    --bg-primary: #09090b;
+    /* Zinc 950 */
+    --bg-secondary: #18181b;
+    /* Zinc 900 */
+    --bg-tertiary: #27272a;
+    /* Zinc 800 */
+    --bg-hover: #27272a;
+    /* Zinc 800 */
 
-    --text-primary: #e8eaed;
-    --text-secondary: #9aa0a6;
-    --text-muted: #80868b;
-    --text-link: #8ab4f8;
-    --text-link-visited: #c58af9;
+    --text-primary: #f4f4f5;
+    /* Zinc 100 */
+    --text-secondary: #a1a1aa;
+    /* Zinc 400 */
+    --text-muted: #71717a;
+    /* Zinc 500 */
+    --text-link: #60a5fa;
+    /* Blue 400 */
+    --text-link-visited: #a78bfa;
+    /* Violet 400 */
 
-    --border-color: #3c4043;
-    --border-light: #5f6368;
+    --border-color: #27272a;
+    /* Zinc 800 */
+    --border-light: #3f3f46;
+    /* Zinc 700 */
 
-    --primary-blue-light: #394457;
+    --primary-blue-light: rgba(59, 130, 246, 0.15);
 }
 
 body {
-    font-family: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--bg-secondary);
     color: var(--text-primary);
     line-height: 1.6;
@@ -125,7 +151,11 @@ body {
 
 body.chat-mode {
     overflow: hidden;
-    padding-bottom: var(--footer-height);
+    padding-bottom: 0;
+}
+
+body.chat-mode .scholar-footer {
+    display: none;
 }
 
 /* Skeleton Loader */
@@ -313,13 +343,20 @@ body.chat-mode {
     left: 0;
     right: 0;
     height: var(--header-height);
-    background: var(--bg-primary);
-    border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(228, 228, 231, 0.6);
     display: flex;
     align-items: center;
     padding: 0 16px;
     z-index: 1200;
     gap: 16px;
+}
+
+[data-theme="dark"] .scholar-header {
+    background: rgba(9, 9, 11, 0.75);
+    border-bottom: 1px solid rgba(39, 39, 42, 0.6);
 }
 
 .header-left {
@@ -421,7 +458,7 @@ body.chat-mode {
 .search-input-wrapper:focus-within {
     background: var(--bg-primary);
     border-color: var(--primary-blue);
-    box-shadow: 0 1px 6px 0 rgba(32, 33, 36, 0.28);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
 }
 
 .search-icon {
@@ -445,23 +482,6 @@ body.chat-mode {
     color: var(--text-muted);
 }
 
-.advanced-search-btn {
-    background: transparent;
-    border: none;
-    padding: 8px;
-    color: var(--text-muted);
-    cursor: pointer;
-    border-radius: var(--radius-full);
-    transition: all var(--transition-fast);
-    display: flex;
-    align-items: center;
-}
-
-.advanced-search-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-
 .search-btn {
     background: var(--primary-blue);
     color: white;
@@ -475,6 +495,34 @@ body.chat-mode {
     justify-content: center;
     margin-left: 4px;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+    position: relative;
+    pointer-events: auto;
+    box-shadow: var(--shadow-sm);
+}
+
+#advanced-search-btn {
+    background: transparent;
+    color: var(--text-muted);
+    border: none;
+    border-radius: var(--radius-full);
+    width: 38px;
+    height: 38px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 4px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 20;
+    position: relative;
+    pointer-events: auto;
+    padding: 0;
+}
+
+#advanced-search-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
 }
 
 .search-btn:hover {
@@ -1676,6 +1724,17 @@ body.chat-mode {
 
 .scholar-main.no-padding {
     padding: 0;
+}
+
+.tab-content {
+    display: none;
+    height: 100%;
+    width: 100%;
+}
+
+.tab-content.active {
+    display: flex;
+    flex-direction: column;
 }
 
 .main-container {
@@ -3841,32 +3900,6 @@ kbd {
     background: var(--bg-primary);
 }
 
-.comment-form {
-    margin-bottom: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-#comment-input {
-    padding: 16px;
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-color);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font-family: inherit;
-    font-size: 14px;
-    resize: vertical;
-    transition: all var(--transition-fast);
-}
-
-#comment-input:focus {
-    outline: none;
-    border-color: var(--primary-blue);
-    background: var(--bg-primary);
-    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
-}
-
 .comments-list {
     display: flex;
     flex-direction: column;
@@ -5807,5 +5840,79 @@ body {
 
 .maverick-floating-chat.resizing {
     transition: none !important;
+}
+
+/* ==========================================
+   FLOATING TELEGRAM CHAT BUTTON
+   ========================================== */
+.floating-chat-button {
+    position: fixed;
+    bottom: 80px;
+    right: 24px;
+    z-index: 999;
+    display: none;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #0088cc 0%, #006ba3 100%);
+    color: white;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0, 136, 204, 0.4);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
+    font-size: 14px;
     user-select: none;
+    border: none;
+    outline: none;
+    pointer-events: auto;
+}
+
+.floating-chat-button.visible {
+    display: flex;
+}
+
+.floating-chat-button:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(0, 136, 204, 0.6);
+}
+
+.floating-chat-button:active {
+    transform: translateY(-2px);
+}
+
+.floating-chat-button:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 2px;
+}
+
+.floating-chat-button svg {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.chat-button-label {
+    white-space: nowrap;
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+    .floating-chat-button {
+        bottom: 70px;
+        right: 16px;
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    .chat-button-label {
+        display: none;
+    }
+
+    .floating-chat-button svg {
+        width: 20px;
+        height: 20px;
+    }
 }

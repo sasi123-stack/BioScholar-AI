@@ -62,3 +62,4 @@ flask>=3.0.0
 dnspython
 selenium
 webdriver-manager
+twilio
