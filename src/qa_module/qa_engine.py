@@ -37,7 +37,8 @@ class QuestionAnsweringEngine:
         index_name: str = 'pubmed_articles',
         num_passages: int = 5,
         num_answers: int = 3,
-        include_context: bool = True
+        include_context: bool = True,
+        history_context: Optional[str] = None
     ) -> Dict:
         """Answer a question using retrieval and extraction."""
         logger.info(f"Answering question: '{question}'")
@@ -64,16 +65,16 @@ class QuestionAnsweringEngine:
         # Prefer OpenClaw if configured (User requested priority)
         if self.openclaw_generator and self.openclaw_generator.api_key != "sk-openclaw-placeholder":
              logger.info("Using OpenClaw for synthesis")
-             generated_answer = self.openclaw_generator.generate_answer(question, passages)
+             generated_answer = self.openclaw_generator.generate_answer(question, passages, history_context=history_context)
         
         # Fallback to Groq
         elif self.groq_generator.api_key and self.groq_generator.api_key != "gsk_your_actual_key_here":
             logger.info("Using Groq for lightning-fast conversational synthesis")
-            generated_answer = self.groq_generator.generate_answer(question, passages)
+            generated_answer = self.groq_generator.generate_answer(question, passages, history_context=history_context)
         # Fallback to Gemini
         elif self.answer_generator.api_key and self.answer_generator.api_key != "your_gemini_api_key_here":
             logger.info("Using Gemini for conversational synthesis")
-            generated_answer = self.answer_generator.generate_answer(question, passages)
+            generated_answer = self.answer_generator.generate_answer(question, passages, history_context=history_context)
         
         # Always run extraction for validation/secondary options
         extracted_answers = self.answer_extractor.extract_from_passages(
