@@ -106,7 +106,7 @@ class HealthResponse(BaseModel):
     elasticsearch: bool = Field(..., description="Elasticsearch connection status")
     models_loaded: bool = Field(..., description="ML models loaded status")
     version: str = Field(..., description="API version")
-    features: Optional[Dict[str, bool]] = Field(None, description="Feature availability flags")
+    features: Optional[Dict[str, Any]] = Field(None, description="Feature availability flags and diagnostic info")
 
 
 class BatchQuestionRequest(BaseModel):
@@ -146,3 +146,22 @@ class IngestResponse(BaseModel):
     status: str = Field(..., description="Status of the operation")
     message: str = Field(..., description="Details about the operation")
     count: Optional[int] = Field(None, description="Number of documents processed")
+
+
+class MaverickChatRequest(BaseModel):
+    """Enhanced request model for Maverick Chat with memory and metadata."""
+    
+    question: str = Field(..., description="The user's question or message")
+    context: Optional[List[Dict[str, str]]] = Field(None, description="Recent conversation history for long-term memory")
+    attachments: Optional[List[Dict[str, Any]]] = Field(None, description="Metadata about attached files/images")
+    user_id: Optional[int] = Field(123, description="Unique user identifier")
+
+
+class MaverickChatResponse(BaseModel):
+    """Enhanced response for Maverick with reasoning and sources."""
+    
+    answer: str = Field(..., description="The AI's answer")
+    reasoning: Optional[str] = Field(None, description="The Chain of Thought or 'Thinking' process")
+    status: str = Field("success", description="Status of the request")
+    sources: List[AnswerResult] = Field(default_factory=list, description="Supporting evidence sources")
+    qa_time_ms: float = Field(0.0, description="Processing time")
