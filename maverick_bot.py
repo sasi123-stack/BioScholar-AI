@@ -159,16 +159,44 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = client.chat.completions.create(model=MODEL_NAME, messages=messages, temperature=0.3, max_tokens=2048)
             answer = response.choices[0].message.content
 
+        # Escape stray < and > that are not part of allowed tags
+        def safe_html(text):
+            # Temporarily hide valid tags
+            text = text.replace("<b>", "##B##").replace("</b>", "##/B##")
+            text = text.replace("<i>", "##I##").replace("</i>", "##/I##")
+            text = text.replace("<u>", "##U##").replace("</u>", "##/U##")
+            # Escape real HTML markers
+            text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            # Restore valid tags
+            text = text.replace("##B##", "<b>").replace("##/B##", "</b>")
+            text = text.replace("##I##", "<i>").replace("##/I##", "</i>")
+            text = text.replace("##U##", "<u>").replace("##/U##", "</u>")
+            return text
+
+        answer = safe_html(answer)
+
         if "💠" not in answer[:15]: answer = "💠 " + answer
         save_message(user_id, "assistant", answer)
         await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=thinking_msg.message_id)
         
         keyboard = [[InlineKeyboardButton("👍 Helpful", callback_data="fb_up"), InlineKeyboardButton("👎 Not Helpful", callback_data="fb_down")]]
-        await update.message.reply_text(answer, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        
+        try:
+            # Attempt to send with HTML
+            await update.message.reply_text(answer, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        except Exception as html_err:
+            logger.warning(f"HTML Parsing failed: {html_err}. Falling back to plain text.")
+            # If HTML fails, try to clean it or just send as plain text
+            clean_answer = answer.replace("<b>", "").replace("</b>", "").replace("<i>", "").replace("</i>", "").replace("<u>", "").replace("</u>", "")
+            await update.message.reply_text(clean_answer, reply_markup=InlineKeyboardMarkup(keyboard))
             
     except Exception as e:
         logger.error(f"Error: {e}")
-        await update.message.reply_text(f"💠 Maverick Suite encountered a node disturbance: {str(e)}")
+        # Final fallback for system errors
+        error_msg = f"💠 Maverick Suite encountered a node disturbance: {str(e)}"
+        if "Can't parse entities" in str(e):
+             error_msg = "💠 Maverick Suite detected a structural HTML syntax error in the response engine. Research remains valid, but formatting was reset."
+        await update.message.reply_text(error_msg)
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
