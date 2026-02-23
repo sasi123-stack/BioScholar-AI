@@ -653,8 +653,8 @@ async def maverick_chat(
         if request.attachments:
             reasoning_steps.append(f"Analyzing {len(request.attachments)} attached files/modalities.")
             
-        # 4. Get answer
-        result = qa_engine.answer_question(question=query, num_answers=1, history_context=history_context)
+        # 4. Get answer (without history_context for now - HF Space has older generators)
+        result = qa_engine.answer_question(question=query, num_answers=1)
         
         if result["status"] == "success" and result["answers"]:
             answer = result["answers"][0]["answer"]

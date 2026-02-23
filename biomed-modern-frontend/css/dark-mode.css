@@ -1,0 +1,219 @@
+/* ============================================================================
+   BIOMED SCHOLAR AI - DARK MODE
+   ============================================================================ */
+
+body.dark-mode {
+  --text-primary: #E8EAED;
+  --text-secondary: #9AA0A6;
+  --bg-primary: #202124;
+  --bg-secondary: #292A2D;
+  --border: #3C4043;
+  --shadow: rgba(0, 0, 0, 0.3);
+
+  --primary-light: rgba(0, 86, 210, 0.15);
+}
+
+body.dark-mode .header {
+  background: var(--bg-primary);
+  border-bottom-color: var(--border);
+}
+
+body.dark-mode .mode-btn {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+body.dark-mode .mode-btn:hover {
+  border-color: var(--primary);
+  background: var(--bg-secondary);
+}
+
+body.dark-mode .search-input {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+body.dark-mode .search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 86, 210, 0.15);
+}
+
+body.dark-mode .sidebar {
+  background: var(--bg-secondary);
+}
+
+body.dark-mode .sidebar-header {
+  border-bottom: none;
+}
+
+body.dark-mode .filter-label {
+  color: var(--text-secondary);
+}
+
+body.dark-mode .article-card {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+body.dark-mode .article-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(0, 86, 210, 0.2);
+}
+
+body.dark-mode .action-btn {
+  border-color: var(--border);
+}
+
+body.dark-mode .action-btn:hover {
+  background: rgba(0, 86, 210, 0.1);
+}
+
+body.dark-mode .action-btn.bookmarked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+body.dark-mode .article-meta {
+  border-bottom-color: var(--border);
+}
+
+body.dark-mode .badge {
+  background: rgba(0, 86, 210, 0.15);
+  color: #64B5F6;
+}
+
+body.dark-mode .badge.source {
+  background: rgba(0, 86, 210, 0.15);
+}
+
+body.dark-mode .badge.type {
+  background: rgba(70, 167, 88, 0.15);
+  color: #81C784;
+}
+
+body.dark-mode .empty-state {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+body.dark-mode .empty-state h3 {
+  color: var(--text-primary);
+}
+
+body.dark-mode .keyboard-hints {
+  background: var(--bg-secondary);
+}
+
+body.dark-mode kbd {
+  background: #3C4043;
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+body.dark-mode .select {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+body.dark-mode .input {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+body.dark-mode .btn-secondary {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+body.dark-mode .btn-secondary:hover {
+  background: var(--border);
+}
+
+body.dark-mode .page-btn {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+body.dark-mode .page-num {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+body.dark-mode .modal-content {
+  background: var(--bg-primary);
+}
+
+body.dark-mode .citation-format {
+  background: var(--bg-secondary);
+}
+
+body.dark-mode .citation-output {
+  background: #1a1d1f;
+  border-color: var(--border);
+  color: #e0e0e0;
+}
+
+body.dark-mode .article-detail-meta {
+  background: var(--bg-secondary);
+}
+
+body.dark-mode .author-tag {
+  background: rgba(0, 86, 210, 0.15);
+  color: #64B5F6;
+}
+
+body.dark-mode .settings-group {
+  border-bottom-color: var(--border);
+}
+
+body.dark-mode .reading-list-item {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+body.dark-mode .reading-list-item:hover {
+  background: rgba(0, 86, 210, 0.1);
+}
+
+body.dark-mode .reading-list-item-btn {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+body.dark-mode .reading-list-item-btn:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+body.dark-mode .toast {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
+body.dark-mode .article-link {
+  background: rgba(0, 86, 210, 0.15);
+  color: #64B5F6;
+}
+
+body.dark-mode .article-link:hover {
+  background: var(--primary);
+  color: white;
+}
+
+body.dark-mode .skeleton {
+  background: linear-gradient(90deg, var(--bg-secondary) 0%, var(--border) 50%, var(--bg-secondary) 100%);
+}
+
+/* Smooth transitions for dark mode */
+body {
+  transition: background-color var(--transition-base), color var(--transition-base);
+}
+
+body * {
+  transition: background-color var(--transition-base), border-color var(--transition-base), color var(--transition-base);
+}

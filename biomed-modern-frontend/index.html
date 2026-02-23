@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="BioMedScholar AI - Modern biomedical research discovery engine">
+  <title>BioMedScholar AI - Research Discovery Engine</title>
+
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/dark-mode.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75' font-weight='bold' fill='%230056D2'>📚</text></svg>">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header" id="header">
+    <div class="header-container">
+      <div class="logo">
+        <span class="logo-icon">🧬</span>
+        <span class="logo-text">BioMedScholar</span>
+      </div>
+
+      <div class="search-wrapper">
+        <input
+          type="text"
+          id="searchInput"
+          class="search-input"
+          placeholder="Search biomedical literature... (Ctrl+K)"
+          aria-label="Search articles"
+        >
+        <div class="search-modes">
+          <button class="mode-btn active" data-mode="balanced" title="Balanced search">⚖️ Balanced</button>
+          <button class="mode-btn" data-mode="keyword" title="Keyword search">🔍 Keyword</button>
+          <button class="mode-btn" data-mode="semantic" title="Semantic search">🧠 Semantic</button>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="darkModeToggle" class="icon-btn" title="Toggle dark mode (D)" aria-label="Toggle dark mode">
+          🌙
+        </button>
+        <button id="readingListBtn" class="icon-btn with-count" title="View reading list (B)" aria-label="View reading list">
+          📖 <span class="count-badge">0</span>
+        </button>
+        <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">
+          ⚙️
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <div class="main-layout">
+    <!-- Sidebar: Filters -->
+    <aside class="sidebar filters-sidebar" id="filtersSidebar">
+      <div class="sidebar-header">
+        <h2>Filters</h2>
+        <button class="close-btn" id="closeFiltets" aria-label="Close filters">✕</button>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Search Mode</label>
+        <div class="filter-options">
+          <label class="checkbox-label">
+            <input type="radio" name="searchMode" value="balanced" checked>
+            <span>Balanced</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="radio" name="searchMode" value="keyword">
+            <span>Keyword Only</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="radio" name="searchMode" value="semantic">
+            <span>Semantic Only</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Data Source</label>
+        <div class="filter-options">
+          <label class="checkbox-label">
+            <input type="checkbox" name="source" value="pubmed" checked>
+            <span>PubMed</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="source" value="clinical-trials" checked>
+            <span>Clinical Trials</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="source" value="arxiv" checked>
+            <span>arXiv</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Publication Year</label>
+        <input type="range" name="yearFrom" min="1990" max="2024" value="2020" class="slider">
+        <div class="year-display">
+          <span id="yearFromDisplay">2020</span> - <span id="yearToDisplay">2024</span>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Article Type</label>
+        <div class="filter-options">
+          <label class="checkbox-label">
+            <input type="checkbox" name="articleType" value="research" checked>
+            <span>Research Paper</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="articleType" value="review" checked>
+            <span>Review</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="articleType" value="systematic" checked>
+            <span>Systematic Review</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="articleType" value="meta-analysis" checked>
+            <span>Meta-Analysis</span>
+          </label>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="applyFiltersBtn">Apply Filters</button>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="content">
+      <!-- Analytics Panel -->
+      <section class="analytics-panel" id="analyticsPanel">
+        <div class="analytics-header">
+          <h2>Research Insights</h2>
+          <button class="toggle-btn" id="toggleAnalytics">−</button>
+        </div>
+        <div class="analytics-content" id="analyticsContent">
+          <div class="stat-card">
+            <div class="stat-number">35M+</div>
+            <div class="stat-label">Indexed Articles</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">245%</div>
+            <div class="stat-label">GLP-1 Agonists Growth</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">1,234</div>
+            <div class="stat-label">New This Week</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">98.5%</div>
+            <div class="stat-label">Index Currency</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Results Section -->
+      <section class="results-section">
+        <div class="results-header">
+          <h2 id="resultsTitle">Enter a search query to begin</h2>
+          <div class="results-controls">
+            <select id="sortBy" class="select" aria-label="Sort results">
+              <option value="relevance">Sort by: Relevance</option>
+              <option value="newest">Newest First</option>
+              <option value="most-cited">Most Cited</option>
+            </select>
+            <button id="toggleFilters" class="btn btn-secondary" aria-label="Toggle filters">
+              ☰ Filters
+            </button>
+          </div>
+        </div>
+
+        <div class="results-list" id="resultsList">
+          <div class="empty-state">
+            <div class="empty-icon">🔬</div>
+            <h3>Welcome to BioMedScholar AI</h3>
+            <p>Start by entering a search term above to discover biomedical research articles from PubMed, Clinical Trials, and arXiv.</p>
+            <div class="keyboard-hints">
+              <p><strong>Keyboard shortcuts:</strong></p>
+              <ul>
+                <li><kbd>Ctrl</kbd> + <kbd>K</kbd> - Focus search</li>
+                <li><kbd>B</kbd> - Reading list</li>
+                <li><kbd>D</kbd> - Dark mode</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        <nav class="pagination" id="pagination" aria-label="Search results pagination">
+          <button class="page-btn" id="prevPage" aria-label="Previous page">← Previous</button>
+          <div class="page-numbers" id="pageNumbers"></div>
+          <button class="page-btn" id="nextPage" aria-label="Next page">Next →</button>
+        </nav>
+      </section>
+    </main>
+
+    <!-- Sidebar: Reading List -->
+    <aside class="sidebar reading-list-sidebar" id="readingSidebar">
+      <div class="sidebar-header">
+        <h2>Reading List</h2>
+        <button class="close-btn" id="closeReadingList" aria-label="Close reading list">✕</button>
+      </div>
+
+      <div class="reading-list-content" id="readingListContent">
+        <div class="empty-state">
+          <p>No saved articles yet</p>
+          <p class="text-sm">Click the bookmark icon on any article to save it</p>
+        </div>
+      </div>
+
+      <div class="reading-list-actions">
+        <button class="btn btn-secondary btn-small" id="exportBtn">📥 Export</button>
+        <button class="btn btn-secondary btn-small" id="clearBtn">🗑️ Clear</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Modals -->
+  <!-- Article Detail Modal -->
+  <div class="modal" id="articleModal">
+    <div class="modal-content">
+      <button class="modal-close" aria-label="Close modal">✕</button>
+      <div id="articleDetail"></div>
+    </div>
+  </div>
+
+  <!-- Citation Modal -->
+  <div class="modal" id="citationModal">
+    <div class="modal-content">
+      <button class="modal-close" aria-label="Close modal">✕</button>
+      <h2>Generate Citation</h2>
+      <div id="citationFormats">
+        <div class="citation-format">
+          <label>
+            <input type="radio" name="citationFormat" value="apa" checked>
+            <span>APA</span>
+          </label>
+          <pre id="citationAPA" class="citation-output"></pre>
+        </div>
+        <div class="citation-format">
+          <label>
+            <input type="radio" name="citationFormat" value="mla">
+            <span>MLA</span>
+          </label>
+          <pre id="citationMLA" class="citation-output"></pre>
+        </div>
+        <div class="citation-format">
+          <label>
+            <input type="radio" name="citationFormat" value="chicago">
+            <span>Chicago</span>
+          </label>
+          <pre id="citationChicago" class="citation-output"></pre>
+        </div>
+        <div class="citation-format">
+          <label>
+            <input type="radio" name="citationFormat" value="harvard">
+            <span>Harvard</span>
+          </label>
+          <pre id="citationHarvard" class="citation-output"></pre>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" id="copyCitationBtn">📋 Copy Citation</button>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal" id="settingsModal">
+    <div class="modal-content">
+      <button class="modal-close" aria-label="Close modal">✕</button>
+      <h2>Settings</h2>
+      <div class="settings-group">
+        <label>
+          <input type="checkbox" id="animationsToggle" checked>
+          <span>Enable Animations</span>
+        </label>
+        <label>
+          <input type="checkbox" id="autoSaveToggle" checked>
+          <span>Auto-save Reading List</span>
+        </label>
+        <label>
+          <input type="checkbox" id="notificationsToggle" checked>
+          <span>Enable Notifications</span>
+        </label>
+      </div>
+      <div class="settings-group">
+        <label>Results Per Page:</label>
+        <input type="number" id="resultsPerPage" min="5" max="50" value="10" class="input">
+      </div>
+      <button class="btn btn-secondary btn-block" id="clearCacheBtn">🗑️ Clear Cache</button>
+      <button class="btn btn-secondary btn-block" id="downloadDataBtn">📥 Download My Data</button>
+    </div>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/keyboard-shortcuts.js"></script>
+  <script src="js/service-worker.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

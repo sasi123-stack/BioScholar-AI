@@ -37,7 +37,11 @@ var isFirebase = window.location.hostname.includes('web.app') || window.location
 var isVercel = window.location.hostname.includes('vercel.app');
 
 // Backend URLs for different environments
+// Main biomedical search API
 var HF_BACKEND_URL = 'https://sasidhara123-biomed-scholar-api.hf.space/api/v1';
+
+// Maverick AI Bot (separate deployment)
+var MAVERICK_API_URL = 'https://sasidhara123-maverick-ai-bot.hf.space/api/v1';
 
 var API_BASE_URL = (isLocal && window.location.search.includes('local=true')) ?
     'http://localhost:8000/api/v1' : HF_BACKEND_URL;
@@ -61,11 +65,12 @@ var firebaseConfig = {
 };
 
 // Initialize Firebase
-var auth;
+var auth, db;
 if (typeof firebase !== 'undefined') {
     try {
         firebase.initializeApp(firebaseConfig);
         auth = firebase.auth();
+        db = firebase.firestore();
     } catch (e) {
         console.error("Firebase initialization failed:", e);
     }
@@ -216,7 +221,7 @@ function createModal() {
     // Modal is now in static HTML
 }
 
-function openArticleModal(resultId) {
+function openArticleModal(resultId, fallbackTitle = null) {
     // Convert resultId to string for comparison to handle numeric vs string IDs
     const idStr = String(resultId);
 
@@ -228,7 +233,30 @@ function openArticleModal(resultId) {
     }
 
     if (!result) {
-        console.warn('Article not found for ID:', resultId);
+        console.warn('Article not found in local memory, attempting external redirect:', resultId);
+        let type = 'pubmed';
+        if (idStr.toUpperCase().startsWith('NCT')) type = 'clinical_trials';
+
+        const url = getExternalUrl({
+            source: type,
+            id: resultId,
+            pmid: type === 'pubmed' ? resultId : null,
+            nct_id: type !== 'pubmed' ? resultId : null
+        });
+
+        if (url) {
+            window.open(url, '_blank');
+        } else if (fallbackTitle && fallbackTitle !== 'undefined') {
+            window.open(`https://scholar.google.com/scholar?q=${encodeURIComponent(fallbackTitle)}`, '_blank');
+        } else {
+            // Last resort if ID contains some digits at least
+            const match = idStr.match(/\d+/);
+            if (match) {
+                window.open(`https://pubmed.ncbi.nlm.nih.gov/${match[0]}/`, '_blank');
+            } else {
+                showToast('Article details not available locally.', 'info');
+            }
+        }
         return;
     }
 
@@ -321,14 +349,11 @@ function openArticleModal(resultId) {
         overlay.classList.add('open');
         document.body.style.overflow = 'hidden';
 
-        // Store current ID for comments
+        // Store current ID for reference
         window.currentArticleId = result.id;
 
         // Reset tabs to summary
         switchModalTab('summary');
-
-        // Load Comments
-        renderComments(result.id);
 
         // Populate Full Text Tab
         const fulltextPreview = document.getElementById('modal-fulltext-content');
@@ -355,7 +380,6 @@ function closeArticleModal() {
 
 function closeAllModals() {
     closeArticleModal();
-    closeAdvancedSearch();
     hideAutocomplete();
     // Close other panels
     const readingListPanel = document.getElementById('reading-list-panel');
@@ -428,7 +452,9 @@ function initEventListeners() {
 
     // Tab Navigation
     document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+        if (tab.dataset.tab) {
+            tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+        }
     });
 
     // View Toggle
@@ -598,7 +624,55 @@ function initEventListeners() {
             sDot.classList.remove('online');
             sDot.classList.add('offline');
         }
-        if (sText) sText.textContent = 'Offline';
+    });
+
+    // Header Menu Toggle
+    window.toggleHeaderMenu = function (e) {
+        if (e) e.stopPropagation();
+        document.getElementById('header-menu')?.classList.toggle('hidden');
+    };
+
+    window.toggleHistoryDropdown = function (e) {
+        if (e) e.stopPropagation();
+        const searchInput = document.getElementById('header-search-input');
+        if (searchInput) {
+            searchInput.focus();
+            showAutocomplete(); // this implicitly shows search history if autocomplete is built
+        }
+        // Force header menu to close
+        document.getElementById('header-menu')?.classList.add('hidden');
+    };
+
+    // Results Actions Menu Toggle
+    window.toggleResultsMenu = function (e) {
+        if (e) e.stopPropagation();
+        document.getElementById('results-menu')?.classList.toggle('hidden');
+    };
+
+    // Close menu when clicking outside
+    window.addEventListener('click', (e) => {
+        const headerMenu = document.getElementById('header-menu');
+        const resultsMenu = document.getElementById('results-menu');
+        const notificationMenu = document.getElementById('notification-dropdown');
+
+        if (headerMenu && !headerMenu.classList.contains('hidden')) {
+            if ((!headerMenu.contains(e.target) || e.target.closest('.menu-item')) && !e.target.closest('.menu-trigger')) {
+                // If it's the notification button, let the toggle run, but hide header
+                headerMenu.classList.add('hidden');
+            }
+        }
+        if (resultsMenu && !resultsMenu.classList.contains('hidden')) {
+            if ((!resultsMenu.contains(e.target) || e.target.closest('.menu-item')) && !e.target.closest('.menu-trigger')) {
+                resultsMenu.classList.add('hidden');
+            }
+        }
+        if (notificationMenu && !notificationMenu.classList.contains('hidden')) {
+            // Close notification dropdown if clicked outside
+            // (Exclude clicks on the notification icon itself if it has a specific trigger, though here we open it via header menu)
+            if (!notificationMenu.contains(e.target) && !e.target.closest('.menu-item[onclick*="toggleNotifications"]')) {
+                notificationMenu.classList.add('hidden');
+            }
+        }
     });
 }
 
@@ -622,11 +696,10 @@ function initKeyboardShortcuts() {
             headerSearchInput?.focus();
         }
 
-        // Ctrl+Shift+F - Advanced search
-        if (isMod && e.shiftKey && e.key === 'F') {
-            e.preventDefault();
-            openAdvancedSearch();
-        }
+        // Ctrl+Shift+F - Reserved for future use
+        // if (isMod && e.shiftKey && e.key === 'F') {
+        //     e.preventDefault();
+        // }
 
         // Ctrl+E - Export results
         if (isMod && e.key === 'e') {
@@ -648,10 +721,8 @@ function initKeyboardShortcuts() {
             showHelpModal();
         }
 
-        // 1, 2, 3 - Switch tabs
+        // 1 - Switch tabs (only Research Desk remains)
         if (e.key === '1' && !isMod) switchTab('articles');
-        if (e.key === '2' && !isMod) switchTab('qa');
-        if (e.key === '3' && !isMod) switchTab('trends');
 
         // B - Toggle reading list
         if ((e.key.toLowerCase() === 'b') && !isMod) {
@@ -700,9 +771,9 @@ function initKeyboardShortcuts() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // G - Toggle sidebar/filters (mobile)
+        // G - Toggle sidebar/filters
         if (e.key.toLowerCase() === 'g' && !isMod) {
-            toggleMobileFilters();
+            toggleSidebar();
         }
 
         // F - Toggle fullscreen
@@ -727,6 +798,42 @@ function initKeyboardShortcuts() {
             }
         }
 
+        // Ctrl+A - Smart Select (add/remove all visible results)
+        if (isMod && e.key === 'a') {
+            e.preventDefault();
+            smartSelectResults();
+        }
+
+        // T - Quick Type Filter (cycle through article types)
+        if (e.key.toLowerCase() === 't' && !isMod && !e.shiftKey) {
+            e.preventDefault();
+            cycleTypeFilter();
+        }
+
+        // Y - Quick Date Filter (cycle through date ranges)
+        if (e.key.toLowerCase() === 'y' && !isMod && !e.shiftKey) {
+            e.preventDefault();
+            cycleDateFilter();
+        }
+
+        // V - View Toggle (switch between list and compact)
+        if (e.key.toLowerCase() === 'v' && !isMod && !e.shiftKey) {
+            e.preventDefault();
+            toggleViewMode();
+        }
+
+        // J - Focus next result
+        if (e.key.toLowerCase() === 'j' && !isMod && !e.shiftKey) {
+            e.preventDefault();
+            focusNextResult();
+        }
+
+        // K - Focus previous result
+        if (e.key.toLowerCase() === 'k' && !isMod && !e.shiftKey) {
+            e.preventDefault();
+            focusPreviousResult();
+        }
+
         // Escape - Close modals and dropdowns
         if (e.key === 'Escape') {
             const modals = document.querySelectorAll('.modal.open, .article-modal-overlay.open');
@@ -738,7 +845,6 @@ function initKeyboardShortcuts() {
                 document.getElementById('autocomplete-dropdown')?.classList.add('hidden');
                 closeArticleModal();
                 closeShortcutsModal();
-                closeAdvancedSearch();
             }
         }
     });
@@ -777,13 +883,7 @@ function updateLoginUI() {
 
 // function openLoginModal moved to auth section
 
-function toggleMobileFilters() {
-    const sidebar = document.querySelector('.filters-sidebar');
-    sidebar.classList.toggle('show-mobile');
 
-    // Also toggle overly if we want one
-    document.body.style.overflow = sidebar.classList.contains('show-mobile') ? 'hidden' : '';
-}
 
 /**
  * Handles Google Sign-In using Firebase Auth
@@ -990,7 +1090,6 @@ function switchTab(tabName) {
     document.querySelector(`.nav-tab[data-tab="${tabName}"]`)?.classList.add('active');
 
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.getElementById(`${tabName}-tab`)?.classList.add('active');
 
     // Handle layout for different tabs
@@ -1000,18 +1099,65 @@ function switchTab(tabName) {
     scholarMain?.classList.remove('no-padding');
     document.body.classList.remove('chat-mode');
 
-    if (tabName === 'qa' || tabName === 'trends') {
+    if (tabName === 'chat') {
+        document.body.classList.add('chat-mode');
         mainContainer?.classList.add('full-width');
         scholarMain?.classList.add('no-padding');
-        if (tabName === 'qa') document.body.classList.add('chat-mode');
-    } else {
-        mainContainer?.classList.remove('full-width');
+        // Auto-load history on first open if needed
+        const historyContainer = document.getElementById('chat-history');
+        if (historyContainer && historyContainer.children.length <= 1) {
+            loadMaverickHistory();
+        }
+        return; // Exit early to avoid removing classes at the end
     }
 
-    // If switching to Trends, update dashboard
-    if (tabName === 'trends') {
-        updateTrendsDashboard();
+    mainContainer?.classList.remove('full-width');
+}
+
+async function loadMaverickHistory() {
+    const historyContainer = document.getElementById('chat-history');
+    if (!historyContainer) return;
+
+    // Show initial loading if it's empty
+    if (historyContainer.children.length <= 1) {
+        historyContainer.innerHTML = '<div class="chat-welcome-message">⚡ Connecting to Maverick Sync...</div>';
     }
+
+    try {
+        const response = await fetch(`${MAVERICK_API_URL}/maverick/history?user_id=123`);
+        const data = await response.json();
+
+        if (data.status === 'success' && data.history.length > 0) {
+            historyContainer.innerHTML = '';
+            data.history.forEach(msg => {
+                // Determine sources - we might not have them in simple history
+                const role = msg.role === 'assistant' ? 'ai' : 'user';
+                addChatMessage(role, msg.content, [], false);
+            });
+            historyContainer.scrollTop = historyContainer.scrollHeight;
+        } else if (data.history.length === 0) {
+            // Keep welcome message
+            renderChatWelcome();
+        }
+    } catch (error) {
+        console.warn('Maverick Sync Error:', error);
+    }
+}
+
+function renderChatWelcome() {
+    const history = document.getElementById('chat-history');
+    if (!history) return;
+    history.innerHTML = `
+        <div class="chat-welcome-message">
+            <div class="welcome-logo">🦞</div>
+            <h2>Research AI Chat (Maverick Sync)</h2>
+            <p>I am Maverick, your synchronized research assistant. Ask me anything about the biomedical database.</p>
+            <div class="chat-examples">
+                <button onclick="document.getElementById('chat-input').value = this.innerText; handleChatSubmit();">Latest trials on CRISPR?</button>
+                <button onclick="document.getElementById('chat-input').value = this.innerText; handleChatSubmit();">mRNA vaccine safety profiles</button>
+            </div>
+        </div>
+    `;
 }
 
 if (typeof trendsChart === 'undefined') {
@@ -1738,6 +1884,7 @@ function clearSearchInput() {
             renderSuggestedQueries(); // Change cards every time search is cleared
             resultsCount.textContent = 'Ready for research';
             pagination.classList.add('hidden');
+            hideFloatingChatButton();
         }
     }
 }
@@ -1745,6 +1892,71 @@ function clearSearchInput() {
 function toggleClearButton() {
     // Redundant as handleSearchInput already manages .hidden class
     // but kept as a no-op to prevent ReferenceErrors if called elsewhere
+}
+
+/**
+ * Fetches synthesized AI insight using Maverick RAG
+ */
+async function fetchMaverickInsight(query) {
+    const insightBox = document.getElementById('maverick-insight-box');
+    const insightContent = document.getElementById('insight-content');
+    const insightSources = document.getElementById('insight-sources');
+
+    if (!insightBox || !insightContent) return;
+
+    // Show box with loading skeleton
+    insightBox.classList.remove('hidden');
+    insightContent.innerHTML = `
+        <div class="insight-loading">
+            <div class="insight-loading-line" style="width: 100%"></div>
+            <div class="insight-loading-line" style="width: 90%"></div>
+            <div class="insight-loading-line" style="width: 70%"></div>
+        </div>
+    `;
+    if (insightSources) insightSources.innerHTML = '';
+
+    try {
+        const response = await fetch(`${MAVERICK_API_URL}/maverick/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: query })
+        });
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            // Process specialized markdown
+            const formattedText = formatMaverickResponse(data.answer);
+
+            insightContent.innerHTML = formattedText;
+
+            // Render sources as chips
+            if (data.sources && data.sources.length > 0) {
+                insightSources.innerHTML = data.sources
+                    .filter(a => a.source_type !== 'generated' && a.source_type !== 'error')
+                    .map(s => {
+                        const sid = s.doc_id || s.source_id || s.id;
+                        return `
+                        <a href="#" class="insight-source-chip" onclick="openArticleModal('${sid}', '${(s.title || s.source_title || 'Research Source').replace(/'/g, "\\'")}'); return false;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                                <polyline points="10 9 9 9 8 9"/>
+                            </svg>
+                            ${truncate(s.title || s.source_title || 'Source', 30)}
+                        </a>
+                    `;
+                    }).join('');
+            }
+        } else {
+            insightBox.classList.add('hidden');
+        }
+    } catch (error) {
+        console.warn('Maverick Insight failed:', error);
+        insightBox.classList.add('hidden');
+    }
 }
 
 function clearAllQuickFilters() {
@@ -1861,10 +2073,18 @@ function displayCurrentResults() {
     const prevPageBtn = document.getElementById('prev-page');
     const nextPageBtn = document.getElementById('next-page');
 
+    // Trigger AI Insight synthesize if it's page 1
+    if (currentPage === 1 && currentQuery) {
+        fetchMaverickInsight(currentQuery);
+    } else if (!currentQuery) {
+        document.getElementById('maverick-insight-box')?.classList.add('hidden');
+    }
+
     if (!currentResults || currentResults.length === 0) {
         if (resultsCount) resultsCount.innerHTML = `No results found for "<strong>${escapeHtml(currentQuery)}</strong>"`;
         if (searchResults) searchResults.innerHTML = showEmptyState('No results found', 'Try different keywords or adjust filters');
         pagination?.classList.add('hidden');
+        hideFloatingChatButton();
         return;
     }
 
@@ -1882,6 +2102,7 @@ function displayCurrentResults() {
         if (resultsCount) resultsCount.innerHTML = `No results match your filters`;
         if (searchResults) searchResults.innerHTML = showEmptyState('No matching results', 'Try adjusting your filters or search terms');
         pagination?.classList.add('hidden');
+        hideFloatingChatButton();
         return;
     }
 
@@ -1920,6 +2141,9 @@ function displayCurrentResults() {
         // No longer needed for sidebar
         // searchResults.style.paddingBottom = '80px';
     }
+
+    // Show floating chat button when there are results
+    showFloatingChatButton();
 
 
 
@@ -2290,7 +2514,7 @@ function createResultCard(result) {
                         </svg>
                         Source
                     </a>` : ''}
-                    <button class="result-action-btn primary" style="background: var(--primary-blue); color: white;" onclick="askMaverickAbout('${result.title.replace(/'/g, "\\'")}')">
+                    <button class="result-action-btn primary" onclick="askMaverickAbout(currentQuery)" style="background: var(--primary-blue); color: white; border: none; cursor: pointer;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
                         </svg>
@@ -2355,19 +2579,23 @@ function getExternalUrl(result) {
     return null;
 }
 
-function askMaverickAbout(title) {
+function askMaverickAbout(queryText) {
     // Switch to Chat tab
-    const chatTab = document.querySelector('[data-tab="qa"]');
-    if (chatTab) chatTab.click();
+    switchTab('chat');
 
     // Set chat input and focus
-    const input = document.getElementById('chat-input');
-    if (input) {
-        input.value = `Tell me more about this research: "${title}"`;
-        input.focus();
-        // Trigger resize
-        autoResizeTextarea(input);
-    }
+    setTimeout(() => {
+        const input = document.getElementById('chat-input');
+        if (input) {
+            input.value = queryText;
+            input.focus();
+            input.style.height = 'auto';
+            input.style.height = input.scrollHeight + 'px';
+
+            // Auto-submit the query to Maverick
+            handleChatSubmit();
+        }
+    }, 100);
 }
 
 /**
@@ -2494,9 +2722,11 @@ function toggleSidebar() {
     const sidebar = document.getElementById('quick-filters');
     const showBtn = document.getElementById('show-sidebar-btn');
 
-    if (sidebar && showBtn) {
+    if (sidebar) {
         sidebar.classList.toggle('hidden');
-        showBtn.classList.toggle('hidden');
+        if (showBtn) {
+            showBtn.classList.toggle('hidden');
+        }
 
         // Save preference if needed
         const isHidden = sidebar.classList.contains('hidden');
@@ -2652,6 +2882,51 @@ function closeCitationModal() {
     document.getElementById('citation-modal')?.classList.remove('open');
 }
 
+function openAdvancedSearch() {
+    document.getElementById('advanced-search-modal')?.classList.add('open');
+}
+
+function closeAdvancedSearch() {
+    document.getElementById('advanced-search-modal')?.classList.remove('open');
+}
+
+function executeAdvancedSearch() {
+    const allWords = document.getElementById('adv-all-words')?.value.trim();
+    const exactPhrase = document.getElementById('adv-exact-phrase')?.value.trim();
+    const anyWords = document.getElementById('adv-any-words')?.value.trim();
+    const noneWords = document.getElementById('adv-none-words')?.value.trim();
+    const author = document.getElementById('adv-author')?.value.trim();
+    const journal = document.getElementById('adv-journal')?.value.trim();
+    const titleContains = document.getElementById('adv-title')?.value.trim();
+
+    let query = '';
+
+    if (allWords) query += allWords + ' ';
+    if (exactPhrase) query += `"${exactPhrase}" `;
+    if (anyWords) query += `(${anyWords.split(/\s+/).join(' OR ')}) `;
+    if (noneWords) query += noneWords.split(/\s+/).map(w => `-${w}`).join(' ') + ' ';
+    if (author) query += `author:${author} `;
+    if (titleContains) query += `title:${titleContains} `;
+
+    query = query.trim();
+
+    if (query) {
+        headerSearchInput.value = query;
+        closeAdvancedSearch();
+        performSearch();
+    } else {
+        alert('Please enter at least one search criterion');
+    }
+}
+
+function searchTrend(element) {
+    const searchTerm = element.getAttribute('data-search-term');
+    if (searchTerm && headerSearchInput) {
+        headerSearchInput.value = searchTerm;
+        performSearch();
+    }
+}
+
 function switchModalTab(tabId) {
     // Update tabs
     document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
@@ -2787,46 +3062,58 @@ function downloadFile(content, filename, mimeType) {
 // ==========================================
 // ADVANCED SEARCH
 // ==========================================
-function openAdvancedSearch() {
-    document.getElementById('advanced-search-modal')?.classList.add('open');
-}
+// ==========================================
+// CHATBOT FUNCTIONALITY (Maverick Synchronized)
+// ==========================================
+/**
+ * Robust markdown parser for Maverick responses
+ * Supports bold, italic, lists, code, and basic underline
+ */
+function formatMaverickResponse(text) {
+    if (!text) return "";
 
-function closeAdvancedSearch() {
-    document.getElementById('advanced-search-modal')?.classList.remove('open');
-}
+    // Escape HTML but allow <u> and <b> tags if strictly formatted
+    let html = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
-function executeAdvancedSearch() {
-    const allWords = document.getElementById('adv-all-words')?.value.trim();
-    const exactPhrase = document.getElementById('adv-exact-phrase')?.value.trim();
-    const anyWords = document.getElementById('adv-any-words')?.value.trim();
-    const noneWords = document.getElementById('adv-none-words')?.value.trim();
-    const author = document.getElementById('adv-author')?.value.trim();
-    const journal = document.getElementById('adv-journal')?.value.trim();
-    const titleContains = document.getElementById('adv-title')?.value.trim();
+    // Standard Markdown formatting
+    html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
+    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/__(.*?)__/g, "<strong>$1</strong>");
+    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+    html = html.replace(/_(.*?)_/g, "<em>$1</em>");
+    html = html.replace(/`(.*?)`/g, "<code class='inline-code'>$1</code>");
 
-    let query = '';
+    // Handle LaTeX-style \boxed{...} or $\boxed{...}$
+    // Strip Math delimiters if they surround the boxed content
+    html = html.replace(/\$+\s*\\boxed\{([\s\S]*?)\}\s*\$+/g, '<span class="maverick-boxed">$1</span>');
+    html = html.replace(/\\boxed\{([\s\S]*?)\}/g, '<span class="maverick-boxed">$1</span>');
 
-    if (allWords) query += allWords + ' ';
-    if (exactPhrase) query += `"${exactPhrase}" `;
-    if (anyWords) query += `(${anyWords.split(/\s+/).join(' OR ')}) `;
-    if (noneWords) query += noneWords.split(/\s+/).map(w => `-${w}`).join(' ') + ' ';
-    if (author) query += `author:${author} `;
-    if (titleContains) query += `title:${titleContains} `;
+    // Revive <u> tags if they were in the original response
+    html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/g, "<u>$1</u>");
 
-    query = query.trim();
+    // Line blocks and basic lists
+    html = html.replace(/^\s*[-*+]\s+(.*)$/gm, "<li>$1</li>");
 
-    if (query) {
-        headerSearchInput.value = query;
-        closeAdvancedSearch();
-        performSearch();
-    } else {
-        showToast('Please enter at least one search term', 'error');
+    // Check if we produced <li> items, if so wrap them
+    if (html.includes("<li>")) {
+        // This is a simple wrapper; complex nested lists would need a real lexer
+        // but this works for most AI-generated responses
+        html = html.replace(/(?:<li>.*<\/li>\s*)+/g, (match) => `<ul>${match}</ul>`);
     }
+
+    // Convert newlines to breaks (careful not to double-break in lists)
+    html = html.replace(/\n/g, "<br>");
+
+    // Cleanup double breaks around lists
+    html = html.replace(/<\/ul><br>/g, "</ul>");
+    html = html.replace(/<br><ul>/g, "<ul>");
+
+    return html;
 }
 
-// ==========================================
-// CHATBOT FUNCTIONALITY
-// ==========================================
 function handleChatSubmit() {
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
@@ -2842,70 +3129,49 @@ function handleChatSubmit() {
     // Show loading state
     showChatLoading();
 
-    // Call API
-    fetchAnswer(message)
+    // Call Synchronized Maverick API
+    fetch(`${MAVERICK_API_URL}/maverick/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            question: message,
+            context: getHistoryForAPI() // For long term memory
+        })
+    })
+        .then(res => res.json())
         .then(data => {
             removeChatLoading();
-            if (data.answers && data.answers.length > 0) {
-                // Construct AI response from the best answer
-                // We'll combine the top answer with source citations
-                const bestAnswer = data.answers[0];
-                let aiText = bestAnswer.answer;
-
-                // If we have alternative extractive answers, append them as insights
-                const otherAnswers = data.answers.slice(1).filter(a => a.confidence > 0.2);
-                if (otherAnswers.length > 0) {
-                    aiText += '\n\n**Additional Key Insights from Literature:**\n';
-                    otherAnswers.forEach((ans, idx) => {
-                        aiText += `• ${ans.answer} (Confidence: ${(ans.confidence * 100).toFixed(0)}%)\n`;
-                    });
-                }
-
-                // Create a map of passages for easy lookup
-                const passageMap = {};
-                (data.passages || []).forEach(p => {
-                    passageMap[p.source_id] = p.text;
-                });
-
-                const sources = data.answers
+            if (data.status === 'success') {
+                const aiText = data.answer;
+                const reasoning = data.reasoning || "Analyzing biomedical patterns and cross-referencing indexed literature...";
+                const sources = (data.sources || [])
                     .filter(a => a.source_type !== 'generated' && a.source_type !== 'error')
                     .map(a => {
-                        // Normalize source type for getExternalUrl if necessary
-                        const normalizedSourceType = a.source_type === 'clinical_trials' ? 'clinical_trials' : a.source_type;
-                        const isPubMed = normalizedSourceType === 'pubmed';
-
+                        const sid = a.doc_id || a.source_id || a.id;
                         return {
-                            title: a.source_title || 'Untitled Research',
+                            title: a.title || a.source_title || 'Research Source',
                             url: getExternalUrl({
-                                source: normalizedSourceType,
-                                id: a.source_id,
-                                pmid: isPubMed ? a.source_id : null,
-                                nct_id: !isPubMed ? a.source_id : null
+                                source: a.source_type,
+                                id: sid,
+                                pmid: a.source_type === 'pubmed' ? sid : null,
+                                nct_id: a.source_type !== 'pubmed' ? sid : null
                             }),
                             score: a.confidence,
-                            type: normalizedSourceType,
-                            snippet: a.context || passageMap[a.source_id] || '',
-                            journal: a.journal || (a.source_type === 'clinical_trials' ? 'ClinicalTrials.gov' : ''),
-                            date: a.publication_date || ''
+                            type: a.source_type,
+                            snippet: a.context || '',
+                            id: sid
                         };
-                    })
-                    .slice(0, 3); // Take top 3 after processing
+                    }).slice(0, 3);
 
-                console.group('AI Chat Debug');
-                console.log('Raw data.answers:', data.answers);
-                console.log('Passage map keys:', Object.keys(passageMap));
-                console.log('Final processed sources:', sources);
-                console.groupEnd();
-
-                addChatMessage('ai', aiText, sources);
+                addChatMessage('ai', aiText, sources, reasoning);
             } else {
-                addChatMessage('ai', "I searched the biomedical database but couldn't find a high-confidence answer for your specific question. \n\nYou might try:\n• Rephrasing your question\n• Checking for specific terms\n• Browsing the 'Articles' tab for broader research");
+                addChatMessage('ai', "I encountered a sync error. Please check if Maverick is online.");
             }
         })
         .catch(err => {
             removeChatLoading();
-            addChatMessage('ai', "I encountered an error while connecting to the knowledge base. Please try again in a moment.");
-            console.error('Chat error:', err);
+            addChatMessage('ai', "Error connecting to Maverick Brain.");
+            console.error('Maverick error:', err);
         });
 }
 
@@ -2917,9 +3183,14 @@ function sendChatMessage(message) {
     }
 }
 
-function addChatMessage(role, text, sources = []) {
+function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll = true, isHistoryLoad = false) {
     const history = document.getElementById('chat-history');
     if (!history) return;
+
+    // Save to Firestore if it's a new message (not loading history)
+    if (!isHistoryLoad && currentUser) {
+        saveChatToFirestore(role, text);
+    }
 
     // Hide welcome message if it's the first message
     const welcome = history.querySelector('.chat-welcome-message');
@@ -2930,8 +3201,10 @@ function addChatMessage(role, text, sources = []) {
 
     let avatar = role === 'user' ?
         `<div class="message-avatar user-avatar-small">U</div>` :
-        `<div class="message-avatar ai-avatar-small" style="background-color: #0056D2; color: white;">
-            <span>M</span>
+        `<div class="message-avatar ai-avatar-small">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
         </div>`;
 
     let sourcesHtml = '';
@@ -2940,41 +3213,60 @@ function addChatMessage(role, text, sources = []) {
         <div class="chat-sources">
             <div class="chat-sources-title">Supporting Evidence (Source Details)</div>
             ${sources.map(s => `
-                <div class="source-item-container" style="margin-bottom: 12px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
-                    <a href="${s.url || '#'}" target="_blank" class="source-title" style="display:block; font-weight: 600; color: var(--primary-blue); text-decoration:none; margin-bottom: 4px;">
-                        ${truncate(s.title, 100)}
-                    </a>
-                    <div class="source-meta" style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
-                        ${s.type === 'pubmed' ? '📄 PubMed' : '🔬 Clinical Trial'} • 
-                        ${s.journal ? `${truncate(s.journal, 40)} • ` : ''} 
-                        ${s.date ? `${s.date} • ` : ''}
-                        Confidence: ${(s.score * 100).toFixed(0)}%
+                <div class="source-item-container insight-source-card" style="cursor: pointer;" onclick="openArticleModal('${s.id || s.source_id}', '${(s.title || '').replace(/'/g, "\\'")}')">
+                    <div class="source-card-header">
+                        <span class="meta-source ${s.type === 'pubmed' ? 'pubmed' : 'clinical-trial'}">${s.type === 'pubmed' ? 'PubMed' : 'Trial'}</span>
+                        <span class="source-card-confidence">Confidence: ${(s.score * 100).toFixed(0)}%</span>
                     </div>
-                    ${s.snippet ? `<div class="source-snippet" style="font-size: 13px; color: var(--text-secondary); line-height: 1.4; font-style: italic;">
-                        "${truncate(s.snippet, 250)}"
-                    </div>` : ''}
+                    <div class="source-card-title">${truncate(s.title, 90)}</div>
+                    ${s.snippet ? `<div class="source-card-snippet">"${truncate(s.snippet, 180)}"</div>` : ''}
                 </div>
             `).join('')}
         </div>`;
     }
 
-    // Process text for formatting (simple bolding/newlines)
-    const formattedText = escapeHtml(text)
-        .replace(/\n/g, '<br>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Process text for formatting (Rich Markdown)
+    const formattedText = formatMaverickResponse(text);
 
     msgDiv.innerHTML = `
         ${avatar}
         <div class="message-bubble">
+            ${reasoning ? `
+                <div class="thinking-process">
+                    <button class="thinking-toggle" onclick="toggleThinking(this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                        Thinking Process
+                    </button>
+                    <div class="thinking-content hidden">${reasoning}</div>
+                </div>
+            ` : ''}
             <div class="chat-answer-content">${formattedText}</div>
             ${sourcesHtml}
+            <div class="message-actions">
+                <button class="msg-action-btn" onclick="copyToClipboard('${text.replace(/'/g, "\\'")}')" title="Copy message">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+                ${role === 'user' ? `
+                    <button class="msg-action-btn" onclick="editUserMessage(this)" title="Edit message">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                ` : `
+                    <button class="msg-action-btn" onclick="sendFeedback(this, 'up')" title="Helpful">
+                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                    </button>
+                    <button class="msg-action-btn" onclick="sendFeedback(this, 'down')" title="Not helpful">
+                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>
+                    </button>
+                `}
+            </div>
         </div>
     `;
 
     history.appendChild(msgDiv);
     // Smooth scroll to bottom
-    history.scrollTop = history.scrollHeight;
+    if (shouldScroll) {
+        history.scrollTop = history.scrollHeight;
+    }
 }
 
 function showChatLoading() {
@@ -3003,6 +3295,112 @@ function showChatLoading() {
     history.scrollTop = history.scrollHeight;
 }
 
+/**
+ * Long Term Memory for API
+ */
+function getHistoryForAPI() {
+    const history = document.getElementById('chat-history');
+    if (!history) return [];
+
+    const messages = Array.from(history.querySelectorAll('.chat-message'))
+        .filter(m => !m.id || m.id !== 'chat-loading-indicator')
+        .map(m => ({
+            role: m.classList.contains('user') ? 'user' : 'assistant',
+            content: m.querySelector('.chat-answer-content')?.innerText || ""
+        }));
+
+    return messages.slice(-10); // Last 10 messages for context
+}
+
+function toggleThinking(btn) {
+    const content = btn.nextElementSibling;
+    if (content) {
+        content.classList.toggle('hidden');
+        btn.classList.toggle('active');
+    }
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Message copied to clipboard', 'success');
+    });
+}
+
+function editUserMessage(btn) {
+    const bubble = btn.closest('.message-bubble');
+    const contentDiv = bubble.querySelector('.chat-answer-content');
+    const oldText = contentDiv.innerText;
+
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = oldText;
+        input.focus();
+        input.style.height = 'auto';
+        input.style.height = input.scrollHeight + 'px';
+        showToast('Message loaded into input for editing', 'info');
+    }
+}
+
+function sendFeedback(btn, type) {
+    const parent = btn.parentElement;
+    parent.querySelectorAll('.msg-action-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    showToast(`Feedback submitted: ${type === 'up' ? 'Helpful' : 'Not helpful'}`, 'success');
+
+    // In a real app, you would POST this to an analytics endpoint
+}
+
+/**
+ * Handle File Uploads (Multi-modality)
+ */
+let currentAttachments = [];
+
+function handleChatFileUpload(input) {
+    const files = Array.from(input.files);
+    const preview = document.getElementById('chat-attachment-preview');
+    if (!preview) return;
+
+    files.forEach(file => {
+        if (currentAttachments.some(a => a.name === file.name)) return;
+
+        currentAttachments.push(file);
+
+        const chip = document.createElement('div');
+        chip.className = 'attachment-chip';
+        chip.innerHTML = `
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            ${truncate(file.name, 15)}
+            <span class="attachment-remove" onclick="removeAttachment('${file.name}', this)">×</span>
+        `;
+        preview.appendChild(chip);
+    });
+
+    preview.classList.remove('hidden');
+    input.value = ""; // Reset input
+}
+
+function removeAttachment(fileName, el) {
+    currentAttachments = currentAttachments.filter(a => a.name !== fileName);
+    el.closest('.attachment-chip').remove();
+
+    const preview = document.getElementById('chat-attachment-preview');
+    if (currentAttachments.length === 0) {
+        preview.classList.add('hidden');
+    }
+}
+
+function sendChatMessage(text) {
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = text;
+        input.style.height = 'auto';
+        input.style.height = (input.scrollHeight) + 'px';
+        handleChatSubmit();
+    }
+}
+
+
+
 function removeChatLoading() {
     const loader = document.getElementById('chat-loading-indicator');
     if (loader) loader.remove();
@@ -3011,21 +3409,79 @@ function removeChatLoading() {
 function clearChat() {
     const history = document.getElementById('chat-history');
     if (history) {
-        // Restore welcome message
         history.innerHTML = `
-            <div class="chat-welcome-message" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: 100%;">
-                <div class="welcome-logo" style="background: #0088cc; color: white; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; margin: 0 auto 20px auto;">
-                    M
+            <div class="chat-welcome-message">
+                <div class="welcome-logo" style="background: linear-gradient(135deg, var(--primary-blue), #0d47a1); color: white; border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto; box-shadow: 0 4px 12px rgba(0, 86, 210, 0.3);">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
                 </div>
-                <h2>Hello, I'm Maverick</h2>
-                <p>Your Groq Llama 4 Maverick research engine. Ask me about biomedical topics, clinical trials, or specific articles.</p>
-                <div class="chat-examples">
-                    <button onclick="sendChatMessage('What are the latest treatments for diabetes?')">Latest diabetes treatments</button>
-                    <button onclick="sendChatMessage('Summarize the side effects of mRNA vaccines')">mRNA vaccine side effects</button>
-                    <button onclick="sendChatMessage('Find clinical trials for Alzheimer\\'s disease')">Alzheimer's clinical trials</button>
+                <h2>Maverick AI v4.0</h2>
+                <p>Chat cleared. Ask me a new research question or upload a file to begin.</p>
+                <div class="chat-examples" style="display: flex; flex-direction: column; gap: 8px; margin-top: 15px;">
+                    <button class="menu-item" style="font-size: 12px; justify-content: center;" onclick="sendChatMessage('Summarize latest CRISPR breakthroughs')">Summarize CRISPR breakthroughs</button>
+                    <button class="menu-item" style="font-size: 12px; justify-content: center;" onclick="sendChatMessage('Compare mRNA vaccine side effects')">mRNA vs Traditional Vaccines</button>
                 </div>
             </div>
         `;
+    }
+}
+
+async function deleteChatHistory() {
+    if (!currentUser || !db) {
+        showToast("Please login to clear cloud history", "info");
+        return;
+    }
+
+    if (confirm("Permanently wipe your Maverick cloud memory? This cannot be undone.")) {
+        try {
+            const snapshot = await db.collection("users").doc(currentUser.uid).collection("chat_history").get();
+            const batch = db.batch();
+            snapshot.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+
+            showToast("Cloud history wiped successfully", "success");
+            clearChat();
+        } catch (err) {
+            console.error("Firestore delete error:", err);
+            showToast("Error clearing cloud history", "error");
+        }
+    }
+}
+
+async function saveChatToFirestore(role, text) {
+    if (!currentUser || !db) return;
+    try {
+        await db.collection("users").doc(currentUser.uid).collection("chat_history").add({
+            role: role,
+            content: text,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (e) {
+        console.error("Error saving chat:", e);
+    }
+}
+
+async function loadMaverickHistory() {
+    if (!currentUser || !db) return;
+    try {
+        const snapshot = await db.collection("users").doc(currentUser.uid).collection("chat_history").orderBy("timestamp", "asc").get();
+        if (snapshot.empty) return;
+
+        const history = document.getElementById('chat-history');
+        if (history) {
+            const welcome = history.querySelector('.chat-welcome-message');
+            if (welcome) welcome.style.display = 'none';
+        }
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            addChatMessage(data.role, data.content, [], null, true, true);
+        });
+    } catch (e) {
+        console.error("Error loading chat history:", e);
     }
 }
 
@@ -3203,6 +3659,142 @@ function closeAllModals() {
         modal.classList.remove('open');
     });
     document.body.style.overflow = '';
+}
+
+// ==========================================
+// NEW KEYBOARD SHORTCUT HELPERS
+// ==========================================
+
+/**
+ * Smart Select - Add/remove all visible results to reading list
+ */
+function smartSelectResults() {
+    if (currentResults.length === 0) {
+        showToast('No results to select', 'info');
+        return;
+    }
+
+    const resultElements = document.querySelectorAll('.result-card');
+    const allSelected = Array.from(resultElements).every(el => {
+        const checkbox = el.querySelector('input[type="checkbox"]');
+        return checkbox && checkbox.checked;
+    });
+
+    resultElements.forEach(el => {
+        const checkbox = el.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+            checkbox.checked = !allSelected;
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+
+    const action = !allSelected ? 'Selected' : 'Deselected';
+    showToast(`${action} ${resultElements.length} result(s)`, 'success');
+}
+
+/**
+ * Cycle Type Filter - T key: cycle through article types
+ */
+function cycleTypeFilter() {
+    const types = ['research', 'review', 'systematic-review', 'meta-analysis', 'rct', 'case-study'];
+    const current = currentFilters.articleTypes;
+
+    let nextType;
+    if (current.length === types.length) {
+        // All types selected, switch to first type only
+        nextType = types[0];
+    } else if (current.length === 1) {
+        // One type selected, switch to next type
+        const currentIndex = types.indexOf(current[0]);
+        nextType = types[(currentIndex + 1) % types.length];
+    } else {
+        // Multiple types selected, show all
+        toggleQuickFilter('articleTypes', types[0]);
+        showToast('Showing all article types', 'info');
+        return;
+    }
+
+    toggleQuickFilter('articleTypes', nextType);
+    const typeLabel = nextType.replace('-', ' ').toUpperCase();
+    showToast(`Filtering by: ${typeLabel}`, 'info');
+}
+
+/**
+ * Cycle Date Filter - Y key: cycle through date ranges
+ */
+function cycleDateFilter() {
+    const ranges = ['any', '1y', '5y', '10y'];
+    const current = currentFilters.dateRange;
+    const currentIndex = ranges.indexOf(current);
+    const nextRange = ranges[(currentIndex + 1) % ranges.length];
+
+    toggleQuickFilter('dateRange', nextRange);
+    const rangeLabel = nextRange === 'any' ? 'All Time' : `Last ${nextRange}`;
+    showToast(`Date filter: ${rangeLabel}`, 'info');
+}
+
+/**
+ * Toggle View Mode - V key: switch between list and compact view
+ */
+function toggleViewMode() {
+    const newView = currentView === 'compact' ? 'list' : 'compact';
+    currentView = newView;
+    applyViewMode();
+
+    const viewLabel = newView === 'compact' ? 'Compact' : 'List';
+    showToast(`View: ${viewLabel} mode`, 'info');
+
+    // Update active view button
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.view === newView) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+/**
+ * Focus Next Result - J key: navigate to next result
+ */
+function focusNextResult() {
+    const resultElements = Array.from(document.querySelectorAll('.result-card'));
+    if (resultElements.length === 0) {
+        showToast('No results to navigate', 'info');
+        return;
+    }
+
+    const focused = document.querySelector('.result-card:focus');
+    let nextIndex = 0;
+
+    if (focused) {
+        const currentIndex = resultElements.indexOf(focused);
+        nextIndex = (currentIndex + 1) % resultElements.length;
+    }
+
+    resultElements[nextIndex].focus();
+    resultElements[nextIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/**
+ * Focus Previous Result - K key: navigate to previous result
+ */
+function focusPreviousResult() {
+    const resultElements = Array.from(document.querySelectorAll('.result-card'));
+    if (resultElements.length === 0) {
+        showToast('No results to navigate', 'info');
+        return;
+    }
+
+    const focused = document.querySelector('.result-card:focus');
+    let prevIndex = resultElements.length - 1;
+
+    if (focused) {
+        const currentIndex = resultElements.indexOf(focused);
+        prevIndex = (currentIndex - 1 + resultElements.length) % resultElements.length;
+    }
+
+    resultElements[prevIndex].focus();
+    resultElements[prevIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // ==========================================
@@ -3392,68 +3984,6 @@ function switchHelpTab(sectionName, btn) {
 }
 
 // ==========================================
-// COMMENTS SYSTEM
-// ==========================================
-function renderComments(articleId) {
-    const list = document.getElementById('comments-list');
-    if (!list) return;
-
-    const allComments = JSON.parse(localStorage.getItem('articleComments') || '{}');
-    const comments = allComments[articleId] || [];
-
-    if (comments.length === 0) {
-        list.innerHTML = `
-            <div class="empty-state small">
-                <p>No comments yet. Be the first to start the discussion!</p>
-            </div>
-        `;
-        return;
-    }
-
-    list.innerHTML = comments.map(c => `
-        <div class="comment-item">
-            <div class="comment-header">
-                <span class="comment-author">${escapeHtml(c.author)}</span>
-                <span class="comment-date">${formatDate(c.date)}</span>
-            </div>
-            <div class="comment-text">${escapeHtml(c.text)}</div>
-        </div>
-    `).join('');
-}
-
-function addComment() {
-    const input = document.getElementById('comment-input');
-    if (!input || !input.value.trim()) return;
-
-    const text = input.value.trim();
-    // Get current article ID from the open modal
-    // We can infer it from the modal title or store it in a global var. 
-    // Best way: check currentResults or readingList for the opened one, 
-    // OR we can make openArticleModal store the currentId globally.
-    // simpler: Let's use a global variable set in openArticleModal
-    if (!window.currentArticleId) {
-        console.error("No article selected");
-        return;
-    }
-
-    const allComments = JSON.parse(localStorage.getItem('articleComments') || '{}');
-    if (!allComments[window.currentArticleId]) {
-        allComments[window.currentArticleId] = [];
-    }
-
-    allComments[window.currentArticleId].unshift({
-        id: Date.now(),
-        text: text,
-        author: currentUser ? (currentUser.displayName || 'User') : 'Guest',
-        date: new Date().toISOString()
-    });
-
-    localStorage.setItem('articleComments', JSON.stringify(allComments));
-    input.value = '';
-    renderComments(window.currentArticleId);
-    showToast('Comment posted!', 'success');
-}
-
 // Add H key shortcut for help
 // Keyboard Shortcuts and Initialization logic consolidated in initKeyboardShortcuts
 
@@ -3462,19 +3992,6 @@ function addComment() {
 document.addEventListener('DOMContentLoaded', init);
 
 // Initialized on load section functions removed or moved
-
-function applyAdvancedSearch() {
-    const authorInput = document.getElementById('adv-author');
-    const journalInput = document.getElementById('adv-journal');
-    const minYear = document.getElementById('adv-year-from');
-    const maxYear = document.getElementById('adv-year-to');
-
-    // Here we would typically enhance the query or apply complex filters
-    // For now, let's just trigger a search and show a toast
-    showToast('Advanced filters applied!', 'info');
-    closeAdvancedSearch();
-    performSearch();
-}
 
 // Authentication Functions
 if (typeof isRegisterMode === 'undefined') {
@@ -3622,12 +4139,55 @@ if (typeof firebase !== 'undefined' && auth) {
                 photoURL: user.photoURL
             };
             localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            loadChatHistoryFromFirestore();
         } else {
             currentUser = null;
             localStorage.removeItem('currentUser');
+            // Optionally clear chat on logout
+            // clearChat(); 
         }
         updateLoginUI();
     });
+}
+
+/**
+ * Cloud Firebase Storage for Chat History
+ */
+function saveChatToFirestore(role, text) {
+    if (!currentUser || !db) return;
+
+    db.collection("users").doc(currentUser.uid).collection("chat_history").add({
+        role: role,
+        text: text,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(err => console.error("Error saving chat to Firestore:", err));
+}
+
+function loadChatHistoryFromFirestore() {
+    if (!currentUser || !db) return;
+
+    db.collection("users").doc(currentUser.uid).collection("chat_history")
+        .orderBy("timestamp", "asc")
+        .limit(50)
+        .get()
+        .then(querySnapshot => {
+            const history = document.getElementById('chat-history');
+            if (!history) return;
+
+            // If there's history, clear the welcome message once
+            if (!querySnapshot.empty) {
+                const welcome = history.querySelector('.chat-welcome-message');
+                if (welcome) welcome.style.display = 'none';
+            }
+
+            querySnapshot.forEach(doc => {
+                const data = doc.data();
+                // Pass false for shouldScroll to avoid jumping, then scroll once at the end
+                addChatMessage(data.role, data.text, [], null, false, true);
+            });
+            history.scrollTop = history.scrollHeight;
+        })
+        .catch(err => console.error("Error loading chat history:", err));
 }
 
 
@@ -4174,13 +4734,6 @@ document.addEventListener('keydown', function (e) {
         return;
     }
 
-    // Ctrl+Shift+F: Open advanced search
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
-        e.preventDefault();
-        openAdvancedSearch();
-        return;
-    }
-
     // Escape: Close modals or clear search
     if (e.key === 'Escape') {
         // Close any open modals
@@ -4210,9 +4763,6 @@ document.addEventListener('keydown', function (e) {
     } else if (e.key === '2') {
         e.preventDefault();
         switchTab('qa');
-    } else if (e.key === '3') {
-        e.preventDefault();
-        switchTab('trends');
     }
 
     // Arrow keys: Navigate pages
@@ -4291,7 +4841,95 @@ function switchTab(tabName) {
     const targetTab = document.getElementById(`${tabName}-tab`);
     if (targetTab) {
         targetTab.classList.add('active');
+        if (tabName === 'trends') {
+            renderTrendsChart();
+        }
     }
+}
+
+let trendsChartInstance = null;
+function renderTrendsChart() {
+    const canvas = document.getElementById('publication-trend-chart');
+    if (!canvas) return;
+
+    if (trendsChartInstance) {
+        return; // Already rendered
+    }
+
+    // Check if Chart is loaded
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js is not loaded.');
+        return;
+    }
+
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 10 }, (_, i) => currentYear - 9 + i);
+
+    // Mocked exponential growth data for demonstration
+    const dataVolumes = [120500, 134200, 151000, 168900, 190500, 245000, 267300, 289000, 312000, 335000];
+
+    const isDarkMode = document.body.dataset.theme === 'dark' || document.body.classList.contains('dark-theme');
+    const textColor = isDarkMode ? '#e2e8f0' : '#475569';
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+
+    trendsChartInstance = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: [{
+                label: 'Biomedical Publications',
+                data: dataVolumes,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#3b82f6',
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return context.parsed.y.toLocaleString() + ' publications';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: gridColor,
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: textColor,
+                        callback: function (value) {
+                            return value / 1000 + 'k';
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: textColor
+                    }
+                }
+            }
+        }
+    });
 }
 
 console.log('✅ Keyboard shortcuts enabled');
@@ -4752,6 +5390,63 @@ function filterNotifications(category, btn) {
     updateNotificationList();
 }
 
+function groupNotificationsByDate(notificationsList) {
+    const grouped = {};
+    const today = new Date().toDateString();
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+    notificationsList.forEach(notif => {
+        const notifDate = new Date(notif.timestamp).toDateString();
+        let groupName = notifDate;
+
+        if (notifDate === today) groupName = 'Today';
+        else if (notifDate === yesterday) groupName = 'Yesterday';
+
+        if (!grouped[groupName]) {
+            grouped[groupName] = [];
+        }
+        grouped[groupName].push(notif);
+    });
+    return grouped;
+}
+
+function formatNotificationTime(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function handleNotificationClick(id) {
+    const notif = notifications.find(n => n.id === id);
+    if (notif && !notif.read) {
+        notif.read = true;
+        saveNotifications();
+        updateNotificationBadge();
+        updateNotificationList();
+    }
+}
+
+function handleNotificationAction(id, actionLabel) {
+    // Basic placeholder for custom actions on notifications
+    console.log(`Action ${actionLabel} on notification ${id}`);
+    showToast(`Action: ${actionLabel}`, 'info');
+}
+
+function dismissNotification(id) {
+    notifications = notifications.filter(n => n.id !== id);
+    saveNotifications();
+    updateNotificationBadge();
+    updateNotificationList();
+}
+
+function markAllNotificationsRead() {
+    notifications.forEach(n => n.read = true);
+    saveNotifications();
+    updateNotificationBadge();
+    updateNotificationList();
+    showToast('All notifications marked as read', 'success');
+}
+
 /**
  * Notification Settings Modal
  */
@@ -4979,6 +5674,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Notification initialization
     initNotifications();
 
+    // Initialize Chat Resizer
+    initChatResizer();
+
     // Close notification dropdown when clicking outside
     document.addEventListener('click', function (e) {
         const notificationContainer = document.querySelector('.notification-container');
@@ -5014,4 +5712,107 @@ document.addEventListener('DOMContentLoaded', function () {
     checkSystemStatus();
     setInterval(checkSystemStatus, 30000);
 });
+
+function openIntelligenceModal() {
+    const modal = document.getElementById('intelligence-modal');
+    if (modal) {
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeIntelligenceModal() {
+    const modal = document.getElementById('intelligence-modal');
+    if (modal) {
+        modal.classList.remove('open');
+        document.body.style.overflow = 'auto';
+    }
+}
+
+/**
+ * Handle floating chat resizing
+ */
+function initChatResizer() {
+    const chat = document.getElementById('maverick-floating-chat');
+    const resizer = document.getElementById('chat-resizer');
+
+    if (!resizer || !chat) return;
+
+    let startX, startY, startWidth, startHeight;
+
+    resizer.addEventListener('mousedown', initDrag, false);
+
+    function initDrag(e) {
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = parseInt(document.defaultView.getComputedStyle(chat).width, 10);
+        startHeight = parseInt(document.defaultView.getComputedStyle(chat).height, 10);
+        document.documentElement.addEventListener('mousemove', doDrag, false);
+        document.documentElement.addEventListener('mouseup', stopDrag, false);
+        chat.classList.add('resizing');
+    }
+
+    function doDrag(e) {
+        const newWidth = startWidth - (e.clientX - startX);
+        const newHeight = startHeight - (e.clientY - startY);
+
+        if (newWidth > 320 && newWidth < 800) {
+            chat.style.width = newWidth + 'px';
+        }
+        if (newHeight > 400 && newHeight < window.innerHeight - 100) {
+            chat.style.height = newHeight + 'px';
+        }
+    }
+
+    function stopDrag(e) {
+        document.documentElement.removeEventListener('mousemove', doDrag, false);
+        document.documentElement.removeEventListener('mouseup', stopDrag, false);
+        chat.classList.remove('resizing');
+    }
+}
+
+function initFloatingChatButton() {
+    const floatingBtn = document.getElementById('floating-chat-btn');
+    if (floatingBtn) {
+        floatingBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openTelegramBot();
+            return false;
+        });
+        console.log('✓ Floating chat button initialized and clickable');
+    } else {
+        console.warn('⚠ Floating chat button element not found');
+    }
+}
+
+function showFloatingChatButton() {
+    const floatingBtn = document.getElementById('floating-chat-btn');
+    if (floatingBtn) {
+        floatingBtn.classList.add('visible');
+    }
+}
+
+function hideFloatingChatButton() {
+    const floatingBtn = document.getElementById('floating-chat-btn');
+    if (floatingBtn) {
+        floatingBtn.classList.remove('visible');
+    }
+}
+
+function openTelegramBot() {
+    const telegramBotUrl = 'https://web.telegram.org/a/#8513211167';
+    window.open(telegramBotUrl, 'telegram-bot', 'width=800,height=600,resizable=yes');
+}
+
+// Initialize floating button on page load
+document.addEventListener('DOMContentLoaded', function () {
+    initFloatingChatButton();
+});
+
+// Integrated Desk Assistant functionality removed in favor of Telegram redirection
+
+function jsonStringify(obj) {
+    return JSON.stringify(obj);
+}
 

@@ -30,15 +30,16 @@ class GroqGenerator:
                 self.client = None
             
             
-        # Default model to Llama 4 Maverick for cutting-edge performance
+        # Default model to Llama 3.3 70B (valid Groq model)
         self.model_name = 'meta-llama/llama-4-maverick-17b-128e-instruct'
 
-    def generate_answer(self, question: str, passages: List[Dict]) -> Dict:
+    def generate_answer(self, question: str, passages: List[Dict], history_context: Optional[str] = None) -> Dict:
         """Generate an answer based on the question and retrieved passages.
         
         Args:
             question: User's question
             passages: List of retrieved passage dictionaries
+            history_context: String containing previous conversation turns
             
         Returns:
             Dictionary containing the generated answer and confidence
@@ -61,13 +62,16 @@ class GroqGenerator:
         ])
 
         system_prompt = (
-            "You are a professional biomedical research assistant. "
-            "Use the provided context passages from PubMed and Clinical Trials to provide a comprehensive, detailed, and evidence-based answer. "
-            "Structure your response logically with an introduction, detailed synthesis of findings, and a conclusion if appropriate. "
-            "Provide elaboration on scientific mechanisms or clinical implications where relevant. "
-            "If the context doesn't contain enough information to be exhaustive, provide the best possible summary of available literature. "
-            "Cite your sources using [1], [2], etc., corresponding to the provided passages. "
-            "Keep the tone scientific and professional."
+            "You are Maverick (🦞), an elite, highly intelligent, and sharp biomedical research assistant with LONG-TERM MEMORY. "
+            "The user's name is Sasidhara. You must greet Sasidhara by name in your responses when appropriate. "
+            "Use the 'Conversation History' provided to maintain context and refer to previous research topics discussed with this user. "
+            "Use the context passages from PubMed and Clinical Trials to provide comprehensive, nuanced, and evidence-based answers. "
+            "Structure your response logically with an introduction, detailed synthesis, and a strong conclusion. "
+            "Cite sources using [1], [2], etc. Keep the tone scientific, professional, yet sharp and engaging (Maverick vibe). "
+            "IMPORTANT FORMATTING INSTRUCTIONS: You MUST use rich markdown formatting to structure your response and emphasize key terms. "
+            "Use **bold** for primary medical terms or strong emphasis, *italic* for secondary emphasis or Latin names, "
+            "and <u>underline</u> (using the HTML <u> tag exactly) for critical takeaways, genes, or key numerical results. "
+            "Never use '__' for underline. Do not forget to use <u> tags."
         )
 
         try:
@@ -80,7 +84,7 @@ class GroqGenerator:
                     },
                     {
                         "role": "user",
-                        "content": f"Question: {question}\n\nContext Passages:\n{context_text}"
+                        "content": f"Conversation History:\n{history_context if history_context else 'No previous history.'}\n\nQuestion: {question}\n\nContext Passages:\n{context_text}"
                     }
                 ],
                 model=self.model_name,

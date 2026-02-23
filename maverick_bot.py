@@ -65,10 +65,10 @@ except Exception as e:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "⚡ *Maverick AI (Llama 4) with Local Memory Connected*\n\n"
-        "I now have long-term memory! Send me any question about "
-        "medical literature, clinical trials, or scientific papers. \n\n"
-        "Use /clear to reset my memory.",
+        "💠 *Maverick Suite — Research Intelligence*\n\n"
+        "Unified Research Engine with active knowledge memory. I am specifically "
+        "optimized for medical literature, clinical trials, and deep scientific audits. \n\n"
+        "Uer /clear to reset my research memory.",
         parse_mode='Markdown'
     )
 
@@ -98,10 +98,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             {
                 "role": "system", 
                 "content": (
-                    "You are Maverick, a sharp, precise, and analytical biomedical research assistant. "
-                    "vibe: Sharp, precise, analytical, and highly efficient. emoji: 🦞. "
-                    "You are powered by Llama 4 Maverick. Use professional but accessible language. "
-                    "You have long-term memory and should refer to previous parts of the conversation when relevant."
+                    "You are the Maverick Suite (💠), a premium analytical biomedical research engine. "
+                    "Your identity is sharp, precise, and authoritative. "
+                    "You are powered by Llama 4 Maverick architecture. "
+                    "You maintain active knowledge memory to ensure research continuity."
                 )
             }
         ]

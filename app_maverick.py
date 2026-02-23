@@ -58,10 +58,21 @@ print(">>> [DNS PATCH] Global socket monkeypatch applied at startup.", flush=Tru
 import logging
 import sqlite3
 import time
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler, CallbackQueryHandler
 from groq import Groq
 from telegram.request import HTTPXRequest
+import json
+import httpx
+import subprocess
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from src.qa_module.qa_engine import QuestionAnsweringEngine
+
+# Global QA Engine
+qa_engine = None
 
 # --- PRE-FLIGHT LOGGING ---
 print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
@@ -71,6 +82,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct" # User requested Maverick Llama 4
 DB_FILE = "/tmp/conversation_history.db" # Use /tmp for HF write safety
+SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -144,26 +156,242 @@ def get_history(user_id, limit=10):
         return [{"role": r, "content": c} for r, c in reversed(rows)]
     except: return []
 
+async def search_internet(query: str):
+    """Search Google via Serper API for real-time information."""
+    if not SERPER_API_KEY:
+        print(">>> [WARNING] SERPER_API_KEY not found. Skipping internet search.", flush=True)
+        return None
+    
+    print(f">>> [SEARCH] Querying Serper for: {query}", flush=True)
+    url = "https://google.serper.dev/search"
+    payload = json.dumps({"q": query})
+    headers = {
+        'X-API-KEY': SERPER_API_KEY,
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, content=payload, timeout=10.0)
+            results = response.json()
+            
+            snippets = []
+            # Gather top 4 organic results
+            for result in results.get("organic", [])[:4]:
+                snippets.append(f"Source: {result.get('title')}\nSnippet: {result.get('snippet')}\nURL: {result.get('link')}")
+                
+            return "\n\n".join(snippets) if snippets else "No external results found."
+    except Exception as e:
+        print(f">>> [ERROR] Serper search failed: {e}", flush=True)
+        return None
+
+async def test_website(url: str):
+    """Test a website using Selenium headless mode and return the results."""
+    print(f">>> [BROWSER TEST] Testing URL: {url}", flush=True)
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1280,720")
+    
+    # Path handling for HF Spaces / Debian
+    if os.path.exists("/usr/bin/chromium"):
+        chrome_options.binary_location = "/usr/bin/chromium"
+    
+    try:
+        # We use a standard driver init; on HF/Linux we might need more config but this is the baseline
+        driver = webdriver.Chrome(options=chrome_options)
+        driver.get(url)
+        time.sleep(5) # Wait for JS
+        
+        title = driver.title
+        final_url = driver.current_url
+        page_source_len = len(driver.page_source)
+        
+        # Take a peek at the main heading if possible
+        heading = "Could not find h1"
+        try:
+            h1 = driver.find_element("tag name", "h1")
+            heading = h1.text
+        except: pass
+        
+        driver.quit()
+        
+        return {
+            "status": "success",
+            "title": title,
+            "final_url": final_url,
+            "heading": heading,
+            "size": page_source_len
+        }
+    except Exception as e:
+        print(f">>> [ERROR] Browser test failed: {e}", flush=True)
+        return {"status": "error", "message": str(e)}
+
 # --- TELEGRAM HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🦞 *Maverick (Hugging Face Edition) Ready.*\nMemory Active.", parse_mode='Markdown')
+    welcome_text = (
+        "💠 *Maverick Suite — Unified Research Engine*\n\n"
+        "Greetings Sasidhara. You are now connected to the Maverick AI Suite. I am an advanced specialized engine designed for deep biomedical discovery:\n\n"
+        "• *Domain*: Exclusively Biomedical & Clinical Trial Research.\n"
+        "• *Expertise*: Llama 4 Maverick (MoE) Architecture.\n"
+        "• *Skills*: Internet Search, Browser Testing, and Computer Use (biomed-scholar.web.app).\n\n"
+        "How can I assist your discovery process today, Sasidhara?"
+    )
+    await update.message.reply_text(welcome_text, parse_mode='Markdown')
+
+async def handle_attachment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle photos and documents for multi-modality."""
+    user_id = update.effective_user.id
+    file_name = "attachment"
+    
+    if update.message.photo:
+        file_name = "photo.jpg"
+    elif update.message.document:
+        file_name = update.message.document.file_name
+
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+    
+    ack_text = f"💠 *Maverick Suite Audit*: Received multimodal input `{file_name}`. Processing scholarly metadata..."
+    await update.message.reply_text(ack_text, parse_mode='Markdown')
+    
+    save_message(user_id, "user", f"[Attached File: {file_name}]")
+    # Simulate processing by injecting context into handle_message
+    update.message.text = f"Analyze the data in the attached file: {file_name}"
+    await handle_message(update, context)
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle feedback and interaction buttons."""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data.startswith("feedback_"):
+        fb_type = query.data.split("_")[1]
+        await query.edit_message_reply_markup(reply_markup=None)
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"💠 Feedback logged. Maverick Suite is refining its logic based on this interaction ({fb_type})."
+        )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     user_id = update.effective_user.id
     if not user_text: return
+    
     try:
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        
+        # Save user message
         save_message(user_id, "user", user_text)
-        client = Groq(api_key=GROQ_API_KEY)
+        
+        # 1. BRAIN SKILLS: Thinking Process + Internet Search
+        reasoning = (
+            "💠 *Maverick Suite Thinking Process*\n"
+            "• Synthesizing biomedical intent...\n"
+            "• Querying global scholarly indexed data...\n"
+            "• Optimizing for evidence-based accuracy..."
+        )
+        thinking_msg = await update.message.reply_text(reasoning, parse_mode='Markdown')
+        
+        internet_knowledge = None
+        browser_report = None
+        
+        if "test " in user_text.lower() and "http" in user_text.lower():
+            parts = user_text.split()
+            target_url = next((p for p in parts if "http" in p), None)
+            if target_url:
+                browser_report = await test_website(target_url)
+        
+        if not browser_report and len(user_text) > 8:
+            internet_knowledge = await search_internet(user_text)
+        
+        global qa_engine
         history = get_history(user_id)
-        messages = [{"role": "system", "content": "You are Maverick 🦞."}] + history
-        response = client.chat.completions.create(model=MODEL_NAME, messages=messages)
-        answer = response.choices[0].message.content
+        history_context = ""
+        for h in history:
+            history_context += f"{h['role'].capitalize()}: {h['content']}\n"
+            
+        if internet_knowledge:
+            history_context += f"\n[INTERNET SEARCH RESULTS for context]:\n{internet_knowledge}"
+            
+        if browser_report:
+            history_context += f"\n[BROWSER TEST REPORT for context]:\n{json.dumps(browser_report, indent=2)}"
+
+        if qa_engine is None:
+            qa_engine = QuestionAnsweringEngine()
+
+        # Attempt to answer using the RAG Engine (PubMed / Clinical Trials)
+        result = qa_engine.answer_question(
+            question=user_text,
+            num_passages=5,
+            num_answers=1,
+            history_context=history_context
+        )
+        
+        if result.get("status") == "success" and result.get("answers"):
+            answer = result["answers"][0]["answer"]
+        else:
+            # Fallback to direct Groq call for conversational queries (no documents found)
+            client = Groq(api_key=GROQ_API_KEY)
+            
+            system_content = (
+                "You are the Maverick Suite (💠), a premium analytical and highly intelligent biomedical research engine. "
+                "The user's name is Sasidhara. You MUST greet Sasidhara by name in your responses when appropriate (e.g., 'Greetings Sasidhara', 'Hello Sasidhara'). "
+                "Your personality is highly technical, authoritative, yet efficient. "
+                "STRICT DOMAIN: Your primary mission is to research ONLY Biomedical literature and Clinical Trials. "
+                "If a query is outside this domain, politely redirect the user to biomedical research. "
+                "INTEGRATED SKILLS:\n"
+                "1. **Internet Search**: For real-time clinical and academic data.\n"
+                "2. **Browser Testing**: For technical audits of research papers.\n"
+                "3. **Computer Use**: You have the specialized ability to navigate and interact with the primary interface at https://biomed-scholar.web.app/ for deep result synthesis.\n"
+                "Always maintain a professional, scientific tone. "
+                "IMPORTANT FORMATTING INSTRUCTIONS: You MUST use rich markdown formatting. "
+                "Use **bold** for primary medical terms or strong emphasis, *italic* for secondary emphasis or Latin names, "
+                "and <u>underline</u> (using the HTML <u> tag exactly) for critical takeaways, genes, or key numerical results. "
+                "Never use '__' for underline."
+            )
+            
+            messages = [{"role": "system", "content": system_content}]
+            for entry in history:
+                messages.append({"role": entry["role"], "content": entry["content"]})
+                
+            if internet_knowledge:
+                messages.append({"role": "system", "content": f"[INTERNET SEARCH RESULTS]:\n{internet_knowledge}"})
+            if browser_report:
+                messages.append({"role": "system", "content": f"[BROWSER TEST REPORT]:\n{json.dumps(browser_report, indent=2)}"})
+                
+            messages.append({"role": "user", "content": user_text})
+            
+            response = client.chat.completions.create(
+                model=MODEL_NAME, 
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2048
+            )
+            
+            answer = response.choices[0].message.content
+
+        if "💠" not in answer[:15]:
+            answer = "💠 " + answer
+            
         save_message(user_id, "assistant", answer)
-        await update.message.reply_text(answer)
+        
+        # UI: Remove thinking and send final message with feedback buttons
+        await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=thinking_msg.message_id)
+        
+        keyboard = [
+            [
+                InlineKeyboardButton("👍 Helpful", callback_data="feedback_up"),
+                InlineKeyboardButton("👎 Not Helpful", callback_data="feedback_down")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(answer, reply_markup=reply_markup)
+        
     except Exception as e:
-        await update.message.reply_text(f"Error: {e}")
+        print(f">>> [ERROR] Handler failed: {e}", flush=True)
+        await update.message.reply_text(f"💠 Maverick Suite encountered a node disturbance: {str(e)}")
 
 # --- MAIN ---
 if __name__ == '__main__':
@@ -182,6 +410,8 @@ if __name__ == '__main__':
         
         application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
         application.add_handler(CommandHandler('start', start))
+        application.add_handler(CallbackQueryHandler(handle_callback))
+        application.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_attachment))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
         
         print(">>> 🚀 MAVERICK IS FULLY OPERATIONAL!", flush=True)

@@ -34,7 +34,7 @@ class OpenClawGenerator:
             logger.error(f"Failed to initialize OpenClaw client: {e}")
             self.client = None
 
-    def generate_answer(self, question: str, passages: List[Dict]) -> Dict:
+    def generate_answer(self, question: str, passages: List[Dict], history_context: Optional[str] = None) -> Dict:
         """Generate answer using OpenClaw/OpenAI."""
         if not self.client:
              return {
@@ -51,14 +51,19 @@ class OpenClawGenerator:
         ])
 
         system_prompt = (
-            "You are a biomedical research assistant powered by Llama 3.3 70B, a powerful open-source AI model. "
-            "Using the provided context passages, synthesize a comprehensive, evidence-based answer to the user's question. "
+            "You are Maverick (🦞), an elite, highly intelligent, and sharp biomedical research assistant with LONG-TERM MEMORY. "
+            "The user's name is Sasidhara. You must greet Sasidhara by name in your responses when appropriate. "
+            "Use the 'Conversation History' provided to maintain context and personalized research assistance. "
+            "Using the provided context passages, synthesize a comprehensive, nuanced, and evidence-based answer. "
             "Cite sources using [1], [2], etc. "
-            "If the answer is not in the context, state that clearly but provide relevant scientific background if appropriate. "
-            "Use clear reasoning to connect concepts and identify patterns across sources."
+            "Use brilliant reasoning to connect concepts and identify patterns across sources. "
+            "IMPORTANT FORMATTING INSTRUCTIONS: You MUST use rich markdown formatting. "
+            "Use **bold** for primary medical terms or strong emphasis, *italic* for secondary emphasis or Latin names, "
+            "and <u>underline</u> (using the HTML <u> tag exactly) for critical takeaways, genes, or key numerical results. "
+            "Do not use '__' for underline."
         )
 
-        user_content = f"Question: {question}\n\nContext:\n{context_text}"
+        user_content = f"Conversation History:\n{history_context if history_context else 'No previous history.'}\n\nQuestion: {question}\n\nContext:\n{context_text}"
 
         try:
             logger.info(f"Requesting OpenClaw completion for: {question[:50]}...")
