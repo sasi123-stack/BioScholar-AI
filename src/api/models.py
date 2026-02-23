@@ -155,6 +155,7 @@ class MaverickChatRequest(BaseModel):
     context: Optional[List[Dict[str, str]]] = Field(None, description="Recent conversation history for long-term memory")
     attachments: Optional[List[Dict[str, Any]]] = Field(None, description="Metadata about attached files/images")
     user_id: Optional[int] = Field(123, description="Unique user identifier")
+    index: Optional[str] = Field("pubmed", description="Index to search (pubmed, google, all)")
 
 
 class MaverickChatResponse(BaseModel):

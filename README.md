@@ -20,7 +20,7 @@ This Space hosts both the **FastAPI Backend API** and the **Maverick Telegram Bo
 
 ### 🛠️ Components
 - **Backend**: FastAPI search engine integrated with BioBERT.
-- **Bot**: Persistent-memory Llama 4 Maverick.
+- **Bot**: Persistent-memory Llama 3.3 Maverick.
 
 ### 🔐 Setup Secrets
 The following secrets are required in your Space Settings:

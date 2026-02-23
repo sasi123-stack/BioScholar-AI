@@ -18,7 +18,7 @@ This guide explains how to host the **FastAPI Backend** and the **Maverick Teleg
 Go to **Settings > Variables and secrets** in your Hugging Face Space and add these:
 
 ### AI & Core
-- `GROQ_API_KEY`: Your Groq API key (for Llama 4).
+- `GROQ_API_KEY`: Your Groq API key (for Llama 3.3).
 - `TELEGRAM_BOT_TOKEN`: From @BotFather.
 - `APP_ENV`: Set to `production`.
 

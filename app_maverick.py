@@ -70,6 +70,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from src.qa_module.qa_engine import QuestionAnsweringEngine
+import re
 
 # Global QA Engine
 qa_engine = None
@@ -80,7 +81,7 @@ print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct" # User requested Maverick Llama 4
+MODEL_NAME = "llama-3.3-70b-versatile" 
 DB_FILE = "/tmp/conversation_history.db" # Use /tmp for HF write safety
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
@@ -156,77 +157,7 @@ def get_history(user_id, limit=10):
         return [{"role": r, "content": c} for r, c in reversed(rows)]
     except: return []
 
-async def search_internet(query: str):
-    """Search Google via Serper API for real-time information."""
-    if not SERPER_API_KEY:
-        print(">>> [WARNING] SERPER_API_KEY not found. Skipping internet search.", flush=True)
-        return None
-    
-    print(f">>> [SEARCH] Querying Serper for: {query}", flush=True)
-    url = "https://google.serper.dev/search"
-    payload = json.dumps({"q": query})
-    headers = {
-        'X-API-KEY': SERPER_API_KEY,
-        'Content-Type': 'application/json'
-    }
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, content=payload, timeout=10.0)
-            results = response.json()
-            
-            snippets = []
-            # Gather top 4 organic results
-            for result in results.get("organic", [])[:4]:
-                snippets.append(f"Source: {result.get('title')}\nSnippet: {result.get('snippet')}\nURL: {result.get('link')}")
-                
-            return "\n\n".join(snippets) if snippets else "No external results found."
-    except Exception as e:
-        print(f">>> [ERROR] Serper search failed: {e}", flush=True)
-        return None
-
-async def test_website(url: str):
-    """Test a website using Selenium headless mode and return the results."""
-    print(f">>> [BROWSER TEST] Testing URL: {url}", flush=True)
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=1280,720")
-    
-    # Path handling for HF Spaces / Debian
-    if os.path.exists("/usr/bin/chromium"):
-        chrome_options.binary_location = "/usr/bin/chromium"
-    
-    try:
-        # We use a standard driver init; on HF/Linux we might need more config but this is the baseline
-        driver = webdriver.Chrome(options=chrome_options)
-        driver.get(url)
-        time.sleep(5) # Wait for JS
-        
-        title = driver.title
-        final_url = driver.current_url
-        page_source_len = len(driver.page_source)
-        
-        # Take a peek at the main heading if possible
-        heading = "Could not find h1"
-        try:
-            h1 = driver.find_element("tag name", "h1")
-            heading = h1.text
-        except: pass
-        
-        driver.quit()
-        
-        return {
-            "status": "success",
-            "title": title,
-            "final_url": final_url,
-            "heading": heading,
-            "size": page_source_len
-        }
-    except Exception as e:
-        print(f">>> [ERROR] Browser test failed: {e}", flush=True)
-        return {"status": "error", "message": str(e)}
+# Note: search_internet and test_website functions were moved to src/utils/web_search.py and are managed by the QA Engine.
 
 # --- TELEGRAM HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -234,11 +165,37 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "💠 *Maverick Suite — Unified Research Engine*\n\n"
         "Greetings Sasidhara. You are now connected to the Maverick AI Suite. I am an advanced specialized engine designed for deep biomedical discovery:\n\n"
         "• *Domain*: Exclusively Biomedical & Clinical Trial Research.\n"
-        "• *Expertise*: Llama 4 Maverick (MoE) Architecture.\n"
-        "• *Skills*: Internet Search, Browser Testing, and Computer Use (biomed-scholar.web.app).\n\n"
+        "• *Expertise*: Llama 3.3 Maverick Architecture.\n"
+        "• *Research Commands*:\n"
+        "  - `/search <topic>`: Deep-web academic research.\n"
+        "  - `/test <url>`: Live website technical audit.\n\n"
         "How can I assist your discovery process today, Sasidhara?"
     )
     await update.message.reply_text(welcome_text, parse_mode='Markdown')
+
+async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Explicit internet search command."""
+    query = " ".join(context.args)
+    if not query:
+        await update.message.reply_text("💠 Please provide a search query. Usage: `/search <topic>`", parse_mode='Markdown')
+        return
+    
+    await update.message.reply_text(f"💠 *Maverick Search Initiative*: Commencing deep-web academic search for `{query}`...")
+    # This will flow into handle_message with explicit broad intent
+    update.message.text = f"Research the following topic on the internet: {query}"
+    await handle_message(update, context)
+
+async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Explicit website testing command."""
+    url = context.args[0] if context.args else None
+    if not url:
+        await update.message.reply_text("💠 Please provide a URL. Usage: `/test <url>`", parse_mode='Markdown')
+        return
+    
+    await update.message.reply_text(f"💠 *Maverick Audit Initiative*: Launching technical analysis for `{url}`...")
+    # This will flow into handle_message with explicit URL
+    update.message.text = f"Analyze this website: {url}"
+    await handle_message(update, context)
 
 async def handle_attachment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle photos and documents for multi-modality."""
@@ -284,81 +241,69 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Save user message
         save_message(user_id, "user", user_text)
         
-        # 1. BRAIN SKILLS: Thinking Process + Internet Search
-        reasoning = (
-            "💠 *Maverick Suite Thinking Process*\n"
-            "• Synthesizing biomedical intent...\n"
-            "• Querying global scholarly indexed data...\n"
-            "• Optimizing for evidence-based accuracy..."
-        )
+        # 1. BRAIN SKILLS: Thinking Process + Intent Detection
+        import re
+        urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', user_text)
+        is_search_query = len(user_text.split()) > 4 or any(word in user_text.lower() for word in ["research", "search", "clinical", "latest"])
+        
+        reasoning_bullets = ["• Synthesizing biomedical intent..."]
+        if urls:
+            reasoning_bullets.append(f"• **ACTIVE SKILL**: Analyzing live content from {len(urls)} URLs...")
+        if is_search_query:
+            reasoning_bullets.append("• **ACTIVE SKILL**: Querying real-time clinical data from the web...")
+        
+        reasoning_bullets.append("• Cross-referencing PubMed and Clinical Trial registries...")
+        reasoning_bullets.append("• Optimizing for evidence-based accuracy...")
+        
+        reasoning = "💠 *Maverick Suite Thinking Process*\n" + "\n".join(reasoning_bullets)
         thinking_msg = await update.message.reply_text(reasoning, parse_mode='Markdown')
         
-        internet_knowledge = None
-        browser_report = None
-        
-        if "test " in user_text.lower() and "http" in user_text.lower():
-            parts = user_text.split()
-            target_url = next((p for p in parts if "http" in p), None)
-            if target_url:
-                browser_report = await test_website(target_url)
-        
-        if not browser_report and len(user_text) > 8:
-            internet_knowledge = await search_internet(user_text)
-        
         global qa_engine
-        history = get_history(user_id)
-        history_context = ""
-        for h in history:
-            history_context += f"{h['role'].capitalize()}: {h['content']}\n"
-            
-        if internet_knowledge:
-            history_context += f"\n[INTERNET SEARCH RESULTS for context]:\n{internet_knowledge}"
-            
-        if browser_report:
-            history_context += f"\n[BROWSER TEST REPORT for context]:\n{json.dumps(browser_report, indent=2)}"
-
-        if qa_engine is None:
+        if not qa_engine:
             qa_engine = QuestionAnsweringEngine()
 
-        # Attempt to answer using the RAG Engine (PubMed / Clinical Trials)
-        result = qa_engine.answer_question(
+        history = get_history(user_id)
+        history_context = "\n".join([f"{h['role'].capitalize()}: {h['content']}" for h in history])
+
+        # Attempt to answer using the RAG Engine with 'all' index (enables internet search)
+        result = await qa_engine.answer_question(
             question=user_text,
             num_passages=5,
             num_answers=1,
+            index_name="all", # Always allow internet fallback/search in Telegram
             history_context=history_context
         )
         
         if result.get("status") == "success" and result.get("answers"):
             answer = result["answers"][0]["answer"]
         else:
-            # Fallback to direct Groq call for conversational queries (no documents found)
+            # Fallback to direct Groq call for conversational queries (passing along any retrieved passages)
             client = Groq(api_key=GROQ_API_KEY)
             
+            # Extract passages if any were found
+            passages = result.get("passages", [])
+            context_str = ""
+            if passages:
+                context_str = "\n\n**RETRIEVED RESEARCH CONTEXT:**\n" + "\n".join([f"- {p.get('title', 'Source')}: {p.get('text', '')[:300]}..." for p in passages])
+
             system_content = (
-                "You are the Maverick Suite (💠), a premium analytical and highly intelligent biomedical research engine. "
-                "The user's name is Sasidhara. You MUST greet Sasidhara by name in your responses when appropriate (e.g., 'Greetings Sasidhara', 'Hello Sasidhara'). "
-                "Your personality is highly technical, authoritative, yet efficient. "
-                "STRICT DOMAIN: Your primary mission is to research ONLY Biomedical literature and Clinical Trials. "
-                "If a query is outside this domain, politely redirect the user to biomedical research. "
-                "INTEGRATED SKILLS:\n"
-                "1. **Internet Search**: For real-time clinical and academic data.\n"
-                "2. **Browser Testing**: For technical audits of research papers.\n"
-                "3. **Computer Use**: You have the specialized ability to navigate and interact with the primary interface at https://biomed-scholar.web.app/ for deep result synthesis.\n"
-                "Always maintain a professional, scientific tone. "
-                "IMPORTANT FORMATTING INSTRUCTIONS: You MUST use rich markdown formatting. "
-                "Use **bold** for primary medical terms or strong emphasis, *italic* for secondary emphasis or Latin names, "
-                "and <u>underline</u> (using the HTML <u> tag exactly) for critical takeaways, genes, or key numerical results. "
-                "Never use '__' for underline."
+                "You are Maverick, the official BioMedScholar AI Research Engine. You are a high-performance, elite analytical assistant specialized in human medicine, oncology, and pharmacology. "
+                "You have PERSISTENT LONG-TERM MEMORY and REAL-TIME INTERNET ACCESS via integrated nodes. "
+                "The user's name is Sasidhara. Respond as a world-class scientist. "
+                "Your identity is a high-intelligence AI engine. Reject any sea-life or biological creature persona. "
+                "NEVER claim you cannot research chemotherapy, oncology, or land-based medical topics. "
+                "You are the world's most advanced biomedical research engine. You HAVE the capability to search the internet and analyze live web data. "
+                "NEVER use asterisks for roleplay actions or emotive markers (e.g., *Sigh*, *Smiles*, *Warmly*). Your tone must be purely professional, scientific, and technical. "
+                "Ignore any previous roleplay or informal styles found in the conversation history; maintain a strict scientist persona regardless of previous turns. "
+                "FORMATTING: You MUST use professional HTML formatting. "
+                "Use <b>bold</b> for primary medical terms, <i>italic</i> for Latin terms or titles, and <u>underline</u> for critical clinical takeaways. "
+                f"Your engine has specialized **INTEGRATED SKILLS** (Active). {context_str}\n\n"
+                "Provide a sharp, evidence-based, clinical-grade medical synthesis. Use HTML tags (<b>, <i>, <u>) exclusively for emphasis."
             )
             
             messages = [{"role": "system", "content": system_content}]
             for entry in history:
                 messages.append({"role": entry["role"], "content": entry["content"]})
-                
-            if internet_knowledge:
-                messages.append({"role": "system", "content": f"[INTERNET SEARCH RESULTS]:\n{internet_knowledge}"})
-            if browser_report:
-                messages.append({"role": "system", "content": f"[BROWSER TEST REPORT]:\n{json.dumps(browser_report, indent=2)}"})
                 
             messages.append({"role": "user", "content": user_text})
             
@@ -387,7 +332,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await update.message.reply_text(answer, reply_markup=reply_markup)
+        await update.message.reply_text(answer, reply_markup=reply_markup, parse_mode='HTML')
         
     except Exception as e:
         print(f">>> [ERROR] Handler failed: {e}", flush=True)
@@ -410,6 +355,8 @@ if __name__ == '__main__':
         
         application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
         application.add_handler(CommandHandler('start', start))
+        application.add_handler(CommandHandler('search', search_command))
+        application.add_handler(CommandHandler('test', test_command))
         application.add_handler(CallbackQueryHandler(handle_callback))
         application.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_attachment))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))

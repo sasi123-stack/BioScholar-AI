@@ -31,7 +31,7 @@ class QuestionAnsweringEngine:
         
         logger.info("QuestionAnsweringEngine initialized (OpenClaw, Gemini & Groq ready)")
     
-    def answer_question(
+    async def answer_question(
         self,
         question: str,
         index_name: str = 'pubmed_articles',
@@ -41,14 +41,37 @@ class QuestionAnsweringEngine:
         history_context: Optional[str] = None
     ) -> Dict:
         """Answer a question using retrieval and extraction."""
-        logger.info(f"Answering question: '{question}'")
+        logger.info(f"Answering question: '{question}' in {index_name}")
+        
+        # Step 0: Check if this is a website testing/fetching request
+        import re
+        urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', question)
+        website_context = []
+        if urls:
+            logger.info(f"Detected URLs for testing/analysis: {urls}")
+            for url in urls:
+                if not url.startswith('http'): url = 'http://' + url
+                content = await self.context_retriever.web_search_tool.fetch_website_content(url)
+                if content.get('status') == 'success':
+                    website_context.append({
+                        'text': content['content'],
+                        'title': content['title'],
+                        'doc_id': url,
+                        'source_type': 'website_test',
+                        'section': 'live_fetch',
+                        'score': 1.0
+                    })
         
         # Step 1: Retrieve relevant passages
-        passages = self.context_retriever.retrieve_for_question(
+        passages = await self.context_retriever.retrieve_for_question_async(
             question,
             index_name=index_name,
             top_k=num_passages
         )
+        
+        # Combine with website context if any
+        if website_context:
+            passages = website_context + passages
         
         if not passages:
             logger.warning("No passages retrieved")
@@ -62,18 +85,8 @@ class QuestionAnsweringEngine:
         # Step 2: Generate/Extract answers from passages
         generated_answer = None
         
-        # Prefer OpenClaw if configured (User requested priority)
-        if self.openclaw_generator and self.openclaw_generator.api_key != "sk-openclaw-placeholder":
-             logger.info("Using OpenClaw for synthesis")
-             try:
-                 # Try with history_context for newer versions
-                 generated_answer = self.openclaw_generator.generate_answer(question, passages, history_context=history_context)
-             except TypeError:
-                 # Fallback for older versions without history_context support
-                 generated_answer = self.openclaw_generator.generate_answer(question, passages)
-        
-        # Fallback to Groq
-        elif self.groq_generator.api_key and self.groq_generator.api_key != "gsk_your_actual_key_here":
+        # Use Groq for lightning-fast conversational synthesis (Preferred)
+        if self.groq_generator.api_key and self.groq_generator.api_key != "gsk_your_actual_key_here":
             logger.info("Using Groq for lightning-fast conversational synthesis")
             try:
                 # Try with history_context for newer versions
@@ -81,6 +94,7 @@ class QuestionAnsweringEngine:
             except TypeError:
                 # Fallback for older versions without history_context support
                 generated_answer = self.groq_generator.generate_answer(question, passages)
+# Skip to Gemini if Groq fails or is not available
         # Fallback to Gemini
         elif self.answer_generator.api_key and self.answer_generator.api_key != "your_gemini_api_key_here":
             logger.info("Using Gemini for conversational synthesis")
@@ -130,64 +144,38 @@ class QuestionAnsweringEngine:
         
         return response
     
-    def answer_batch(
+    async def answer_batch(
         self,
         questions: List[str],
         **kwargs
     ) -> List[Dict]:
-        """Answer multiple questions.
-        
-        Args:
-            questions: List of questions
-            **kwargs: Additional arguments for answer_question
-            
-        Returns:
-            List of answer dictionaries
-        """
+        """Answer multiple questions."""
         logger.info(f"Answering {len(questions)} questions")
         
         results = []
         for question in questions:
-            result = self.answer_question(question, **kwargs)
+            result = await self.answer_question(question, **kwargs)
             results.append(result)
         
         return results
     
-    def answer_with_followup(
+    async def answer_with_followup(
         self,
         question: str,
         previous_context: Optional[List[Dict]] = None,
         **kwargs
     ) -> Dict:
-        """Answer question considering previous context (for follow-up questions).
-        
-        Args:
-            question: User question
-            previous_context: Context from previous question
-            **kwargs: Additional arguments
-            
-        Returns:
-            Answer dictionary
-        """
+        """Answer question considering previous context."""
         # For now, just answer normally
-        # In production, implement context-aware QA
-        return self.answer_question(question, **kwargs)
+        return await self.answer_question(question, **kwargs)
     
-    def get_best_answer(
+    async def get_best_answer(
         self,
         question: str,
         **kwargs
     ) -> Dict:
-        """Get single best answer for a question.
-        
-        Args:
-            question: User question
-            **kwargs: Additional arguments
-            
-        Returns:
-            Best answer dictionary
-        """
-        result = self.answer_question(question, num_answers=1, **kwargs)
+        """Get single best answer for a question."""
+        result = await self.answer_question(question, num_answers=1, **kwargs)
         
         if result['status'] == 'success' and result['answers']:
             best = result['answers'][0]
