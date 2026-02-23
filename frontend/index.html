@@ -59,7 +59,10 @@
                     <circle cx="24" cy="24" r="1.5" fill="white" />
                 </svg>
                 <span class="logo-text">BioMedScholar <span class="logo-scholar">AI</span></span>
-                <span class="beta-badge">BETA</span>
+                <span class="beta-badge indicator-badge" id="maverick-sync-indicator" title="Maverick System Status">
+                    <div class="sync-dot synced"></div>
+                    <span class="sync-text">BETA</span>
+                </span>
             </a>
         </div>
 
@@ -763,6 +766,7 @@
 
                         <div class="chat-input-area">
                             <div id="chat-attachment-preview"></div>
+                            <div id="suggested-questions-container" class="suggested-questions-chips hidden"></div>
                             <div class="chat-input-wrapper">
                                 <button class="chat-upload-btn"
                                     onclick="document.getElementById('chat-file-input').click()" title="Upload Context">
@@ -788,6 +792,22 @@
                                 <textarea id="chat-input" placeholder="Ask Maverick about biomedical research..."
                                     rows="1"
                                     oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+
+                                <button id="chat-voice-btn" class="chat-secondary-btn" title="Voice Input">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                                    </svg>
+                                </button>
+                                <button id="chat-stop-btn" class="hidden" title="Stop Generation"
+                                    onclick="stopChatGeneration()">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                        <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
+                                    </svg>
+                                </button>
                                 <button id="chat-send-btn" title="Send Message">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                         stroke-width="2">
@@ -1108,7 +1128,9 @@
                     <button class="help-tab" data-section="authentication"
                         onclick="switchHelpTab('authentication', this)">Authentication</button>
                     <button class="help-tab" data-section="search-tips"
-                        onclick="switchHelpTab('search-tips', this)">Search & Q&A</button>
+                        onclick="switchHelpTab('search-tips', this)">Search Modes</button>
+                    <button class="help-tab" data-section="maverick-ai"
+                        onclick="switchHelpTab('maverick-ai', this)">Research AI Chat</button>
                     <button class="help-tab" data-section="library"
                         onclick="switchHelpTab('library', this)">Library</button>
                     <button class="help-tab" data-section="shortcuts"
@@ -1196,6 +1218,35 @@
                             </ul>
                         </div>
                     </div>
+
+                    <!-- Research AI (Maverick) -->
+                    <div class="help-section" id="help-maverick-ai">
+                        <h3>🤖 Maverick Research AI</h3>
+                        <p>Leveraging advanced RAG (Retrieval-Augmented Generation) to analyze biomedical data in
+                            real-time.</p>
+
+                        <div class="help-card">
+                            <h4>🧠 Transparent Thinking</h4>
+                            <p>Maverick now shows its internal analytical steps line-by-line, including query
+                                interpretation, metadata checking, and evidence contextualization. You can expand the
+                                <strong>"Thinking Process"</strong> toggle on any response to see the full logic.</p>
+                        </div>
+
+                        <div class="help-card">
+                            <h4>🎙️ Interactive Tools</h4>
+                            <ul>
+                                <li><strong>Speak:</strong> Click the speaker icon to vocalize Maverick's synthesis.
+                                </li>
+                                <li><strong>Stop:</strong> Click the red Stop button while Maverick is thinking to abort
+                                    a request instantly.</li>
+                                <li><strong>Follow-ups:</strong> Use the Suggested Research Chips to dive deeper into
+                                    specific results.</li>
+                                <li><strong>Feedback:</strong> Use Thumbs Up/Down to help improve Maverick's research
+                                    accuracy.</li>
+                            </ul>
+                        </div>
+                    </div>
+
 
                     <!-- Library Management -->
                     <div class="help-section" id="help-library">
