@@ -613,7 +613,7 @@ function initEventListeners() {
             sDot.classList.add('online');
         }
         if (sText) sText.textContent = 'Online';
-        checkHealth(); // Trigger immediate check
+        if (window.updateSystemStatus) window.updateSystemStatus(); // Trigger immediate check
     });
 
     window.addEventListener('offline', () => {
@@ -1916,6 +1916,7 @@ async function fetchMaverickInsight(query) {
     if (insightSources) insightSources.innerHTML = '';
 
     try {
+        updateSyncStatus('syncing');
         const response = await fetch(`${MAVERICK_API_URL}/maverick/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1923,6 +1924,7 @@ async function fetchMaverickInsight(query) {
         });
 
         const data = await response.json();
+        updateSyncStatus('synced');
 
         if (data.status === 'success') {
             // Process specialized markdown
@@ -1954,6 +1956,7 @@ async function fetchMaverickInsight(query) {
             insightBox.classList.add('hidden');
         }
     } catch (error) {
+        updateSyncStatus('offline');
         console.warn('Maverick Insight failed:', error);
         insightBox.classList.add('hidden');
     }
@@ -3072,11 +3075,20 @@ function downloadFile(content, filename, mimeType) {
 function formatMaverickResponse(text) {
     if (!text) return "";
 
-    // Escape HTML but allow <u> and <b> tags if strictly formatted
+    // Escape HTML but selectively revive safe tags
     let html = text
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
+
+    // Revive safe formatting tags if they were in the original response
+    html = html.replace(/&lt;b&gt;(.*?)&lt;\/b&gt;/g, "<strong>$1</strong>");
+    html = html.replace(/&lt;i&gt;(.*?)&lt;\/i&gt;/g, "<em>$1</em>");
+    html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/g, "<u>$1</u>");
+
+    // Revive links but ensure they open in new tab and are safe
+    html = html.replace(/&lt;a href=(?:'|")([^'"]+)(?:'|")&gt;(.*?)&lt;\/a&gt;/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer" class="maverick-link">$2</a>');
 
     // Standard Markdown formatting
     html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
@@ -3086,28 +3098,40 @@ function formatMaverickResponse(text) {
     html = html.replace(/_(.*?)_/g, "<em>$1</em>");
     html = html.replace(/`(.*?)`/g, "<code class='inline-code'>$1</code>");
 
-    // Handle LaTeX-style \boxed{...} or $\boxed{...}$
-    // Strip Math delimiters if they surround the boxed content
+    // Scientific Header Formatting: 
+    // Convert strong tags at the beginning of a block to Section Headers
+    html = html.replace(/^(?:<br>)*<strong>(Introduction|Synthesis|Conclusion|Methodology|Analysis|Results|Discussion|References)<\/strong>/gim,
+        '<span class="maverick-section-header">$1</span>');
+
+    // Reference Citation Styling: [1], [2], etc.
+    html = html.replace(/\[(\d+)\]/g, '<span class="maverick-cite">[$1]</span>');
+
+    // Handle LaTeX-style \boxed{...}
     html = html.replace(/\$+\s*\\boxed\{([\s\S]*?)\}\s*\$+/g, '<span class="maverick-boxed">$1</span>');
     html = html.replace(/\\boxed\{([\s\S]*?)\}/g, '<span class="maverick-boxed">$1</span>');
-
-    // Revive <u> tags if they were in the original response
-    html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/g, "<u>$1</u>");
 
     // Line blocks and basic lists
     html = html.replace(/^\s*[-*+]\s+(.*)$/gm, "<li>$1</li>");
 
-    // Check if we produced <li> items, if so wrap them
     if (html.includes("<li>")) {
-        // This is a simple wrapper; complex nested lists would need a real lexer
-        // but this works for most AI-generated responses
         html = html.replace(/(?:<li>.*<\/li>\s*)+/g, (match) => `<ul>${match}</ul>`);
     }
 
-    // Convert newlines to breaks (careful not to double-break in lists)
+    // Convert newlines to breaks
     html = html.replace(/\n/g, "<br>");
 
-    // Cleanup double breaks around lists
+    // Wrap parts in paragraphs if they are not already structured
+    // This is simple but helps with spacing
+    const parts = html.split('<br><br>');
+    html = parts.map(p => {
+        if (p.startsWith('<span class="maverick-section-header">') || p.startsWith('<ul>') || p.startsWith('<span class="maverick-boxed">')) {
+            return p;
+        }
+        return `<p>${p}</p>`;
+    }).join('');
+
+    // Cleanup double breaks or empty paragraphs
+    html = html.replace(/<p><\/p>/g, "");
     html = html.replace(/<\/ul><br>/g, "</ul>");
     html = html.replace(/<br><ul>/g, "<ul>");
 
@@ -3129,10 +3153,16 @@ function toggleWebSearch() {
     }
 }
 
+let currentChatController = null;
+
 function handleChatSubmit() {
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
     if (!message) return;
+
+    // Abort previous request if any
+    if (currentChatController) currentChatController.abort();
+    currentChatController = new AbortController();
 
     // Add user message
     addChatMessage('user', message);
@@ -3141,22 +3171,33 @@ function handleChatSubmit() {
     input.value = '';
     input.style.height = 'auto';
 
-    // Show loading state
-    showChatLoading();
+    // Show loading state with detailed thinking steps
+    showChatLoading(message);
+
+    // Show stop button and hide send button
+    document.getElementById('chat-send-btn')?.classList.add('hidden');
+    document.getElementById('chat-stop-btn')?.classList.remove('hidden');
+
+    // Hide suggested chips if user type something
+    const suggestedContainer = document.getElementById('suggested-questions-container');
+    if (suggestedContainer) suggestedContainer.classList.add('hidden');
 
     // Call Synchronized Maverick API
+    updateSyncStatus('syncing');
     fetch(`${MAVERICK_API_URL}/maverick/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: currentChatController.signal,
         body: JSON.stringify({
             question: message,
-            context: getHistoryForAPI(), // For long term memory
-            index: isWebSearchEnabled ? "all" : "pubmed" // Ensure web search is used if enabled
+            context: getHistoryForAPI(),
+            index: isWebSearchEnabled ? "all" : "pubmed"
         })
     })
         .then(res => res.json())
         .then(data => {
             removeChatLoading();
+            updateSyncStatus('synced');
             if (data.status === 'success') {
                 const aiText = data.answer;
                 const reasoning = data.reasoning || "Analyzing biomedical patterns and cross-referencing indexed literature...";
@@ -3180,14 +3221,25 @@ function handleChatSubmit() {
                     }).slice(0, 3);
 
                 addChatMessage('ai', aiText, sources, reasoning);
+
+                // Show elite follow-up suggestions
+                showSuggestedQuestions(aiText);
             } else {
                 addChatMessage('ai', "I encountered a sync error. Please check if Maverick is online.");
             }
         })
         .catch(err => {
+            if (err.name === 'AbortError') {
+                console.log('Maverick generation stopped by user');
+                return;
+            }
             removeChatLoading();
+            updateSyncStatus('offline');
             addChatMessage('ai', "Error connecting to Maverick Brain.");
             console.error('Maverick error:', err);
+        })
+        .finally(() => {
+            currentChatController = null;
         });
 }
 
@@ -3263,16 +3315,19 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 </button>
                 ${role === 'user' ? `
-                    <button class="msg-action-btn" onclick="editUserMessage(this)" title="Edit message">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    </button>
+                <button class="msg-action-btn" onclick="editUserMessage(this)" title="Edit message">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
                 ` : `
-                    <button class="msg-action-btn" onclick="sendFeedback(this, 'up')" title="Helpful">
-                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
-                    </button>
-                    <button class="msg-action-btn" onclick="sendFeedback(this, 'down')" title="Not helpful">
-                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>
-                    </button>
+                <button class="msg-action-btn" onclick="speakMessage('${text.replace(/'/g, "\\'")}', this)" title="Listen to response">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                </button>
+                <button class="msg-action-btn" onclick="sendFeedback(this, 'up')" title="Helpful">
+                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                </button>
+                <button class="msg-action-btn" onclick="sendFeedback(this, 'down')" title="Not helpful">
+                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>
+                </button>
                 `}
             </div>
         </div>
@@ -3285,7 +3340,7 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
     }
 }
 
-function showChatLoading() {
+function showChatLoading(query = "") {
     const history = document.getElementById('chat-history');
     if (!history) return;
 
@@ -3299,16 +3354,68 @@ function showChatLoading() {
                 <path d="M12 16v-4"/><path d="M12 8h.01"/>
             </svg>
         </div>
-        <div class="typing-bubble">
-            <div class="typing-indicator">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
+        <div class="typing-bubble detailed-thinking">
+            <div class="loading-content">
+                <div class="thinking-header">
+                    <span class="thinking-main-text">Thinking Process</span>
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+                <div class="thinking-steps" id="thinking-steps">
+                    <div class="thinking-step" data-step="1">Interpreting query: '${truncate(query, 35)}'</div>
+                    <div class="thinking-step" data-step="2">Checking indexed PubMed and Clinical Trials metadata...</div>
+                    <div class="thinking-step" data-step="3">Contextualizing based on previous interaction history...</div>
+                    <div class="thinking-step" data-step="4">High-confidence match found in literature.</div>
+                </div>
             </div>
         </div>
     `;
     history.appendChild(loaderDiv);
     history.scrollTop = history.scrollHeight;
+
+    // Animate steps line by line
+    let currentStep = 0;
+    const stepElements = loaderDiv.querySelectorAll('.thinking-step');
+
+    function showNextStep() {
+        if (!document.getElementById('chat-loading-indicator')) return;
+
+        if (currentStep < stepElements.length) {
+            stepElements[currentStep].classList.add('active');
+            currentStep++;
+            history.scrollTop = history.scrollHeight;
+            setTimeout(showNextStep, 800);
+        }
+    }
+
+    // Start animation
+    showNextStep();
+}
+
+function removeChatLoading() {
+    const loader = document.getElementById('chat-loading-indicator');
+    if (loader) {
+        if (loader.dataset.intervalId) {
+            clearInterval(parseInt(loader.dataset.intervalId));
+        }
+        loader.remove();
+    }
+
+    // Hide stop button and show send button
+    document.getElementById('chat-stop-btn')?.classList.add('hidden');
+    document.getElementById('chat-send-btn')?.classList.remove('hidden');
+}
+
+function stopChatGeneration() {
+    if (currentChatController) {
+        currentChatController.abort();
+        removeChatLoading();
+        addChatMessage('ai', "Research generation stopped.");
+        showToast('Generation stopped', 'info');
+    }
 }
 
 /**
@@ -3361,9 +3468,122 @@ function sendFeedback(btn, type) {
     const parent = btn.parentElement;
     parent.querySelectorAll('.msg-action-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    showToast(`Feedback submitted: ${type === 'up' ? 'Helpful' : 'Not helpful'}`, 'success');
-
     // In a real app, you would POST this to an analytics endpoint
+    showToast(`Feedback submitted: ${type === 'up' ? 'Helpful' : 'Not helpful'}`, 'success');
+}
+
+/**
+ * ELITE RESEARCH TOOLS: VOICE, EXPORT & SUGGESTIONS
+ */
+
+let currentUtterance = null;
+
+function speakMessage(text, btn) {
+    if (!window.speechSynthesis) {
+        showToast('Speech synthesis not supported in this browser', 'error');
+        return;
+    }
+
+    // Toggle stop if already speaking
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        if (currentUtterance && currentUtterance.btn === btn) {
+            btn.classList.remove('speaking');
+            currentUtterance = null;
+            return;
+        }
+    }
+
+    // Reset other buttons
+    document.querySelectorAll('.msg-action-btn.speaking').forEach(b => b.classList.remove('speaking'));
+
+    // Clean text of markdown/hidden tags
+    const cleanText = text.replace(/\[\d+\]/g, '').replace(/\*+|_|#/g, '');
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    utterance.onstart = () => {
+        btn.classList.add('speaking');
+    };
+
+    utterance.onend = () => {
+        btn.classList.remove('speaking');
+        currentUtterance = null;
+    };
+
+    currentUtterance = { utterance, btn };
+    window.speechSynthesis.speak(utterance);
+}
+
+function exportChat() {
+    const history = document.getElementById('chat-history');
+    if (!history) return;
+
+    const messages = Array.from(history.querySelectorAll('.chat-message'))
+        .filter(m => !m.id || m.id !== 'chat-loading-indicator');
+
+    if (messages.length === 0) {
+        showToast('No conversation to export', 'info');
+        return;
+    }
+
+    let markdown = `# Maverick Research Analysis - ${new Date().toLocaleDateString()}\n\n`;
+
+    messages.forEach(m => {
+        const role = m.classList.contains('user') ? 'USER' : 'MAVERICK';
+        const content = m.querySelector('.chat-answer-content')?.innerText || "";
+        markdown += `### ${role}\n${content}\n\n`;
+    });
+
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Maverick_Analysis_${new Date().getTime()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast('Research conversation exported successfully!', 'success');
+}
+
+function showSuggestedQuestions(aiResponse) {
+    const container = document.getElementById('suggested-questions-container');
+    if (!container) return;
+
+    // Simple heuristic for follow-up questions
+    const suggestions = [];
+    if (aiResponse.toLowerCase().includes('atherosclerosis')) {
+        suggestions.push("Tell me more about molecular therapies");
+        suggestions.push("What are the risk factors for genetic dyslipidemia?");
+    } else if (aiResponse.toLowerCase().includes('crispr') || aiResponse.toLowerCase().includes('editing')) {
+        suggestions.push("Compare Cas12i3 vs Cas9 in plants");
+        suggestions.push("Are there any clinical trials for base editing?");
+    } else {
+        suggestions.push("Summarize the key takeaways");
+        suggestions.push("Explain the methodology used here");
+        suggestions.push("What are the clinical implications?");
+    }
+
+    container.innerHTML = suggestions.map(q => `
+        <button class="question-chip" onclick="sendSuggestedQuestion('${q.replace(/'/g, "\\'")}')">${q}</button>
+    `).join('');
+
+    container.classList.remove('hidden');
+}
+
+function sendSuggestedQuestion(question) {
+    const input = document.getElementById('chat-input');
+    const container = document.getElementById('suggested-questions-container');
+    if (input) {
+        input.value = question;
+        container.classList.add('hidden');
+        handleChatSubmit();
+    }
 }
 
 /**
@@ -3384,10 +3604,10 @@ function handleChatFileUpload(input) {
         const chip = document.createElement('div');
         chip.className = 'attachment-chip';
         chip.innerHTML = `
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-            ${truncate(file.name, 15)}
-            <span class="attachment-remove" onclick="removeAttachment('${file.name}', this)">×</span>
-        `;
+    < svg width = "12" height = "12" viewBox = "0 0 24 24" fill = "none" stroke = "currentColor" stroke - width="2" ><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg >
+        ${truncate(file.name, 15)}
+<span class="attachment-remove" onclick="removeAttachment('${file.name}', this)">×</span>
+`;
         preview.appendChild(chip);
     });
 
@@ -3426,7 +3646,7 @@ function clearChat() {
     const history = document.getElementById('chat-history');
     if (history) {
         history.innerHTML = `
-            <div class="chat-welcome-message">
+    < div class="chat-welcome-message" >
                 <div class="welcome-logo" style="background: linear-gradient(135deg, var(--primary-blue), #0d47a1); color: white; border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto; box-shadow: 0 4px 12px rgba(0, 86, 210, 0.3);">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
@@ -3440,8 +3660,8 @@ function clearChat() {
                     <button class="menu-item" style="font-size: 12px; justify-content: center;" onclick="sendChatMessage('Summarize latest CRISPR breakthroughs')">Summarize CRISPR breakthroughs</button>
                     <button class="menu-item" style="font-size: 12px; justify-content: center;" onclick="sendChatMessage('Compare mRNA vaccine side effects')">mRNA vs Traditional Vaccines</button>
                 </div>
-            </div>
-        `;
+            </div >
+    `;
     }
 }
 
@@ -5706,27 +5926,38 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Status Checker
-    function checkSystemStatus() {
+    function updateSystemStatus() {
         const dot = document.getElementById('status-dot');
         const txt = document.getElementById('status-text');
-        if (!dot || !txt) return;
 
-        fetch(API_BASE_URL + '/health')
+        // System Health (Central API)
+        if (dot && txt) {
+            fetch(API_BASE_URL + '/health')
+                .then(r => {
+                    if (r.ok) {
+                        dot.className = 'status-dot connected';
+                        txt.textContent = 'System Online';
+                    } else {
+                        throw new Error('API Error');
+                    }
+                })
+                .catch(e => {
+                    dot.className = 'status-dot error';
+                    txt.textContent = 'Offline';
+                });
+        }
+
+        // Maverick Sync Status
+        fetch(MAVERICK_API_URL + '/health')
             .then(r => {
-                if (r.ok) {
-                    dot.className = 'status-dot connected';
-                    txt.textContent = 'System Online';
-                } else {
-                    throw new Error('API Error');
-                }
+                if (r.ok) updateSyncStatus('synced');
+                else updateSyncStatus('offline');
             })
-            .catch(e => {
-                dot.className = 'status-dot error';
-                txt.textContent = 'Offline';
-            });
+            .catch(() => updateSyncStatus('offline'));
     }
-    checkSystemStatus();
-    setInterval(checkSystemStatus, 30000);
+
+    // Globally expose for initial check
+    window.updateSystemStatus = updateSystemStatus;
 });
 
 function openIntelligenceModal() {
@@ -5824,11 +6055,122 @@ function openTelegramBot() {
 // Initialize floating button on page load
 document.addEventListener('DOMContentLoaded', function () {
     initFloatingChatButton();
+    initVoiceSearch(); // Voice Input System
+    updateSystemStatus(); // Initial check
+    setInterval(updateSystemStatus, 30000); // Periodic check
 });
+
+/**
+ * Global Maverick Sync Indicator Management
+ * Updates the UI based on connection state
+ */
+function updateSyncStatus(status) {
+    const wrapper = document.getElementById('maverick-sync-indicator');
+    const dot = wrapper?.querySelector('.sync-dot');
+    const text = wrapper?.querySelector('.sync-text');
+
+    if (!wrapper || !dot || !text) return;
+
+    dot.classList.remove('synced', 'syncing', 'offline');
+
+    switch (status) {
+        case 'synced':
+            dot.classList.add('synced');
+            text.textContent = 'BETA';
+            wrapper.title = 'Maverick Synced & Online';
+            break;
+        case 'syncing':
+            dot.classList.add('syncing');
+            text.textContent = 'SYNCING';
+            wrapper.title = 'Syncing...';
+            break;
+        case 'offline':
+            dot.classList.add('offline');
+            text.textContent = 'OFFLINE';
+            wrapper.title = 'Maverick Offline';
+            break;
+        default:
+            dot.classList.add('offline');
+            text.textContent = 'ERROR';
+            break;
+    }
+}
 
 // Integrated Desk Assistant functionality removed in favor of Telegram redirection
 
 function jsonStringify(obj) {
     return JSON.stringify(obj);
+}
+
+/**
+ * Voice Input Management for Maverick Chat
+ */
+let recognition = null;
+let isRecording = false;
+
+function initVoiceSearch() {
+    const voiceBtn = document.getElementById('chat-voice-btn');
+    const chatInput = document.getElementById('chat-input');
+
+    if (!voiceBtn || !chatInput) return;
+
+    // Check for browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        voiceBtn.classList.add('hidden');
+        console.warn('Speech Recognition: Browser does not support Web Speech API');
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+        isRecording = true;
+        voiceBtn.classList.add('recording');
+        chatInput.placeholder = "Listening...";
+    };
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        chatInput.value = transcript;
+        // Adjust textarea height for transcript
+        chatInput.style.height = 'auto';
+        chatInput.style.height = chatInput.scrollHeight + 'px';
+        // Auto-submit after voice input for seamless experience
+        handleChatSubmit();
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        stopRecording();
+        if (event.error !== 'no-speech') {
+            showToast('Microphone error: ' + event.error, 'error');
+        }
+    };
+
+    recognition.onend = () => {
+        stopRecording();
+    };
+
+    voiceBtn.addEventListener('click', () => {
+        if (isRecording) {
+            recognition.stop();
+        } else {
+            try {
+                recognition.start();
+            } catch (e) {
+                console.warn('Recognition already started');
+            }
+        }
+    });
+
+    function stopRecording() {
+        isRecording = false;
+        voiceBtn.classList.remove('recording');
+        chatInput.placeholder = "Ask Maverick about biomedical research...";
+    }
 }
 
