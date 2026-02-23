@@ -3114,6 +3114,21 @@ function formatMaverickResponse(text) {
     return html;
 }
 
+let isWebSearchEnabled = false;
+
+function toggleWebSearch() {
+    isWebSearchEnabled = !isWebSearchEnabled;
+    const btn = document.getElementById('chat-web-toggle');
+    if (btn) {
+        if (isWebSearchEnabled) {
+            btn.classList.add('active');
+            showNotification('Maverick Internal Search expanded to WWW', 'info');
+        } else {
+            btn.classList.remove('active');
+        }
+    }
+}
+
 function handleChatSubmit() {
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
@@ -3135,7 +3150,8 @@ function handleChatSubmit() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             question: message,
-            context: getHistoryForAPI() // For long term memory
+            context: getHistoryForAPI(), // For long term memory
+            index: isWebSearchEnabled ? "all" : "pubmed" // Ensure web search is used if enabled
         })
     })
         .then(res => res.json())

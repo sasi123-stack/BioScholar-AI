@@ -3,6 +3,7 @@
 from typing import List, Dict, Optional
 from src.search_engine import HybridSearchEngine
 from src.utils.logger import get_logger
+from src.utils.web_search import WebSearchTool
 
 logger = get_logger(__name__)
 
@@ -13,6 +14,7 @@ class ContextRetriever:
     def __init__(
         self,
         search_engine: Optional[HybridSearchEngine] = None,
+        web_search_tool: Optional[WebSearchTool] = None,
         max_passages: int = 5,
         passage_length: int = 512
     ):
@@ -20,10 +22,12 @@ class ContextRetriever:
         
         Args:
             search_engine: Search engine for retrieving documents
+            web_search_tool: Tool for internet searching
             max_passages: Maximum number of passages to retrieve
             passage_length: Maximum length of each passage (characters)
         """
         self.search_engine = search_engine or HybridSearchEngine()
+        self.web_search_tool = web_search_tool or WebSearchTool()
         self.max_passages = max_passages
         self.passage_length = passage_length
         
@@ -105,11 +109,34 @@ class ContextRetriever:
         index_name: str = 'pubmed_articles',
         top_k: int = None
     ) -> List[Dict]:
-        """Retrieve relevant passages for a question.
+        """Retrieve relevant passages for a question (Synchronous)."""
+        import asyncio
+        try:
+            # Try to run in current loop if exists, else create new
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # This is tricky in FastAPI, but for now we'll try a wrapper
+                # or just use the async version
+                return asyncio.run_coroutine_threadsafe(
+                    self.retrieve_for_question_async(question, index_name, top_k),
+                    loop
+                ).result()
+            else:
+                return loop.run_until_complete(self.retrieve_for_question_async(question, index_name, top_k))
+        except Exception:
+            return asyncio.run(self.retrieve_for_question_async(question, index_name, top_k))
+
+    async def retrieve_for_question_async(
+        self,
+        question: str,
+        index_name: str = 'pubmed_articles',
+        top_k: int = None
+    ) -> List[Dict]:
+        """Retrieve relevant passages for a question (Asynchronous).
         
         Args:
             question: User question
-            index_name: Index to search
+            index_name: Index to search (pubmed_articles, clinical_trials, all, google)
             top_k: Number of passages to return
             
         Returns:
@@ -117,19 +144,48 @@ class ContextRetriever:
         """
         top_k = top_k or self.max_passages
         
-        logger.info(f"Retrieving context for: '{question}'")
+        logger.info(f"Retrieving context for: '{question}' in {index_name}")
+        documents = []
         
         # Search for relevant documents
         if index_name == 'pubmed_articles':
             documents = self.search_engine.search_pubmed(question, size=10)
         elif index_name == 'clinical_trials':
             documents = self.search_engine.search_clinical_trials(question, size=10)
+        elif index_name == 'google':
+            web_results = await self.web_search_tool.search(question, num_results=10)
+            for i, res in enumerate(web_results):
+                documents.append({
+                    'id': f"web-{i}",
+                    'score': 1.0 - (i * 0.05),
+                    'source': {
+                        'title': res['title'],
+                        'abstract': res['snippet'],
+                        'link': res['link'],
+                        'source': 'google'
+                    }
+                })
         else:  # 'all' or any other value
-            # Search both
+            # Search primary indices
             results = self.search_engine.search_all(question, size=5)
             documents = results['pubmed'] + results['clinical_trials']
+            
+            # Optionally add internet if no medical results found or if explicitly 'all'
+            if not documents or index_name == 'all':
+                web_results = await self.web_search_tool.search(question, num_results=5)
+                for i, res in enumerate(web_results):
+                    documents.append({
+                        'id': f"web-{i}",
+                        'score': 0.8 - (i * 0.05), # Lower score priority than peer-reviewed
+                        'source': {
+                            'title': res['title'],
+                            'abstract': res['snippet'],
+                            'link': res['link'],
+                            'source': 'google'
+                        }
+                    })
         
-        logger.info(f"Found {len(documents)} relevant documents")
+        logger.info(f"Found {len(documents)} relevant documents/links")
         
         # Extract passages
         passages = self.retrieve_from_documents(question, documents, top_k)

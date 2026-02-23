@@ -281,7 +281,7 @@ async def answer_question(
         
         # Answer the question
         logger.info(f"Answering question: '{request.question}'")
-        result = qa_engine.answer_question(
+        result = await qa_engine.answer_question(
             question=request.question,
             index_name=index_name,
             num_answers=request.max_answers,
@@ -357,7 +357,7 @@ async def batch_answer_questions(
         for question in request.questions:
             question_start = time.time()
             
-            result = qa_engine.answer_question(
+            result = await qa_engine.answer_question(
                 question=question,
                 index_name=index_name,
                 num_answers=request.max_answers_per_question
@@ -653,17 +653,21 @@ async def maverick_chat(
         if request.attachments:
             reasoning_steps.append(f"Analyzing {len(request.attachments)} attached files/modalities.")
             
-        # 4. Get answer (without history_context for now - HF Space has older generators)
-        result = qa_engine.answer_question(question=query, num_answers=1)
+        # 4. Get answer (Passing history_context for long-term memory sync)
+        result = await qa_engine.answer_question(
+            question=query, 
+            num_answers=1, 
+            index_name=request.index or "all", 
+            history_context=history_context
+        )
         
         if result["status"] == "success" and result["answers"]:
             answer = result["answers"][0]["answer"]
             reasoning_steps.append(f"High-confidence match found in {result['answers'][0].get('source_title', 'literature')}.")
-            # Add Maverick personality if not already there
-            if "🦞" not in answer:
-                answer = "🦞 " + answer
+            if "💠" not in answer:
+                answer = "💠 " + answer
         else:
-            answer = "I'm sorry, I couldn't find a precise answer in the literature. Rephrase your question? 🦞"
+            answer = "I'm sorry, I couldn't find a precise answer in the literature. Rephrase your question?"
             reasoning_steps.append("No high-confidence matches found in primary indices.")
             
         # 5. Save assistant message to sync DB

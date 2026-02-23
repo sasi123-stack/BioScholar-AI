@@ -2,13 +2,13 @@
 
 ## ✅ You're Already Set Up!
 
-Good news! Your OpenClaw is now configured to use **Groq's FREE tier** with **Llama 4 Maverick** - and you already have a Groq API key in your `.env` file!
+Good news! Your OpenClaw is now configured to use **Groq's FREE tier** with **Llama 3.3 Maverick** - and you already have a Groq API key in your `.env` file!
 
 ---
 
 ## 🚀 What You Get (100% FREE)
 
-- **Model**: Llama 4 Maverick (17B MoE)
+- **Model**: Llama 3.3 Maverick (70B)
 - **Speed**: ⚡ Blazing fast (up to 800 tokens/second!)
 - **Free Tier Limits**:
   - 30 requests per minute
@@ -29,7 +29,7 @@ Good news! Your OpenClaw is now configured to use **Groq's FREE tier** with **Ll
    OPENCLAW_API_BASE=https://api.groq.com/openai/v1
    ```
 
-2. **`src/qa_module/groq_generator.py`** - Using `meta-llama/llama-4-maverick-17b-128e-instruct`
+2. **`src/qa_module/groq_generator.py`** - Using `llama-3.3-70b-versatile`
 
 3. **`openclaw-hf/Dockerfile`** - Configured for Groq
 

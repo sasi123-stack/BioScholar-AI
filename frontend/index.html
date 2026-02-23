@@ -774,6 +774,17 @@
                                 </button>
                                 <input type="file" id="chat-file-input" class="hidden" multiple
                                     onchange="handleChatFileUpload(this)">
+                                <button class="chat-web-toggle" id="chat-web-toggle" onclick="toggleWebSearch()"
+                                    title="Search Web">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                                        <path
+                                            d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
+                                        </path>
+                                    </svg>
+                                </button>
                                 <textarea id="chat-input" placeholder="Ask Maverick about biomedical research..."
                                     rows="1"
                                     oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
@@ -809,19 +820,23 @@
                                     <h3>Fast-Emerging Topics</h3>
                                 </div>
                                 <ul class="trends-list">
-                                    <li class="trends-list-item" data-search-term="GLP-1 Agonists" onclick="searchTrend(this)">
+                                    <li class="trends-list-item" data-search-term="GLP-1 Agonists"
+                                        onclick="searchTrend(this)">
                                         <span class="trends-list-item-label">GLP-1 Agonists</span>
                                         <span class="trends-list-item-growth">+245%</span>
                                     </li>
-                                    <li class="trends-list-item" data-search-term="CRISPR-Cas9 Editing" onclick="searchTrend(this)">
+                                    <li class="trends-list-item" data-search-term="CRISPR-Cas9 Editing"
+                                        onclick="searchTrend(this)">
                                         <span class="trends-list-item-label">CRISPR-Cas9 Editing</span>
                                         <span class="trends-list-item-growth">+182%</span>
                                     </li>
-                                    <li class="trends-list-item" data-search-term="mRNA Immunotherapy" onclick="searchTrend(this)">
+                                    <li class="trends-list-item" data-search-term="mRNA Immunotherapy"
+                                        onclick="searchTrend(this)">
                                         <span class="trends-list-item-label">mRNA Immunotherapy</span>
                                         <span class="trends-list-item-growth">+134%</span>
                                     </li>
-                                    <li class="trends-list-item" data-search-term="AI in Radiology" onclick="searchTrend(this)">
+                                    <li class="trends-list-item" data-search-term="AI in Radiology"
+                                        onclick="searchTrend(this)">
                                         <span class="trends-list-item-label">AI in Radiology</span>
                                         <span class="trends-list-item-growth">+115%</span>
                                     </li>
@@ -835,12 +850,18 @@
                                     <h3>Highest Volume (All-Time)</h3>
                                 </div>
                                 <div class="trends-tags">
-                                    <span class="trends-tag" data-search-term="Type 2 Diabetes" onclick="searchTrend(this)">Type 2 Diabetes</span>
-                                    <span class="trends-tag" data-search-term="Breast Cancer" onclick="searchTrend(this)">Breast Cancer</span>
-                                    <span class="trends-tag" data-search-term="COVID-19" onclick="searchTrend(this)">COVID-19</span>
-                                    <span class="trends-tag" data-search-term="Hypertension" onclick="searchTrend(this)">Hypertension</span>
-                                    <span class="trends-tag" data-search-term="Alzheimer's" onclick="searchTrend(this)">Alzheimer's</span>
-                                    <span class="trends-tag" data-search-term="Depression" onclick="searchTrend(this)">Depression</span>
+                                    <span class="trends-tag" data-search-term="Type 2 Diabetes"
+                                        onclick="searchTrend(this)">Type 2 Diabetes</span>
+                                    <span class="trends-tag" data-search-term="Breast Cancer"
+                                        onclick="searchTrend(this)">Breast Cancer</span>
+                                    <span class="trends-tag" data-search-term="COVID-19"
+                                        onclick="searchTrend(this)">COVID-19</span>
+                                    <span class="trends-tag" data-search-term="Hypertension"
+                                        onclick="searchTrend(this)">Hypertension</span>
+                                    <span class="trends-tag" data-search-term="Alzheimer's"
+                                        onclick="searchTrend(this)">Alzheimer's</span>
+                                    <span class="trends-tag" data-search-term="Depression"
+                                        onclick="searchTrend(this)">Depression</span>
                                 </div>
                             </div>
                         </div>
@@ -876,7 +897,7 @@
                 </div>
             </div>
             <div class="footer-center">
-                <span>Powered by Groq Llama 4 & BioBERT | Built with ❤️ by <span class="attribution-name">Sasidhara
+                <span>Powered by Groq Llama 3.3 & BioBERT | Built with ❤️ by <span class="attribution-name">Sasidhara
                         Kashyap Ch</span></span>
             </div>
             <div class="footer-right">
