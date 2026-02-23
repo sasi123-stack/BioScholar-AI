@@ -43,3 +43,24 @@ postgres-data/
 .idea/
 *.db
 *.sqlite
+
+# Testing
+tests/screenshots/
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Build Artifacts
+.next/
+node_modules/
+dist/
+build/
+*.gz
+*.gz_
+*.pack
+
+# Temp Files
+tmpclaude-*
+.coverage
+htmlcov/

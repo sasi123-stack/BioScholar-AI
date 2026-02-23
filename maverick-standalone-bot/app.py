@@ -151,8 +151,12 @@ def landing():
             .lobster-icon {
                 font-size: 80px;
                 margin-bottom: 20px;
-                filter: drop-shadow(0 0 20px rgba(0, 136, 204, 0.4));
+                filter: drop-shadow(0 0 20px rgba(0, 86, 210, 0.4));
                 animation: float 3s ease-in-out infinite;
+                background: linear-gradient(135deg, var(--primary) 0%, #0d47a1 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                font-weight: 800;
             }
             @keyframes float {
                 0%, 100% { transform: translateY(0); }
@@ -216,10 +220,10 @@ def landing():
     </head>
     <body>
         <div class="background"></div>
-        <div class="badge">Experimental Research AI</div>
-        <div class="lobster-icon">🦞</div>
-        <h1>Maverick AI</h1>
-        <p>Advanced Biomedical Intelligence powered by Llama 4. Persistent research memory on your favorite messaging platform.</p>
+        <div class="badge">Unified Research AI</div>
+        <div class="lobster-icon">💠</div>
+        <h1>Maverick Suite</h1>
+        <p>Premium Biomedical Intelligence. Persistent research memory and deep discovery tools on your favorite messaging platform.</p>
         
         <a href="https://web.telegram.org/a/#8513211167" target="_blank" class="cta-button">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -252,7 +256,7 @@ def run_flask():
 
 # --- TELEGRAM HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🦞 *Maverick (Hugging Face Edition) Ready.*\nMemory Active.", parse_mode='Markdown')
+    await update.message.reply_text("💠 *Maverick Suite — Research Intelligence Ready.*\nKnowledge Memory: Active.", parse_mode='Markdown')
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
@@ -263,9 +267,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_message(user_id, "user", user_text)
         client = Groq(api_key=GROQ_API_KEY)
         history = get_history(user_id)
-        messages = [{"role": "system", "content": "You are Maverick 🦞."}] + history
+        messages = [{"role": "system", "content": "You are the Maverick Suite (💠), a premium analytical research engine."}] + history
         response = client.chat.completions.create(model=MODEL_NAME, messages=messages)
         answer = response.choices[0].message.content
+        if "💠" not in answer[:15]:
+            answer = "💠 " + answer
         save_message(user_id, "assistant", answer)
         await update.message.reply_text(answer)
     except Exception as e:

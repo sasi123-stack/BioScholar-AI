@@ -65,16 +65,31 @@ class QuestionAnsweringEngine:
         # Prefer OpenClaw if configured (User requested priority)
         if self.openclaw_generator and self.openclaw_generator.api_key != "sk-openclaw-placeholder":
              logger.info("Using OpenClaw for synthesis")
-             generated_answer = self.openclaw_generator.generate_answer(question, passages, history_context=history_context)
+             try:
+                 # Try with history_context for newer versions
+                 generated_answer = self.openclaw_generator.generate_answer(question, passages, history_context=history_context)
+             except TypeError:
+                 # Fallback for older versions without history_context support
+                 generated_answer = self.openclaw_generator.generate_answer(question, passages)
         
         # Fallback to Groq
         elif self.groq_generator.api_key and self.groq_generator.api_key != "gsk_your_actual_key_here":
             logger.info("Using Groq for lightning-fast conversational synthesis")
-            generated_answer = self.groq_generator.generate_answer(question, passages, history_context=history_context)
+            try:
+                # Try with history_context for newer versions
+                generated_answer = self.groq_generator.generate_answer(question, passages, history_context=history_context)
+            except TypeError:
+                # Fallback for older versions without history_context support
+                generated_answer = self.groq_generator.generate_answer(question, passages)
         # Fallback to Gemini
         elif self.answer_generator.api_key and self.answer_generator.api_key != "your_gemini_api_key_here":
             logger.info("Using Gemini for conversational synthesis")
-            generated_answer = self.answer_generator.generate_answer(question, passages, history_context=history_context)
+            try:
+                # Try with history_context for newer versions
+                generated_answer = self.answer_generator.generate_answer(question, passages, history_context=history_context)
+            except TypeError:
+                # Fallback for older versions without history_context support
+                generated_answer = self.answer_generator.generate_answer(question, passages)
         
         # Always run extraction for validation/secondary options
         extracted_answers = self.answer_extractor.extract_from_passages(
