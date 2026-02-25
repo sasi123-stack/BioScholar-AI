@@ -42,8 +42,8 @@ var isVercel = window.location.hostname.includes('vercel.app');
 // Main biomedical search API
 var HF_BACKEND_URL = 'https://sasidhara123-biomed-scholar-api.hf.space/api/v1';
 
-// Maverick AI Bot (separate deployment - only has / and /logs routes)
-var MAVERICK_API_URL = 'https://sasidhara123-maverick-ai-bot.hf.space';
+// Maverick AI Bot (same API space - endpoints served under /api/v1/)
+var MAVERICK_API_URL = 'https://sasidhara123-maverick-ai-bot.hf.space/api/v1';
 
 var API_BASE_URL = (isLocal && window.location.search.includes('local=true')) ?
     'http://localhost:8000/api/v1' : HF_BACKEND_URL;
@@ -5837,8 +5837,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
         }
 
-        // Maverick Bot Space — just ping the landing page (no /api/v1/health)
-        fetch(MAVERICK_API_URL + '/', { method: 'HEAD' })
+        // Maverick Bot Space — ping the health endpoint
+        fetch(MAVERICK_API_URL + '/health', { method: 'GET' })
             .then(r => {
                 if (r.ok) updateSyncStatus('synced');
                 else updateSyncStatus('offline');
