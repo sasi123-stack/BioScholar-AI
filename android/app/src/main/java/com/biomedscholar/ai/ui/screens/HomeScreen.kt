@@ -41,6 +41,7 @@ fun HomeScreen(
 ) {
     val articles by viewModel.articles.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
     val bookmarks by viewModel.bookmarks.collectAsState()
 
     var query by remember { mutableStateOf("") }
@@ -161,8 +162,33 @@ fun HomeScreen(
                 }
             }
 
+            // Error state
+            if (!isLoading && error != null) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = error ?: "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+
             // Empty state with suggested queries
-            if (!isLoading && articles.isEmpty()) {
+            if (!isLoading && error == null && articles.isEmpty()) {
                 item {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(32.dp),

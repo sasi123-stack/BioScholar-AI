@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -21,7 +22,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Research : Screen("research", "Research", Icons.Default.Science)
     object Chat     : Screen("chat",     "AI Chat",  Icons.Default.Chat)
     object Trends   : Screen("trends",   "Trends",   Icons.Default.TrendingUp)
-    object Login    : Screen("login",    "Login",    Icons.Default.Lock)
+    object Login    : Screen("login",    "Login",    Icons.Default.Person)
 }
 
 val bottomNavItems = listOf(Screen.Research, Screen.Chat, Screen.Trends)

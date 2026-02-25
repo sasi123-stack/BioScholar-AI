@@ -22,16 +22,16 @@ class HomeViewModel : ViewModel() {
     private val _bookmarks = MutableStateFlow<Set<String>>(emptySet())
     val bookmarks: StateFlow<Set<String>> = _bookmarks
 
-    fun search(query: String, sourceFilter: String = "both") {
+    fun search(query: String, sourceFilter: String = "All Sources") {
         if (query.isBlank()) return
         _isLoading.value = true
         _error.value = null
+        _articles.value = emptyList()
 
         viewModelScope.launch {
             try {
-                // Map frontend filter labels to backend index names
                 val indexName = when (sourceFilter) {
-                    "PubMed" -> "pubmed"
+                    "PubMed" -> "pubmed_articles"
                     "Clinical Trials" -> "clinical_trials"
                     else -> "both"
                 }
@@ -41,29 +41,46 @@ class HomeViewModel : ViewModel() {
                     index = indexName,
                     max_results = 25
                 )
-                
+
                 val response = RetrofitClient.maverickApi.search(request)
-                
-                // Convert backend results to Article objects and refine fields
+
                 _articles.value = response.results.map { doc ->
-                    val year = (doc.metadata["publication_date"] as? String)?.take(4) 
-                               ?: (doc.metadata["publication_year"] as? String)?.take(4) 
-                               ?: doc.year.take(4)
-                    
+                    // authors can come back as a JSON array or a plain string
+                    val authorsStr = when (val a = doc.authors) {
+                        is List<*> -> a.joinToString(", ")
+                        is String -> a
+                        else -> doc.metadata["authors"]?.toString() ?: "Unknown Authors"
+                    }
+
+                    // year: prefer top-level field, fall back to metadata
+                    val year = doc.year?.take(4)
+                        ?: (doc.metadata["publication_date"] as? String)?.take(4)
+                        ?: (doc.metadata["publication_year"] as? String)?.take(4)
+                        ?: ""
+
+                    val journal = doc.journal
+                        ?: doc.metadata["journal"] as? String
+                        ?: doc.metadata["source_name"] as? String
+                        ?: "Biomedical Literature"
+
                     Article(
                         id = doc.id,
                         title = doc.title,
-                        authors = (doc.metadata["authors"] as? List<*>)?.joinToString(", ") ?: doc.authors,
-                        journal = doc.metadata["journal"] as? String ?: doc.journal,
+                        authors = authorsStr,
+                        journal = journal,
                         year = year,
                         abstract = doc.abstract,
                         source = doc.source,
-                        score = doc.score,
+                        score = doc.score.toFloat(),
                         metadata = doc.metadata
                     )
                 }
+
+                if (_articles.value.isEmpty()) {
+                    _error.value = "No results found for \"$query\". Try different keywords."
+                }
             } catch (e: Exception) {
-                _error.value = "Search failed: ${e.message}"
+                _error.value = "Search failed: ${e.message ?: "Unknown error"}"
                 _articles.value = emptyList()
             } finally {
                 _isLoading.value = false
@@ -78,5 +95,8 @@ class HomeViewModel : ViewModel() {
 
     fun isBookmarked(articleId: String) = _bookmarks.value.contains(articleId)
 
-    fun clearResults() { _articles.value = emptyList() }
+    fun clearResults() {
+        _articles.value = emptyList()
+        _error.value = null
+    }
 }
