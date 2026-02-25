@@ -348,10 +348,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- MAIN ---
 if __name__ == '__main__':
     import threading
-    from flask import Flask, jsonify
+    from flask import Flask, jsonify, request as flask_request
 
-    # --- Flask health server (required by Hugging Face Spaces on port 7860) ---
+    # --- Flask server (health + REST API for frontend) ---
     flask_app = Flask(__name__)
+
+    @flask_app.after_request
+    def add_cors(response):
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        return response
 
     @flask_app.route('/')
     def home():
@@ -361,12 +368,61 @@ if __name__ == '__main__':
     def health():
         return jsonify({"status": "synced", "engine": "Llama 4 Maverick", "bot": "online"})
 
+    @flask_app.route('/api/v1/maverick/chat', methods=['POST', 'OPTIONS'])
+    def maverick_chat():
+        if flask_request.method == 'OPTIONS':
+            return jsonify({}), 200
+        try:
+            data = flask_request.get_json(force=True)
+            question = data.get('question', '')
+            context = data.get('context', [])
+            if not question:
+                return jsonify({"status": "error", "answer": "No question provided."}), 400
+
+            system_content = (
+                "You are Maverick, the official BioMedScholar AI Research Engine. "
+                "You are a high-performance, elite analytical assistant specialized in human medicine, oncology, and pharmacology. "
+                "Respond as a world-class scientist. "
+                "FORMATTING: Use HTML tags — <b>bold</b> for primary medical terms, <i>italic</i> for Latin terms, <u>underline</u> for critical clinical takeaways. "
+                "Provide a sharp, evidence-based, clinical-grade medical synthesis."
+            )
+
+            messages = [{"role": "system", "content": system_content}]
+            for turn in context:
+                if turn.get('role') in ('user', 'assistant'):
+                    messages.append({"role": turn['role'], "content": turn.get('content', '')})
+            messages.append({"role": "user", "content": question})
+
+            client = Groq(api_key=GROQ_API_KEY)
+            response = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2048
+            )
+            answer = response.choices[0].message.content
+            if "💠" not in answer[:15]:
+                answer = "💠 " + answer
+
+            return jsonify({
+                "status": "success",
+                "answer": answer,
+                "reasoning": "Maverick AI synthesis via Llama 4 Maverick on Groq",
+                "sources": []
+            })
+        except Exception as e:
+            return jsonify({"status": "error", "answer": f"Maverick disturbance: {str(e)[:100]}"}), 500
+
+    @flask_app.route('/api/v1/maverick/history', methods=['GET'])
+    def maverick_history():
+        return jsonify({"status": "success", "history": []})
+
     def run_flask():
         flask_app.run(host='0.0.0.0', port=7860, use_reloader=False)
 
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    print(">>> [HF] Flask health server started on port 7860", flush=True)
+    print(">>> [HF] Flask API server started on port 7860", flush=True)
 
     # --- Telegram Bot ---
     print(">>> [4/5] CHECKING SECRETS...", flush=True)
