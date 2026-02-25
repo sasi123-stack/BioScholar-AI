@@ -30,8 +30,8 @@ class GroqGenerator:
                 self.client = None
             
             
-        # Use a stable high-performance model
-        self.model_name = 'llama-3.3-70b-versatile'
+        # Llama 4 Maverick — highest performance on Groq
+        self.model_name = 'meta-llama/llama-4-maverick-17b-128e-instruct'
 
     def generate_answer(self, question: str, passages: List[Dict], history_context: Optional[str] = None) -> Dict:
         """Generate an answer based on the question and retrieved passages.
