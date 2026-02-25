@@ -179,11 +179,15 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not query:
         await update.message.reply_text("💠 Please provide a search query. Usage: `/search <topic>`", parse_mode='Markdown')
         return
-    
-    await update.message.reply_text(f"💠 *Maverick Search Initiative*: Commencing deep-web academic search for `{query}`...")
-    # This will flow into handle_message with explicit broad intent
-    update.message.text = f"Research the following topic on the internet: {query}"
-    await handle_message(update, context)
+
+    user_id = update.effective_user.id
+    await update.message.reply_text(
+        f"💠 *Maverick Search Initiative*: Commencing deep-web academic search for `{query}`...",
+        parse_mode='Markdown'
+    )
+    prompt = f"Research the following topic on the internet: {query}"
+    save_message(user_id, "user", f"/search {query}")
+    await ai_call(update, context, user_id, prompt)
 
 async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Explicit website testing command."""
@@ -191,31 +195,34 @@ async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not url:
         await update.message.reply_text("💠 Please provide a URL. Usage: `/test <url>`", parse_mode='Markdown')
         return
-    
-    await update.message.reply_text(f"💠 *Maverick Audit Initiative*: Launching technical analysis for `{url}`...")
-    # This will flow into handle_message with explicit URL
-    update.message.text = f"Analyze this website: {url}"
-    await handle_message(update, context)
+
+    user_id = update.effective_user.id
+    await update.message.reply_text(
+        f"💠 *Maverick Audit Initiative*: Launching technical analysis for `{url}`...",
+        parse_mode='Markdown'
+    )
+    prompt = f"Analyze this website and provide an evidence-based audit: {url}"
+    save_message(user_id, "user", f"/test {url}")
+    await ai_call(update, context, user_id, prompt)
 
 async def handle_attachment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle photos and documents for multi-modality."""
     user_id = update.effective_user.id
     file_name = "attachment"
-    
+
     if update.message.photo:
         file_name = "photo.jpg"
     elif update.message.document:
         file_name = update.message.document.file_name
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-    
+
     ack_text = f"💠 *Maverick Suite Audit*: Received multimodal input `{file_name}`. Processing scholarly metadata..."
     await update.message.reply_text(ack_text, parse_mode='Markdown')
-    
+
     save_message(user_id, "user", f"[Attached File: {file_name}]")
-    # Simulate processing by injecting context into handle_message
-    update.message.text = f"Analyze the data in the attached file: {file_name}"
-    await handle_message(update, context)
+    prompt = f"Analyze the data in the attached file: {file_name}"
+    await ai_call(update, context, user_id, prompt)
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle feedback and interaction buttons."""
@@ -230,10 +237,98 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"💠 Feedback logged. Maverick Suite is refining its logic based on this interaction ({fb_type})."
         )
 
+async def ai_call(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, user_text: str):
+    """Core AI processing pipeline — shared by all commands and free chat."""
+    try:
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+
+        # Detect intent for thinking display
+        urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', user_text)
+        is_search_query = len(user_text.split()) > 4 or any(w in user_text.lower() for w in ["research", "search", "clinical", "latest"])
+
+        reasoning_bullets = ["• Synthesizing biomedical intent..."]
+        if urls:
+            reasoning_bullets.append(f"• **ACTIVE SKILL**: Analyzing live content from {len(urls)} URLs...")
+        if is_search_query:
+            reasoning_bullets.append("• **ACTIVE SKILL**: Querying real-time clinical data from the web...")
+        reasoning_bullets.append("• Cross-referencing PubMed and Clinical Trial registries...")
+        reasoning_bullets.append("• Optimizing for evidence-based accuracy...")
+
+        reasoning = "💠 *Maverick Suite Thinking Process*\n" + "\n".join(reasoning_bullets)
+        thinking_msg = await update.message.reply_text(reasoning, parse_mode='Markdown')
+
+        global qa_engine
+        if not qa_engine:
+            qa_engine = QuestionAnsweringEngine()
+
+        history = get_history(user_id)
+        history_context = "\n".join([f"{h['role'].capitalize()}: {h['content']}" for h in history])
+
+        result = await qa_engine.answer_question(
+            question=user_text,
+            num_passages=5,
+            num_answers=1,
+            index_name="all",
+            history_context=history_context
+        )
+
+        if result.get("status") == "success" and result.get("answers"):
+            answer = result["answers"][0]["answer"]
+        else:
+            client = Groq(api_key=GROQ_API_KEY)
+            passages = result.get("passages", [])
+            context_str = ""
+            if passages:
+                context_str = "\n\n**RETRIEVED RESEARCH CONTEXT:**\n" + "\n".join(
+                    [f"- {p.get('title', 'Source')}: {p.get('text', '')[:300]}..." for p in passages]
+                )
+
+            system_content = (
+                "You are Maverick, the official BioMedScholar AI Research Engine. "
+                "You are a high-performance, elite analytical assistant specialized in human medicine, oncology, and pharmacology. "
+                "The user's name is Sasidhara. Respond as a world-class scientist. "
+                "NEVER use asterisks for roleplay actions. Your tone must be purely professional, scientific, and technical. "
+                "FORMATTING: Use HTML tags — <b>bold</b> for primary medical terms, <i>italic</i> for Latin terms, <u>underline</u> for critical takeaways. "
+                f"Your engine has integrated skills (Active). {context_str}\n\n"
+                "Provide a sharp, evidence-based, clinical-grade medical synthesis."
+            )
+
+            messages = [{"role": "system", "content": system_content}]
+            for entry in history:
+                messages.append({"role": entry["role"], "content": entry["content"]})
+            messages.append({"role": "user", "content": user_text})
+
+            response = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2048
+            )
+            answer = response.choices[0].message.content
+
+        if "💠" not in answer[:15]:
+            answer = "💠 " + answer
+
+        save_message(user_id, "assistant", answer)
+        await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=thinking_msg.message_id)
+
+        keyboard = [
+            [InlineKeyboardButton("👍 Helpful", callback_data="feedback_up"),
+             InlineKeyboardButton("👎 Not Helpful", callback_data="feedback_down")]
+        ]
+        await update.message.reply_text(answer, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+
+    except Exception as e:
+        print(f">>> [ERROR] ai_call failed: {e}", flush=True)
+        await update.message.reply_text(f"💠 Maverick Suite encountered a node disturbance: {str(e)[:100]}")
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     user_id = update.effective_user.id
-    if not user_text: return
+    if not user_text:
+        return
+    save_message(user_id, "user", user_text)
     
     try:
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
