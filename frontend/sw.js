@@ -5,7 +5,9 @@ const ASSETS_TO_CACHE = [
     '/styles.css',
     '/chat_styles.css',
     '/app.js',
-    '/manifest.json'
+    '/manifest.json',
+    '/icons/icon-192x192.png',
+    '/icons/icon-512x512.png'
 ];
 
 // On install, cache the essential assets

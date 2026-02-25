@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description"
         content="BioMedScholar AI - Search biomedical literature, PubMed articles, and clinical trials with AI-powered semantic search">
     <title>BioMedScholar AI | Evidence-Based Research Engine</title>
@@ -18,10 +18,9 @@
     <meta name="theme-color" content="#0056D2">
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
 
-    <!-- Firebase SDKs -->
+    <!-- Firebase SDKs (Auth only - Firestore not required) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <script>
         if ('serviceWorker' in navigator) {
@@ -1229,7 +1228,8 @@
                             <h4>🧠 Transparent Thinking</h4>
                             <p>Maverick now shows its internal analytical steps line-by-line, including query
                                 interpretation, metadata checking, and evidence contextualization. You can expand the
-                                <strong>"Thinking Process"</strong> toggle on any response to see the full logic.</p>
+                                <strong>"Thinking Process"</strong> toggle on any response to see the full logic.
+                            </p>
                         </div>
 
                         <div class="help-card">

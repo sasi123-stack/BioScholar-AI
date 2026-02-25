@@ -6,6 +6,8 @@ if (typeof isLocal === 'undefined') {
     var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 }
 
+var isNative = window.location.origin.includes('capacitor://') || window.location.origin.includes('http://localhost') || window.location.hostname === '';
+
 /**
  * Robustly ensures authors data is an array of strings.
  * Handles strings, JSON-stringified arrays, CSV, and weird objects.
@@ -46,6 +48,10 @@ var MAVERICK_API_URL = 'https://sasidhara123-maverick-ai-bot.hf.space/api/v1';
 var API_BASE_URL = (isLocal && window.location.search.includes('local=true')) ?
     'http://localhost:8000/api/v1' : HF_BACKEND_URL;
 
+if (isNative) {
+    API_BASE_URL = HF_BACKEND_URL;
+}
+
 // Serper.dev API Key (Google Search)
 var SERPER_API_KEY = localStorage.getItem('serper_api_key') || "YOUR_SERPER_API_KEY_HERE";
 
@@ -64,13 +70,12 @@ var firebaseConfig = {
     measurementId: "G-CGJ5B74CEQ"
 };
 
-// Initialize Firebase
-var auth, db;
+// Initialize Firebase (Auth only)
+var auth;
 if (typeof firebase !== 'undefined') {
     try {
         firebase.initializeApp(firebaseConfig);
         auth = firebase.auth();
-        db = firebase.firestore();
     } catch (e) {
         console.error("Firebase initialization failed:", e);
     }
@@ -4375,7 +4380,7 @@ if (typeof firebase !== 'undefined' && auth) {
                 photoURL: user.photoURL
             };
             localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            loadChatHistoryFromFirestore();
+            loadChatHistoryFromLocalStorage();
         } else {
             currentUser = null;
             localStorage.removeItem('currentUser');
@@ -4387,43 +4392,40 @@ if (typeof firebase !== 'undefined' && auth) {
 }
 
 /**
- * Cloud Firebase Storage for Chat History
+ * localStorage-based Chat History (replaces Firestore — free, no backend needed)
  */
 function saveChatToFirestore(role, text) {
-    if (!currentUser || !db) return;
-
-    db.collection("users").doc(currentUser.uid).collection("chat_history").add({
-        role: role,
-        text: text,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    }).catch(err => console.error("Error saving chat to Firestore:", err));
+    if (!currentUser) return;
+    const key = 'chatHistory_' + currentUser.uid;
+    const history = JSON.parse(localStorage.getItem(key) || '[]');
+    history.push({ role, text, timestamp: Date.now() });
+    // Keep only the last 100 messages to avoid localStorage bloat
+    if (history.length > 100) history.splice(0, history.length - 100);
+    localStorage.setItem(key, JSON.stringify(history));
 }
 
+function loadChatHistoryFromLocalStorage() {
+    if (!currentUser) return;
+    const key = 'chatHistory_' + currentUser.uid;
+    const saved = JSON.parse(localStorage.getItem(key) || '[]');
+    if (saved.length === 0) return;
+
+    const historyEl = document.getElementById('chat-history');
+    if (!historyEl) return;
+
+    // Hide welcome message if there's existing history
+    const welcome = historyEl.querySelector('.chat-welcome-message');
+    if (welcome) welcome.style.display = 'none';
+
+    saved.forEach(msg => {
+        addChatMessage(msg.role, msg.text, [], null, false, true);
+    });
+    historyEl.scrollTop = historyEl.scrollHeight;
+}
+
+// Keep backward-compat alias
 function loadChatHistoryFromFirestore() {
-    if (!currentUser || !db) return;
-
-    db.collection("users").doc(currentUser.uid).collection("chat_history")
-        .orderBy("timestamp", "asc")
-        .limit(50)
-        .get()
-        .then(querySnapshot => {
-            const history = document.getElementById('chat-history');
-            if (!history) return;
-
-            // If there's history, clear the welcome message once
-            if (!querySnapshot.empty) {
-                const welcome = history.querySelector('.chat-welcome-message');
-                if (welcome) welcome.style.display = 'none';
-            }
-
-            querySnapshot.forEach(doc => {
-                const data = doc.data();
-                // Pass false for shouldScroll to avoid jumping, then scroll once at the end
-                addChatMessage(data.role, data.text, [], null, false, true);
-            });
-            history.scrollTop = history.scrollHeight;
-        })
-        .catch(err => console.error("Error loading chat history:", err));
+    loadChatHistoryFromLocalStorage();
 }
 
 
@@ -5783,122 +5785,6 @@ function unlockAchievement(id, title, message) {
     });
 }
 
-/**
- * Group notifications by date
- */
-function groupNotificationsByDate(notifications) {
-    const groups = {};
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    notifications.forEach(notif => {
-        const notifDate = new Date(notif.timestamp);
-        notifDate.setHours(0, 0, 0, 0);
-
-        let groupKey;
-        if (notifDate.getTime() === today.getTime()) {
-            groupKey = 'Today';
-        } else if (notifDate.getTime() === yesterday.getTime()) {
-            groupKey = 'Yesterday';
-        } else {
-            groupKey = notifDate.toLocaleDateString();
-        }
-
-        if (!groups[groupKey]) {
-            groups[groupKey] = [];
-        }
-        groups[groupKey].push(notif);
-    });
-
-    return groups;
-}
-
-/**
- * Handle notification click
- */
-function handleNotificationClick(notificationId) {
-    const notification = notifications.find(n => n.id === notificationId);
-    if (!notification) return;
-
-    // Mark as read
-    notification.read = true;
-    saveNotifications();
-    updateNotificationBadge();
-    updateNotificationList();
-}
-
-/**
- * Handle notification action button click
- */
-function handleNotificationAction(notificationId, actionLabel) {
-    const notification = notifications.find(n => n.id === notificationId);
-    if (!notification) return;
-
-    const action = notification.actions.find(a => a.label === actionLabel);
-    if (action && action.callback) {
-        action.callback(notification);
-    }
-
-    // Mark as read and dismiss
-    notification.read = true;
-    dismissNotification(notificationId);
-}
-
-/**
- * Dismiss a notification
- */
-function dismissNotification(notificationId) {
-    notifications = notifications.filter(n => n.id !== notificationId);
-    saveNotifications();
-    updateNotificationBadge();
-    updateNotificationList();
-}
-
-/**
- * Mark all notifications as read
- */
-function markAllNotificationsRead() {
-    notifications.forEach(n => n.read = true);
-    saveNotifications();
-    updateNotificationBadge();
-    updateNotificationList();
-    showToast('All notifications marked as read', 'success');
-}
-
-/**
- * Save notifications to localStorage
- */
-function saveNotifications() {
-    localStorage.setItem('notifications', JSON.stringify(notifications));
-}
-
-/**
- * Save notification preferences
- */
-function saveNotificationPreferences() {
-    localStorage.setItem('notificationPreferences', JSON.stringify(notificationPreferences));
-}
-
-/**
- * Format notification timestamp
- */
-function formatNotificationTime(timestamp) {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-
-    return date.toLocaleDateString();
-}
 
 // Initialize everything on page load
 document.addEventListener('DOMContentLoaded', function () {

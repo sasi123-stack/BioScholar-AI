@@ -1,0 +1,9 @@
+{
+    "appId": "com.biomedscholar.ai",
+    "appName": "BioMedScholar AI",
+    "webDir": "frontend",
+    "server": {
+        "androidScheme": "https",
+        "cleartext": true
+    }
+}
