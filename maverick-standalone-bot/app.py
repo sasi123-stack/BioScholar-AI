@@ -254,28 +254,152 @@ def run_flask():
     print(">>> [3/5] STARTING HEALTH CHECK PORT 7860...", flush=True)
     app.run(host='0.0.0.0', port=7860)
 
-# --- TELEGRAM HANDLERS ---
+# --- SYSTEM PROMPT ---
+SYSTEM_PROMPT = """You are Maverick (💠), an elite biomedical research AI assistant built into BioMedScholar AI.
+You specialize in:
+- PubMed literature analysis and synthesis
+- Clinical trial interpretation and eligibility criteria
+- Drug mechanisms, pharmacology, and interactions
+- Medical terminology explanations
+- Evidence-based medicine and study design critique
+- Biostatistics and research methodology
+
+Always be precise, cite evidence levels where possible, and use medical terminology appropriately.
+If asked about something outside biomedical research, politely redirect to your specialty.
+Format responses clearly with bullet points or numbered lists when appropriate."""
+
+# --- TELEGRAM COMMAND HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("💠 *Maverick Suite — Research Intelligence Ready.*\nKnowledge Memory: Active.", parse_mode='Markdown')
+    user_name = update.effective_user.first_name or "Researcher"
+    welcome = (
+        f"💠 *Welcome to Maverick, {user_name}\\!*\n\n"
+        "I'm your AI-powered biomedical research assistant\\. I can help you with:\n"
+        "🔬 PubMed literature analysis\n"
+        "🧪 Clinical trial interpretation\n"
+        "💊 Drug mechanisms & pharmacology\n"
+        "📊 Research methodology & stats\n\n"
+        "*Available Commands:*\n"
+        "/help \\- Show all commands\n"
+        "/search \\<query\\> \\- Search biomedical literature\n"
+        "/clear \\- Clear conversation memory\n"
+        "/history \\- View recent conversation\n"
+        "/about \\- About Maverick AI\n\n"
+        "Or just type your research question to get started\\!"
+    )
+    await update.message.reply_text(welcome, parse_mode='MarkdownV2')
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = (
+        "💠 *Maverick Command Reference*\n\n"
+        "*/start* \\- Welcome message & quick start\n"
+        "*/help* \\- Show this help menu\n"
+        "*/search* \\<query\\> \\- Quick biomedical search\n"
+        "*/clear* \\- Clear your conversation history\n"
+        "*/history* \\- Show your last 5 messages\n"
+        "*/about* \\- About Maverick AI\n\n"
+        "💡 *Tips:*\n"
+        "• Just type any question for AI analysis\n"
+        "• Ask about drugs, trials, studies, diseases\n"
+        "• Request literature summaries or comparisons\n"
+        "• Ask for ELI5 explanations of complex topics\n\n"
+        "🌐 Web App: https://biomed\\-scholar\\.web\\.app"
+    )
+    await update.message.reply_text(help_text, parse_mode='MarkdownV2')
+
+async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    clear_history(user_id)
+    await update.message.reply_text(
+        "🧹 *Conversation cleared\\!*\nMemory wiped\\. Starting fresh\\.",
+        parse_mode='MarkdownV2'
+    )
+
+async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    query = ' '.join(context.args)
+    if not query:
+        await update.message.reply_text(
+            "❌ Please provide a search query\\.\n*Usage:* /search diabetes treatment 2024",
+            parse_mode='MarkdownV2'
+        )
+        return
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+        search_prompt = f"""The user wants to search biomedical literature for: "{query}"
+
+Please provide:
+1. A brief overview of this research topic (2-3 sentences)
+2. Key findings from recent literature (bullet points)
+3. Important clinical considerations
+4. Suggested search terms to refine further
+
+Be concise and evidence-based."""
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": search_prompt}
+            ]
+        )
+        answer = response.choices[0].message.content
+        save_message(user_id, "user", f"/search {query}")
+        save_message(user_id, "assistant", answer)
+        await update.message.reply_text(f"🔍 *Search: {query}*\n\n{answer}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Search failed: {e}")
+
+async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    hist = get_history(user_id, limit=10)
+    if not hist:
+        await update.message.reply_text("📭 No conversation history yet\\. Start chatting\\!", parse_mode='MarkdownV2')
+        return
+    lines = ["📋 *Recent Conversation:*\n"]
+    for msg in hist[-5:]:
+        role_icon = "👤" if msg['role'] == 'user' else "💠"
+        content = msg['content'][:120] + "..." if len(msg['content']) > 120 else msg['content']
+        lines.append(f"{role_icon} *{msg['role'].capitalize()}:* {content}")
+    await update.message.reply_text('\n\n'.join(lines), parse_mode='Markdown')
+
+async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    about_text = (
+        "💠 *About Maverick AI*\n\n"
+        "Maverick is the AI research engine powering *BioMedScholar AI* \\— "
+        "a platform for evidence\\-based biomedical research\\.\n\n"
+        "🧠 *Powered by:* Llama 4 Maverick \\(Groq\\)\n"
+        "📚 *Specialties:* PubMed, Clinical Trials, Drug Research\n"
+        "🔒 *Memory:* Per\\-user conversation history\n"
+        "🌐 *Web App:* https://biomed\\-scholar\\.web\\.app\n\n"
+        "Built with ❤️ for the biomedical research community\\."
+    )
+    await update.message.reply_text(about_text, parse_mode='MarkdownV2')
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     user_id = update.effective_user.id
-    if not user_text: return
+    if not user_text:
+        return
     try:
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
         save_message(user_id, "user", user_text)
         client = Groq(api_key=GROQ_API_KEY)
-        history = get_history(user_id)
-        messages = [{"role": "system", "content": "You are the Maverick Suite (💠), a premium analytical research engine."}] + history
-        response = client.chat.completions.create(model=MODEL_NAME, messages=messages)
+        history = get_history(user_id, limit=10)
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+        response = client.chat.completions.create(model=MODEL_NAME, messages=messages, max_tokens=1024)
         answer = response.choices[0].message.content
         if "💠" not in answer[:15]:
             answer = "💠 " + answer
         save_message(user_id, "assistant", answer)
-        await update.message.reply_text(answer)
+        # Split long messages (Telegram 4096 char limit)
+        if len(answer) > 4000:
+            for i in range(0, len(answer), 4000):
+                await update.message.reply_text(answer[i:i+4000])
+        else:
+            await update.message.reply_text(answer)
     except Exception as e:
-        await update.message.reply_text(f"Error: {e}")
+        logger.error(f"Message handler error: {e}")
+        await update.message.reply_text(f"⚠️ Error processing your request. Please try again.\n`{str(e)[:100]}`", parse_mode='Markdown')
 
 # --- MAIN ---
 if __name__ == '__main__':
@@ -283,17 +407,29 @@ if __name__ == '__main__':
     if not TELEGRAM_TOKEN or not GROQ_API_KEY:
         print(">>> [CRITICAL] MISSING API KEYS! Check Settings > Secrets.", flush=True)
         sys.exit(1)
-    
+
     init_db()
     threading.Thread(target=run_flask, daemon=True).start()
-    
+
     print(">>> [5/5] CONNECTING TO TELEGRAM...", flush=True)
     try:
         request = HTTPXRequest(connect_timeout=30, read_timeout=30, write_timeout=30)
         application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
-        application.add_handler(CommandHandler('start', start))
+
+        # Register all command handlers
+        application.add_handler(CommandHandler('start',   start))
+        application.add_handler(CommandHandler('help',    help_command))
+        application.add_handler(CommandHandler('clear',   clear_command))
+        application.add_handler(CommandHandler('search',  search_command))
+        application.add_handler(CommandHandler('history', history_command))
+        application.add_handler(CommandHandler('about',   about_command))
+
+        # Handle regular text messages
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+
         print(">>> 🚀 MAVERICK IS FULLY OPERATIONAL!", flush=True)
+        logger.info("Bot started with commands: /start /help /clear /search /history /about")
         application.run_polling(drop_pending_updates=True)
     except Exception as e:
         print(f">>> [FATAL] BOT CRASHED: {e}", flush=True)
+        logger.critical(f"Bot crashed: {e}")
