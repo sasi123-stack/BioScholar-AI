@@ -1,0 +1,11 @@
+{
+    "owner": {
+        "username": "sasi123-stack",
+        "email": "sasidhara@example.com"
+    },
+    "description": "BioMedScholar AI - Evidence-Based Biomedical Research Platform powered by Llama 4 Maverick",
+    "repo": "https://github.com/sasi123-stack/BioScholar-AI",
+    "record": {
+        "CNAME": "biomed-scholar.web.app"
+    }
+}
