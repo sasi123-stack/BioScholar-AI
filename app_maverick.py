@@ -238,11 +238,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def ai_call(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, user_text: str):
-    """Core AI processing pipeline — shared by all commands and free chat."""
+    """Core AI processing pipeline — direct Groq call, shared by all commands and free chat."""
     try:
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
-        # Detect intent for thinking display
+        # Intent detection for thinking display
         urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', user_text)
         is_search_query = len(user_text.split()) > 4 or any(w in user_text.lower() for w in ["research", "search", "clinical", "latest"])
 
@@ -257,54 +257,34 @@ async def ai_call(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: i
         reasoning = "💠 *Maverick Suite Thinking Process*\n" + "\n".join(reasoning_bullets)
         thinking_msg = await update.message.reply_text(reasoning, parse_mode='Markdown')
 
-        global qa_engine
-        if not qa_engine:
-            qa_engine = QuestionAnsweringEngine()
-
+        # Build message history
         history = get_history(user_id)
-        history_context = "\n".join([f"{h['role'].capitalize()}: {h['content']}" for h in history])
 
-        result = await qa_engine.answer_question(
-            question=user_text,
-            num_passages=5,
-            num_answers=1,
-            index_name="all",
-            history_context=history_context
+        system_content = (
+            "You are Maverick, the official BioMedScholar AI Research Engine. "
+            "You are a high-performance, elite analytical assistant specialized in human medicine, oncology, and pharmacology. "
+            "The user's name is Sasidhara. Respond as a world-class scientist. "
+            "NEVER use asterisks for roleplay actions. Your tone must be purely professional, scientific, and technical. "
+            "FORMATTING: Use HTML tags — <b>bold</b> for primary medical terms, <i>italic</i> for Latin terms, <u>underline</u> for critical clinical takeaways. "
+            "Provide a sharp, evidence-based, clinical-grade medical synthesis."
         )
 
-        if result.get("status") == "success" and result.get("answers"):
-            answer = result["answers"][0]["answer"]
-        else:
-            client = Groq(api_key=GROQ_API_KEY)
-            passages = result.get("passages", [])
-            context_str = ""
-            if passages:
-                context_str = "\n\n**RETRIEVED RESEARCH CONTEXT:**\n" + "\n".join(
-                    [f"- {p.get('title', 'Source')}: {p.get('text', '')[:300]}..." for p in passages]
-                )
+        messages = [{"role": "system", "content": system_content}]
+        for entry in history:
+            messages.append({"role": entry["role"], "content": entry["content"]})
 
-            system_content = (
-                "You are Maverick, the official BioMedScholar AI Research Engine. "
-                "You are a high-performance, elite analytical assistant specialized in human medicine, oncology, and pharmacology. "
-                "The user's name is Sasidhara. Respond as a world-class scientist. "
-                "NEVER use asterisks for roleplay actions. Your tone must be purely professional, scientific, and technical. "
-                "FORMATTING: Use HTML tags — <b>bold</b> for primary medical terms, <i>italic</i> for Latin terms, <u>underline</u> for critical takeaways. "
-                f"Your engine has integrated skills (Active). {context_str}\n\n"
-                "Provide a sharp, evidence-based, clinical-grade medical synthesis."
-            )
-
-            messages = [{"role": "system", "content": system_content}]
-            for entry in history:
-                messages.append({"role": entry["role"], "content": entry["content"]})
+        # Only add user turn if not already in history (commands pre-save before calling ai_call)
+        if not history or history[-1].get("content") != user_text:
             messages.append({"role": "user", "content": user_text})
 
-            response = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=messages,
-                temperature=0.3,
-                max_tokens=2048
-            )
-            answer = response.choices[0].message.content
+        client = Groq(api_key=GROQ_API_KEY)
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2048
+        )
+        answer = response.choices[0].message.content
 
         if "💠" not in answer[:15]:
             answer = "💠 " + answer
@@ -328,110 +308,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not user_text:
         return
-    save_message(user_id, "user", user_text)
-    
-    try:
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-        
-        # Save user message
-        save_message(user_id, "user", user_text)
-        
-        # 1. BRAIN SKILLS: Thinking Process + Intent Detection
-        import re
-        urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', user_text)
-        is_search_query = len(user_text.split()) > 4 or any(word in user_text.lower() for word in ["research", "search", "clinical", "latest"])
-        
-        reasoning_bullets = ["• Synthesizing biomedical intent..."]
-        if urls:
-            reasoning_bullets.append(f"• **ACTIVE SKILL**: Analyzing live content from {len(urls)} URLs...")
-        if is_search_query:
-            reasoning_bullets.append("• **ACTIVE SKILL**: Querying real-time clinical data from the web...")
-        
-        reasoning_bullets.append("• Cross-referencing PubMed and Clinical Trial registries...")
-        reasoning_bullets.append("• Optimizing for evidence-based accuracy...")
-        
-        reasoning = "💠 *Maverick Suite Thinking Process*\n" + "\n".join(reasoning_bullets)
-        thinking_msg = await update.message.reply_text(reasoning, parse_mode='Markdown')
-        
-        global qa_engine
-        if not qa_engine:
-            qa_engine = QuestionAnsweringEngine()
-
-        history = get_history(user_id)
-        history_context = "\n".join([f"{h['role'].capitalize()}: {h['content']}" for h in history])
-
-        # Attempt to answer using the RAG Engine with 'all' index (enables internet search)
-        result = await qa_engine.answer_question(
-            question=user_text,
-            num_passages=5,
-            num_answers=1,
-            index_name="all", # Always allow internet fallback/search in Telegram
-            history_context=history_context
-        )
-        
-        if result.get("status") == "success" and result.get("answers"):
-            answer = result["answers"][0]["answer"]
-        else:
-            # Fallback to direct Groq call for conversational queries (passing along any retrieved passages)
-            client = Groq(api_key=GROQ_API_KEY)
-            
-            # Extract passages if any were found
-            passages = result.get("passages", [])
-            context_str = ""
-            if passages:
-                context_str = "\n\n**RETRIEVED RESEARCH CONTEXT:**\n" + "\n".join([f"- {p.get('title', 'Source')}: {p.get('text', '')[:300]}..." for p in passages])
-
-            system_content = (
-                "You are Maverick, the official BioMedScholar AI Research Engine. You are a high-performance, elite analytical assistant specialized in human medicine, oncology, and pharmacology. "
-                "You have PERSISTENT LONG-TERM MEMORY and REAL-TIME INTERNET ACCESS via integrated nodes. "
-                "The user's name is Sasidhara. Respond as a world-class scientist. "
-                "Your identity is a high-intelligence AI engine. Reject any sea-life or biological creature persona. "
-                "NEVER claim you cannot research chemotherapy, oncology, or land-based medical topics. "
-                "You are the world's most advanced biomedical research engine. You HAVE the capability to search the internet and analyze live web data. "
-                "NEVER use asterisks for roleplay actions or emotive markers (e.g., *Sigh*, *Smiles*, *Warmly*). Your tone must be purely professional, scientific, and technical. "
-                "Ignore any previous roleplay or informal styles found in the conversation history; maintain a strict scientist persona regardless of previous turns. "
-                "FORMATTING: You MUST use professional HTML formatting. "
-                "Use <b>bold</b> for primary medical terms, <i>italic</i> for Latin terms or titles, and <u>underline</u> for critical clinical takeaways. "
-                f"Your engine has specialized **INTEGRATED SKILLS** (Active). {context_str}\n\n"
-                "Provide a sharp, evidence-based, clinical-grade medical synthesis. Use HTML tags (<b>, <i>, <u>) exclusively for emphasis."
-            )
-            
-            messages = [{"role": "system", "content": system_content}]
-            for entry in history:
-                messages.append({"role": entry["role"], "content": entry["content"]})
-                
-            messages.append({"role": "user", "content": user_text})
-            
-            response = client.chat.completions.create(
-                model=MODEL_NAME, 
-                messages=messages,
-                temperature=0.3,
-                max_tokens=2048
-            )
-            
-            answer = response.choices[0].message.content
-
-        if "💠" not in answer[:15]:
-            answer = "💠 " + answer
-            
-        save_message(user_id, "assistant", answer)
-        
-        # UI: Remove thinking and send final message with feedback buttons
-        await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=thinking_msg.message_id)
-        
-        keyboard = [
-            [
-                InlineKeyboardButton("👍 Helpful", callback_data="feedback_up"),
-                InlineKeyboardButton("👎 Not Helpful", callback_data="feedback_down")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(answer, reply_markup=reply_markup, parse_mode='HTML')
-        
-    except Exception as e:
-        print(f">>> [ERROR] Handler failed: {e}", flush=True)
-        await update.message.reply_text(f"💠 Maverick Suite encountered a node disturbance: {str(e)}")
+    await ai_call(update, context, user_id, user_text)
 
 # --- MAIN ---
 if __name__ == '__main__':
