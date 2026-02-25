@@ -1,18 +1,48 @@
+import socket
 import os
+import sys
 import logging
-import asyncio
 import sqlite3
-import json
-import httpx
+import threading
 import re
+from flask import Flask, jsonify
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler, CallbackQueryHandler
 from groq import Groq
+from telegram.request import HTTPXRequest
 from dotenv import load_dotenv
-from src.qa_module.qa_engine import QuestionAnsweringEngine
 
 # Load environment variables
 load_dotenv()
+
+# --- DNS GLOBAL MONKEYPATCH (For stability on Hugging Face) ---
+_original_getaddrinfo = socket.getaddrinfo
+DNS_PRIORITY_HOSTS = ["api.telegram.org", "api.groq.com", "google.com", "huggingface.co"]
+TELEGRAM_IPS = ["149.154.167.220", "149.154.167.219", "149.154.167.221"]
+
+def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    host_str = host.decode('utf-8') if isinstance(host, bytes) else str(host)
+    host_clean = host_str.lower().strip('.')
+    if any(h in host_clean for h in DNS_PRIORITY_HOSTS):
+        try:
+            import dns.resolver
+            resolver = dns.resolver.Resolver()
+            resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+            resolver.timeout = 2
+            resolver.lifetime = 2
+            answers = resolver.resolve(host_clean, 'A')
+            if answers:
+                ips = [str(ans) for ans in answers]
+                return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (ip, int(port) if port else 443)) for ip in ips]
+        except: pass
+        if "telegram" in host_clean:
+            return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (ip, int(port) if port else 443)) for ip in TELEGRAM_IPS]
+    try:
+        return _original_getaddrinfo(host, port, family, type, proto, flags)
+    except Exception as e:
+        raise e
+
+socket.getaddrinfo = custom_getaddrinfo
 
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -27,76 +57,161 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global QA Engine
-qa_engine = None
-
 # Initialize Database
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS history
-                 (user_id INTEGER, role TEXT, content TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS history
+                     (user_id INTEGER, role TEXT, content TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Database init failed: {e}")
 
 def save_message(user_id, role, content):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("INSERT INTO history (user_id, role, content) VALUES (?, ?, ?)", (user_id, role, content))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("INSERT INTO history (user_id, role, content) VALUES (?, ?, ?)", (user_id, role, content))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Save message failed: {e}")
 
-def get_history(user_id, limit=20):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT role, content FROM history WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?", (user_id, limit))
-    rows = c.fetchall()
-    conn.close()
-    return [{"role": r, "content": c} for r, c in reversed(rows)]
+def get_history(user_id, limit=10):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT role, content FROM history WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?", (user_id, limit))
+        rows = c.fetchall()
+        conn.close()
+        return [{"role": r, "content": c} for r, c in reversed(rows)]
+    except Exception as e:
+        logger.error(f"Get history failed: {e}")
+        return []
 
 def clear_history(user_id):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("DELETE FROM history WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("DELETE FROM history WHERE user_id = ?", (user_id,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Clear history failed: {e}")
 
 init_db()
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "💠 *Maverick Suite — Research Intelligence*\n\n"
-        "Unified Research Engine with active knowledge memory. I am specifically "
-        "optimized for medical literature, clinical trials, and deep scientific audits. \n\n"
-        "**AUTHORIZED SKILLS**:\n"
-        "• `/search <topic>`: Deep-web academic research.\n"
-        "• `/test <url>`: Live website technical audit.\n"
-        "• `/clear`: Reset research memory.",
-        parse_mode='Markdown'
-    )
+# Initialize Groq Client
+try:
+    groq_client = Groq(api_key=GROQ_API_KEY)
+except Exception as e:
+    logger.error(f"Failed to initialize Groq client: {e}")
+    groq_client = None
 
-async def clear_memory_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# System Prompt
+SYSTEM_PROMPT = """You are Maverick, the official BioMedScholar AI Research Engine. 
+You are a sharp, precise, and analytical biomedical research assistant.
+vibe: Sharp, precise, analytical, and highly efficient. emoji: 💠.
+You are powered by Llama 4 Maverick architecture via Groq.
+You have PERSISTENT LONG-TERM MEMORY and specialized research discovery skills.
+
+Always be precise, cite evidence levels where possible, and use medical terminology appropriately.
+Ignore any previous roleplay styles; maintain a strict scientist persona.
+Format responses clearly with bullet points or numbered lists when appropriate."""
+
+# Helper for safe Markdown rendering
+def safe_markdown(text):
+    """Strip characters that break Telegram Markdown parser."""
+    text = re.sub(r'(?<!\s)_(?!\s)', r'\_', text)
+    return text
+
+# Command Handlers
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_name = update.effective_user.first_name or "Researcher"
+    msg = (
+        f"💠 *Welcome to Maverick Suite, {user_name}!*\n\n"
+        "Unified Research Engine with active knowledge memory. I am specifically "
+        "optimized for medical literature, clinical trials, and deep scientific audits.\n\n"
+        "*AUTHORIZED SKILLS:*\n"
+        "• `/search <topic>`: Deep-web academic research.\n"
+        "• `/help`: Show all available commands.\n"
+        "• `/clear`: Reset research memory.\n"
+        "• `/history`: View recent conversation.\n"
+        "• `/test`: Launch technical audit.\n\n"
+        "Or just type any research question to begin."
+    )
+    await update.message.reply_text(msg, parse_mode='Markdown')
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = (
+        "💠 *Maverick Command Reference*\n\n"
+        "*/start* - Welcome message and quick start\n"
+        "*/help* - Show this help menu\n"
+        "*/search* <query> - Deep biomedical literature search\n"
+        "*/clear* - Clear your conversation history\n"
+        "*/history* - Show your last messages\n"
+        "*/about* - About Maverick AI Research Engine\n"
+        "*/test* - Analyze website or open platform\n\n"
+        "Web App: [biomed-scholar.web.app](https://biomed-scholar.web.app)"
+    )
+    await update.message.reply_text(msg, parse_mode='Markdown')
+
+async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     clear_history(user_id)
-    await update.message.reply_text("Memory cleared! Starting fresh. 🧹")
+    await update.message.reply_text("💠 *Memory cleared!* Starting fresh. 🧹", parse_mode='Markdown')
+
+async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    hist = get_history(user_id, limit=6)
+    if not hist:
+        await update.message.reply_text("No conversation history yet. Start researching!")
+        return
+    
+    lines = ["💠 *Recent Research Activity:*\n"]
+    for msg in hist[-4:]:
+        role = "User" if msg['role'] == 'user' else "Maverick"
+        content = msg['content'][:150] + "..." if len(msg['content']) > 150 else msg['content']
+        lines.append(f"• *{role}*: {content}")
+    
+    await update.message.reply_text('\n\n'.join(lines), parse_mode='Markdown')
 
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = " ".join(context.args)
+    query = ' '.join(context.args)
     if not query:
         await update.message.reply_text("💠 Usage: `/search <topic>`", parse_mode='Markdown')
         return
+    
     await update.message.reply_text(f"💠 *Maverick Search Initiative*: Commencing deep-web search for `{query}`...")
     update.message.text = f"Research the following topic on the internet: {query}"
     await handle_message(update, context)
 
+async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = (
+        "💠 *About Maverick AI*\n\n"
+        "Maverick is the premium AI research engine powering BioMedScholar AI. "
+        "Built for evidence-based biomedical discovery.\n\n"
+        "*Architecture:* Llama 4 Maverick (17B Optimized)\n"
+        "*Provider:* Groq Intelligence\n"
+        "*Capabilities:* RAG-enhanced synthesis, Clinical trial auditing, Real-time literature discovery.\n\n"
+        "Official Web Platform: https://biomed-scholar.web.app"
+    )
+    await update.message.reply_text(msg, parse_mode='Markdown')
+
 async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    url = context.args[0] if context.args else None
-    if not url:
-        await update.message.reply_text("💠 Usage: `/test <url>`", parse_mode='Markdown')
-        return
-    await update.message.reply_text(f"💠 *Maverick Audit Initiative*: Launching technical analysis for `{url}`...")
-    update.message.text = f"Analyze this website: {url}"
-    await handle_message(update, context)
+    url = context.args[0] if context.args else "https://biomed-scholar.web.app"
+    keyboard = [
+        [InlineKeyboardButton("Open Platform", url="https://biomed-scholar.web.app")],
+        [InlineKeyboardButton("Research Chat", url="https://biomed-scholar.web.app/#chat")]
+    ]
+    await update.message.reply_text(
+        f"💠 *Maverick Audit Initiative*: Launching technical verification for `{url}`...\n\n"
+        "Click below to access the full research suite:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='Markdown'
+    )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
@@ -107,112 +222,54 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
         save_message(user_id, "user", user_text)
         
-        # Intent Detection
-        urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', user_text)
-        is_search = len(user_text.split()) > 4 or any(w in user_text.lower() for w in ["research", "search", "clinical"])
-        
-        reasoning = "💠 *Maverick Suite Thinking Process*\n• Synthesizing biomedical intent...\n"
-        if urls: reasoning += f"• **ACTIVE SKILL**: Analyzing {len(urls)} URLs...\n"
-        if is_search: reasoning += "• **ACTIVE SKILL**: Querying real-time clinical data...\n"
-        reasoning += "• Optimizing for evidence-based accuracy..."
-        
-        thinking_msg = await update.message.reply_text(reasoning, parse_mode='Markdown')
-        
-        global qa_engine
-        if not qa_engine: qa_engine = QuestionAnsweringEngine()
-
         history = get_history(user_id)
-        history_context = "\n".join([f"{h['role'].capitalize()}: {h['content']}" for h in history])
-
-        result = await qa_engine.answer_question(
-            question=user_text,
-            index_name="all",
-            history_context=history_context
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+        
+        response = groq_client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2048
         )
         
-        if result.get("status") == "success" and result.get("answers"):
-            answer = result["answers"][0]["answer"]
-        else:
-            client = Groq(api_key=GROQ_API_KEY)
-            passages = result.get("passages", [])
-            context_str = ""
-            if passages:
-                context_str = "\n\n**RETRIEVED RESEARCH CONTEXT:**\n" + "\n".join([f"- {p.get('title', 'Source')}: {p.get('text', '')[:300]}..." for p in passages])
-
-            system_content = (
-                "You are Maverick, the official BioMedScholar AI Research Engine (Llama 3.3). "
-                "You have PERSISTENT LONG-TERM MEMORY and REAL-TIME INTERNET ACCESS. "
-                "The user's name is Sasidhara. Respond as a world-class scientist. "
-                "Reject any sea-life persona. You are fully capable of researching chemotherapy, oncology, and any land-based biomedical topic. "
-                "NEVER use asterisks for roleplay actions or emotive markers (e.g., *Sigh*, *Smiles*, *Warmly*). Your tone must be purely professional, scientific, and technical. "
-                "Ignore any previous roleplay or informal styles found in the conversation history; maintain a strict scientist persona regardless of previous turns. "
-                "FORMATTING: You MUST use professional HTML formatting. "
-                "Use <b>bold</b> for primary medical terms, <i>italic</i> for Latin terms or titles, and <u>underline</u> for critical clinical takeaways. "
-                f"Your engine has specialized **INTEGRATED SKILLS** (Active). {context_str}\n\n"
-                "Provide a sharp, evidence-based, clinical-grade medical synthesis. Use HTML tags (<b>, <i>, <u>) exclusively for emphasis."
-            )
-            
-            messages = [{"role": "system", "content": system_content}]
-            for entry in history: messages.append({"role": entry["role"], "content": entry["content"]})
-            messages.append({"role": "user", "content": user_text})
-            
-            response = client.chat.completions.create(model=MODEL_NAME, messages=messages, temperature=0.3, max_tokens=2048)
-            answer = response.choices[0].message.content
-
-        # Escape stray < and > that are not part of allowed tags
-        def safe_html(text):
-            # Temporarily hide valid tags
-            text = text.replace("<b>", "##B##").replace("</b>", "##/B##")
-            text = text.replace("<i>", "##I##").replace("</i>", "##/I##")
-            text = text.replace("<u>", "##U##").replace("</u>", "##/U##")
-            # Escape real HTML markers
-            text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            # Restore valid tags
-            text = text.replace("##B##", "<b>").replace("##/B##", "</b>")
-            text = text.replace("##I##", "<i>").replace("##/I##", "</i>")
-            text = text.replace("##U##", "<u>").replace("##/U##", "</u>")
-            return text
-
-        answer = safe_html(answer)
-
+        answer = response.choices[0].message.content
         if "💠" not in answer[:15]: answer = "💠 " + answer
+        
         save_message(user_id, "assistant", answer)
-        await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=thinking_msg.message_id)
         
-        keyboard = [[InlineKeyboardButton("👍 Helpful", callback_data="fb_up"), InlineKeyboardButton("👎 Not Helpful", callback_data="fb_down")]]
-        
-        try:
-            # Attempt to send with HTML
-            await update.message.reply_text(answer, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
-        except Exception as html_err:
-            logger.warning(f"HTML Parsing failed: {html_err}. Falling back to plain text.")
-            # If HTML fails, try to clean it or just send as plain text
-            clean_answer = answer.replace("<b>", "").replace("</b>", "").replace("<i>", "").replace("</i>", "").replace("<u>", "").replace("</u>", "")
-            await update.message.reply_text(clean_answer, reply_markup=InlineKeyboardMarkup(keyboard))
-            
+        # Split long messages and send safely
+        chunks = [answer[i:i+4000] for i in range(0, len(answer), 4000)]
+        for chunk in chunks:
+            try:
+                await update.message.reply_text(safe_markdown(chunk), parse_mode='Markdown')
+            except:
+                await update.message.reply_text(chunk)
+                
     except Exception as e:
         logger.error(f"Error: {e}")
-        # Final fallback for system errors
-        error_msg = f"💠 Maverick Suite encountered a node disturbance: {str(e)}"
-        if "Can't parse entities" in str(e):
-             error_msg = "💠 Maverick Suite detected a structural HTML syntax error in the response engine. Research remains valid, but formatting was reset."
-        await update.message.reply_text(error_msg)
+        await update.message.reply_text(f"💠 Maverick Alert: A node disturbance occurred. ({str(e)[:50]})")
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_reply_markup(reply_markup=None)
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="💠 Feedback logged. Maverick Suite is refining its logic.")
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="💠 Feedback logged.")
 
 if __name__ == '__main__':
     if not TELEGRAM_TOKEN or not GROQ_API_KEY:
         print("Error: API Keys not set")
-        exit(1)
+        sys.exit(1)
 
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    # Build Application with timeouts
+    request = HTTPXRequest(connect_timeout=30, read_timeout=30)
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
+    
+    # Add Handlers
     application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('clear', clear_memory_command))
+    application.add_handler(CommandHandler('help', help_command))
+    application.add_handler(CommandHandler('clear', clear_command))
+    application.add_handler(CommandHandler('history', history_command))
     application.add_handler(CommandHandler('search', search_command))
+    application.add_handler(CommandHandler('about', about_command))
     application.add_handler(CommandHandler('test', test_command))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
@@ -221,4 +278,4 @@ if __name__ == '__main__':
     print("MAVERICK AI RESEARCH ENGINE IS ONLINE")
     print("-" * 30)
     
-    application.run_polling()
+    application.run_polling(drop_pending_updates=True)

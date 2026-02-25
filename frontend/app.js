@@ -1153,14 +1153,52 @@ function renderChatWelcome() {
     const history = document.getElementById('chat-history');
     if (!history) return;
     history.innerHTML = `
-        <div class="chat-welcome-message">
-            <div class="welcome-logo">🦞</div>
-            <h2>Research AI Chat (Maverick Sync)</h2>
-            <p>I am Maverick, your synchronized research assistant. Ask me anything about the biomedical database.</p>
-            <div class="chat-examples">
-                <button onclick="document.getElementById('chat-input').value = this.innerText; handleChatSubmit();">Latest trials on CRISPR?</button>
-                <button onclick="document.getElementById('chat-input').value = this.innerText; handleChatSubmit();">mRNA vaccine safety profiles</button>
+        <div class="chat-welcome-message" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; padding: 40px 20px; box-sizing: border-box;">
+            <div class="welcome-logo" style="background: linear-gradient(135deg, #4285f4, #0d47a1); color: white; border-radius: 16px; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; box-shadow: 0 8px 16px rgba(0, 86, 210, 0.2); animation: float 3s ease-in-out infinite;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
             </div>
+            <h2 style="font-size: 32px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #1a73e8, #0d47a1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 12px 0;">Maverick AI v4.0</h2>
+            <p style="color: var(--text-secondary); max-width: 440px; margin: 0 auto 32px; font-size: 16px; line-height: 1.6; opacity: 0.9;">Chat cleared. Ask me a new research question or upload a file to begin.</p>
+            
+            <div style="width: 100%; max-width: 480px;">
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button class="chat-example-btn" style="display: flex; align-items: center; gap: 12px; width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); padding: 14px 20px; border-radius: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); text-align: left;" onclick="sendChatMessage('Summarize latest CRISPR breakthroughs')">
+                        <span style="font-size: 18px;">🧬</span>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 14px; color: var(--text-primary);">Summarize CRISPR breakthroughs</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">Get a synthesis of recent gene-editing discoveries</div>
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+                    
+                    <button class="chat-example-btn" style="display: flex; align-items: center; gap: 12px; width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); padding: 14px 20px; border-radius: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); text-align: left;" onclick="sendChatMessage('Compare mRNA vaccine side effects versus traditional platforms')">
+                        <span style="font-size: 18px;">💉</span>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 14px; color: var(--text-primary);">mRNA vs Traditional Vaccines</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">Compare safety profiles and clinical efficacy</div>
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+            
+            <style>
+                @keyframes float {
+                    0% { transform: translateY(0px); }
+                    50% { transform: translateY(-10px); }
+                    100% { transform: translateY(0px); }
+                }
+                .chat-example-btn:hover {
+                    background: var(--bg-secondary) !important;
+                    border-color: var(--primary-blue) !important;
+                    transform: translateX(4px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+                }
+            </style>
         </div>
     `;
 }
@@ -3201,7 +3239,6 @@ function handleChatSubmit() {
     })
         .then(res => res.json())
         .then(data => {
-            removeChatLoading();
             updateSyncStatus('synced');
             if (data.status === 'success') {
                 const aiText = data.answer;
@@ -3238,13 +3275,16 @@ function handleChatSubmit() {
                 console.log('Maverick generation stopped by user');
                 return;
             }
-            removeChatLoading();
             updateSyncStatus('offline');
             addChatMessage('ai', "Error connecting to Maverick Brain.");
             console.error('Maverick error:', err);
         })
         .finally(() => {
             currentChatController = null;
+            removeChatLoading();
+            // Force hidden state for stop button in case of any edge cases
+            document.getElementById('chat-stop-btn')?.classList.add('hidden');
+            document.getElementById('chat-send-btn')?.classList.remove('hidden');
         });
 }
 
@@ -3648,26 +3688,7 @@ function removeChatLoading() {
 }
 
 function clearChat() {
-    const history = document.getElementById('chat-history');
-    if (history) {
-        history.innerHTML = `
-    < div class="chat-welcome-message" >
-                <div class="welcome-logo" style="background: linear-gradient(135deg, var(--primary-blue), #0d47a1); color: white; border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto; box-shadow: 0 4px 12px rgba(0, 86, 210, 0.3);">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                    </svg>
-                </div>
-                <h2>Maverick AI v4.0</h2>
-                <p>Chat cleared. Ask me a new research question or upload a file to begin.</p>
-                <div class="chat-examples" style="display: flex; flex-direction: column; gap: 8px; margin-top: 15px;">
-                    <button class="menu-item" style="font-size: 12px; justify-content: center;" onclick="sendChatMessage('Summarize latest CRISPR breakthroughs')">Summarize CRISPR breakthroughs</button>
-                    <button class="menu-item" style="font-size: 12px; justify-content: center;" onclick="sendChatMessage('Compare mRNA vaccine side effects')">mRNA vs Traditional Vaccines</button>
-                </div>
-            </div >
-    `;
-    }
+    renderChatWelcome();
 }
 
 async function deleteChatHistory() {
