@@ -107,15 +107,15 @@ def parse_pubmed_xml(xml_text):
     return articles
 
 def run_ingestion():
-    print(f"🚀 Starting FULL OpenSearch Ingestion to {ES_HOST}...")
+    print(f"[START] Starting FULL OpenSearch Ingestion to {ES_HOST}...")
     client = get_opensearch_client()
     
     # Check connection
     if not client.ping():
-        print("❌ Could not connect to OpenSearch. check credentials.")
+        print("[ERROR] Could not connect to OpenSearch. check credentials.")
         return
 
-    print("✅ Connected to OpenSearch!")
+    print("[SUCCESS] Connected to OpenSearch!")
 
     index_name = "pubmed_articles"
     
@@ -178,7 +178,7 @@ def run_ingestion():
         
         time.sleep(1)
 
-    print(f"\n\n🎉 Done! Total indexed: {total_indexed}")
+    print(f"\n\n[DONE] Done! Total indexed: {total_indexed}")
 
 if __name__ == "__main__":
     run_ingestion()

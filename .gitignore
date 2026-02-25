@@ -56,6 +56,9 @@ tests/screenshots/
 node_modules/
 dist/
 build/
+android/.gradle/
+android/app/build/
+android/build/
 *.gz
 *.gz_
 *.pack

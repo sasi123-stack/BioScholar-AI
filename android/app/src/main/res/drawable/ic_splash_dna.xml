@@ -1,0 +1,43 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Blue background -->
+    <path
+        android:fillColor="#0056D2"
+        android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
+
+    <!-- DNA Helix Arch 1 (top) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M27,24 Q54,38 81,24" />
+
+    <!-- DNA Helix Arch 2 (middle) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M27,48 Q54,62 81,48" />
+
+    <!-- DNA Helix Arch 3 (bottom) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M27,72 Q54,86 81,72" />
+
+    <!-- Cross circles -->
+    <path android:fillColor="#FFFFFF" android:pathData="M38,31 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+    <path android:fillColor="#FFFFFF" android:pathData="M70,31 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+    <path android:fillColor="#FFFFFF" android:pathData="M38,55 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+    <path android:fillColor="#FFFFFF" android:pathData="M70,55 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+    <path android:fillColor="#FFFFFF" android:pathData="M38,79 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+    <path android:fillColor="#FFFFFF" android:pathData="M70,79 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+</vector>

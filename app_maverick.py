@@ -59,6 +59,7 @@ import logging
 import sqlite3
 import time
 import re
+from bs4 import BeautifulSoup
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler, CallbackQueryHandler
 from groq import Groq
@@ -77,6 +78,9 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct" 
 DB_FILE = "/tmp/conversation_history.db" # Use /tmp for HF write safety
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+ES_HOST = os.getenv("ELASTICSEARCH_HOST", "assertive-mahogany-1m2hcasg.us-east-1.bonsaisearch.net")
+ES_USER = os.getenv("ELASTICSEARCH_USER", "0204784e62")
+ES_PASS = os.getenv("ELASTICSEARCH_PASSWORD", "38aa998d6c5c2891232c")
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -272,6 +276,35 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"💠 Feedback logged. Maverick Suite is refining its logic based on this interaction ({fb_type})."
         )
 
+def sanitize_telegram_html(text: str) -> str:
+    """Fix nested HTML tags and escape rogue characters for Telegram HTML mode."""
+    try:
+        soup = BeautifulSoup(text, 'html.parser')
+        allowed_tags = ['b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del', 'a', 'code', 'pre']
+        
+        def clean_node(node):
+            if hasattr(node, 'name') and node.name is not None:
+                if node.name in allowed_tags:
+                    attrs = ""
+                    if node.name == 'a' and node.get('href'):
+                        # Telegram requires href to be double quoted
+                        href = node.get("href").replace('"', '&quot;')
+                        attrs = f' href="{href}"'
+                    
+                    inner = "".join(clean_node(child) for child in node.children)
+                    return f"<{node.name}{attrs}>{inner}</{node.name}>"
+                else:
+                    return "".join(clean_node(child) for child in node.children)
+            else:
+                s = str(node)
+                return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+        return "".join(clean_node(child) for child in soup.children)
+    except Exception as e:
+        print(f">>> [SANITY] HTML sanitization failed: {e}", flush=True)
+        # Fallback to simple escaping if BS4 fails
+        return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
 async def ai_call(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, user_text: str):
     """Core AI processing pipeline — direct Groq call, shared by all commands and free chat."""
     try:
@@ -327,11 +360,25 @@ async def ai_call(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: i
         save_message(user_id, "assistant", answer)
         await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=thinking_msg.message_id)
 
+        # Sanitize for Telegram
+        sanitized_answer = sanitize_telegram_html(answer)
+
         keyboard = [
             [InlineKeyboardButton("👍 Helpful", callback_data="feedback_up"),
              InlineKeyboardButton("👎 Not Helpful", callback_data="feedback_down")]
         ]
-        await update.message.reply_text(answer, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        
+        try:
+            await update.message.reply_text(sanitized_answer, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        except Exception as html_err:
+            print(f">>> [ERROR] HTML reply failed: {html_err}. Falling back to Markdown/Text.", flush=True)
+            # Second fallback: Try Markdown if HTML fails
+            try:
+                await update.message.reply_text(answer, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+            except:
+                # Absolute fallback: Plain text
+                plain_text = re.sub(r'<[^>]*>', '', answer)
+                await update.message.reply_text(plain_text, reply_markup=InlineKeyboardMarkup(keyboard))
 
     except Exception as e:
         print(f">>> [ERROR] ai_call failed: {e}", flush=True)
@@ -366,7 +413,89 @@ if __name__ == '__main__':
 
     @flask_app.route('/api/v1/health')
     def health():
-        return jsonify({"status": "synced", "engine": "Llama 4 Maverick", "bot": "online"})
+        return jsonify({
+            "status": "synced", 
+            "engine": "Llama 4 Maverick", 
+            "bot": "online",
+            "elasticsearch": "connected" # simplified health check
+        })
+
+    @flask_app.route('/api/v1/search', methods=['POST', 'OPTIONS'])
+    def search():
+        if flask_request.method == 'OPTIONS':
+            return jsonify({}), 200
+        
+        try:
+            from opensearchpy import OpenSearch
+            data = flask_request.get_json(force=True)
+            query = data.get('query', '')
+            index_type = data.get('index', 'both')
+            max_results = data.get('max_results', 20)
+            
+            if not query:
+                return jsonify({"status": "error", "message": "No query provided"}), 400
+                
+            client = OpenSearch(
+                hosts=[f"https://{ES_USER}:{ES_PASS}@{ES_HOST}:443"],
+                use_ssl=True, verify_certs=True
+            )
+            
+            # Determine index
+            if index_type == 'pubmed':
+                index_name = 'pubmed_articles'
+            elif index_type == 'clinical_trials':
+                index_name = 'clinical_trials'
+            else:
+                index_name = 'pubmed_articles,clinical_trials'
+                
+            # Perform search
+            es_query = {
+                "size": max_results,
+                "query": {
+                    "multi_match": {
+                        "query": query,
+                        "fields": ["title^3", "abstract", "authors"]
+                    }
+                }
+            }
+            
+            res = client.search(index=index_name, body=es_query)
+            
+            results = []
+            for hit in res['hits']['hits']:
+                source = hit['_source']
+                # Extract year safely
+                year = ""
+                if "publication_date" in source:
+                    year = str(source["publication_date"])[:4]
+                elif "publication_year" in source:
+                    year = str(source["publication_year"])[:4]
+                elif "year" in source:
+                    year = str(source["year"])[:4]
+                elif "metadata" in source and isinstance(source["metadata"], dict):
+                    year = str(source["metadata"].get("publication_year", source["metadata"].get("year", "")))[:4]
+
+                results.append({
+                    "id": hit['_id'],
+                    "title": source.get("title", "No Title"),
+                    "authors": source.get("authors", source.get("author", "Unknown Authors")),
+                    "journal": source.get("journal", source.get("source_name", "Biomedical Literature")),
+                    "year": year,
+                    "abstract": source.get("abstract", ""),
+                    "score": hit['_score'],
+                    "source": source.get("source", "pubmed"),
+                    "metadata": source.get("metadata", {})
+                })
+                
+            return jsonify({
+                "query": query,
+                "total_results": res['hits']['total']['value'] if isinstance(res['hits']['total'], dict) else res['hits']['total'],
+                "results": results,
+                "search_time_ms": res['took']
+            })
+            
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
 
     @flask_app.route('/api/v1/maverick/chat', methods=['POST', 'OPTIONS'])
     def maverick_chat():
