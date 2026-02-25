@@ -109,7 +109,7 @@ def parse_studies(studies):
     return parsed_studies
 
 def run_ingestion():
-    print("🚀 Starting Clinical Trials Ingestion...")
+    print("[START] Starting Clinical Trials Ingestion...")
     
     # 1. Setup Index
     index_name = "clinical_trials"
@@ -186,7 +186,7 @@ def run_ingestion():
         print(f" -> {count} indexed")
         time.sleep(1) 
 
-    print(f"\n\n🎉 Done! Total indexed: {total_indexed}")
+    print(f"\n\n[DONE] Done! Total indexed: {total_indexed}")
 
 if __name__ == "__main__":
     run_ingestion()
