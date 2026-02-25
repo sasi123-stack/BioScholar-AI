@@ -58,22 +58,11 @@ print(">>> [DNS PATCH] Global socket monkeypatch applied at startup.", flush=Tru
 import logging
 import sqlite3
 import time
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler, CallbackQueryHandler
 from groq import Groq
 from telegram.request import HTTPXRequest
-import json
-import httpx
-import subprocess
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from src.qa_module.qa_engine import QuestionAnsweringEngine
-import re
-
-# Global QA Engine
-qa_engine = None
 
 # --- PRE-FLIGHT LOGGING ---
 print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
