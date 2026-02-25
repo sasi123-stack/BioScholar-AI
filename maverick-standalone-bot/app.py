@@ -375,6 +375,26 @@ async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(about_text, parse_mode='MarkdownV2')
 
+async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    keyboard = [
+        [InlineKeyboardButton("Open BioMedScholar AI", url="https://biomed-scholar.web.app")],
+        [InlineKeyboardButton("PubMed Search", url="https://biomed-scholar.web.app/#articles")],
+        [InlineKeyboardButton("Maverick AI Chat", url="https://biomed-scholar.web.app/#chat")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "💠 *BioMedScholar AI — Web Platform*\n\n"
+        "Access the full research platform with:\n"
+        "🔬 35M+ PubMed articles\n"
+        "🧪 Clinical trial database\n"
+        "🤖 Maverick AI chat\n"
+        "📊 Research trends & analytics\n\n"
+        "👇 Click below to open:",
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     user_id = update.effective_user.id
@@ -423,12 +443,13 @@ if __name__ == '__main__':
         application.add_handler(CommandHandler('search',  search_command))
         application.add_handler(CommandHandler('history', history_command))
         application.add_handler(CommandHandler('about',   about_command))
+        application.add_handler(CommandHandler('test',    test_command))
 
         # Handle regular text messages
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
         print(">>> 🚀 MAVERICK IS FULLY OPERATIONAL!", flush=True)
-        logger.info("Bot started with commands: /start /help /clear /search /history /about")
+        logger.info("Bot started with commands: /start /help /clear /search /history /about /test")
         application.run_polling(drop_pending_updates=True)
     except Exception as e:
         print(f">>> [FATAL] BOT CRASHED: {e}", flush=True)
