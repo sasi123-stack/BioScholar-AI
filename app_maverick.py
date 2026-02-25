@@ -63,6 +63,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters, CommandHandler, CallbackQueryHandler
 from groq import Groq
 from telegram.request import HTTPXRequest
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 # --- PRE-FLIGHT LOGGING ---
 print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
@@ -178,6 +182,28 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_message(user_id, "user", f"/search {query}")
     await ai_call(update, context, user_id, prompt)
 
+def scrape_url(url: str, max_chars: int = 3000) -> str:
+    """Use headless Chromium to scrape visible text from a URL."""
+    try:
+        opts = Options()
+        opts.add_argument("--headless")
+        opts.add_argument("--no-sandbox")
+        opts.add_argument("--disable-dev-shm-usage")
+        opts.add_argument("--disable-gpu")
+        opts.binary_location = "/usr/bin/chromium"
+        driver = webdriver.Chrome(
+            service=Service("/usr/bin/chromedriver"),
+            options=opts
+        )
+        driver.set_page_load_timeout(15)
+        driver.get(url)
+        text = driver.find_element("tag name", "body").text
+        driver.quit()
+        return text[:max_chars] if text else ""
+    except Exception as e:
+        print(f">>> [SCRAPE] Failed for {url}: {e}", flush=True)
+        return ""
+
 async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Explicit website testing command."""
     url = context.args[0] if context.args else None
@@ -187,12 +213,32 @@ async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
     await update.message.reply_text(
-        f"💠 *Maverick Audit Initiative*: Launching technical analysis for `{url}`...",
+        f"💠 *Maverick Audit Initiative*: Scraping and analysing `{url}`...",
         parse_mode='Markdown'
     )
-    prompt = f"Analyze this website and provide an evidence-based audit: {url}"
+
+    # Try to scrape live content first
+    page_content = scrape_url(url)
+    if page_content:
+        prompt = (
+            f"Perform a technical audit of this website: {url}\n\n"
+            f"LIVE PAGE CONTENT (first 3000 chars):\n{page_content}\n\n"
+            "Based on the above content, provide:\n"
+            "1. Purpose and credibility of the website\n"
+            "2. Key research content or features available\n"
+            "3. Technical quality and trustworthiness\n"
+            "4. Recommendations for a biomedical researcher"
+        )
+    else:
+        prompt = (
+            f"Perform a knowledge-based technical audit of this website: {url}\n\n"
+            "Cover: 1) Purpose and credibility, 2) Key content available, "
+            "3) Technical quality, 4) Recommendations for a biomedical researcher."
+        )
+
     save_message(user_id, "user", f"/test {url}")
     await ai_call(update, context, user_id, prompt)
+
 
 async def handle_attachment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle photos and documents for multi-modality."""
