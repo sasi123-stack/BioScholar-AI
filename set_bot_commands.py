@@ -16,6 +16,7 @@ commands = [
     {"command": "clear",   "description": "Clear conversation memory"},
     {"command": "history", "description": "View recent conversation"},
     {"command": "about",   "description": "About Maverick AI"},
+    {"command": "test",    "description": "Open BioMedScholar AI website"},
 ]
 
 url = f"https://api.telegram.org/bot{token}/setMyCommands"
