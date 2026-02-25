@@ -165,7 +165,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "💠 *Maverick Suite — Unified Research Engine*\n\n"
         "Greetings Sasidhara. You are now connected to the Maverick AI Suite. I am an advanced specialized engine designed for deep biomedical discovery:\n\n"
         "• *Domain*: Exclusively Biomedical & Clinical Trial Research.\n"
-        "• *Expertise*: Llama 3.3 Maverick Architecture.\n"
+        "• *Expertise*: Llama 4 Maverick Architecture.\n"
         "• *Research Commands*:\n"
         "  - `/search <topic>`: Deep-web academic research.\n"
         "  - `/test <url>`: Live website technical audit.\n\n"
