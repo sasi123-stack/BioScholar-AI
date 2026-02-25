@@ -296,6 +296,13 @@ async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=reply_markup)
 
+def safe_send(text):
+    """Strip characters that break Telegram Markdown parser so we can safely use parse_mode='Markdown'."""
+    import re
+    # Remove underscores inside words (e.g. snake_case) that confuse the parser
+    text = re.sub(r'(?<!\s)_(?!\s)', r'\_', text)
+    return text
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     user_id = update.effective_user.id
@@ -312,12 +319,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "💠" not in answer[:15]:
             answer = "💠 " + answer
         save_message(user_id, "assistant", answer)
-        # Split long messages (Telegram 4096 char limit)
-        if len(answer) > 4000:
-            for i in range(0, len(answer), 4000):
-                await update.message.reply_text(answer[i:i+4000])
-        else:
-            await update.message.reply_text(answer)
+
+        # Split long messages (Telegram 4096 char limit) and render Markdown
+        chunks = [answer[i:i+4000] for i in range(0, len(answer), 4000)]
+        for chunk in chunks:
+            try:
+                await update.message.reply_text(safe_send(chunk), parse_mode='Markdown')
+            except Exception:
+                # Fallback to plain text if Markdown still fails
+                await update.message.reply_text(chunk)
     except Exception as e:
         logger.error(f"Message handler error: {e}")
         await update.message.reply_text(f"Error processing your request. Please try again.\n{str(e)[:100]}")
