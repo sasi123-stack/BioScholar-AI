@@ -347,19 +347,38 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- MAIN ---
 if __name__ == '__main__':
+    import threading
+    from flask import Flask, jsonify
+
+    # --- Flask health server (required by Hugging Face Spaces on port 7860) ---
+    flask_app = Flask(__name__)
+
+    @flask_app.route('/')
+    def home():
+        return "💠 Maverick AI Research Engine — Online"
+
+    @flask_app.route('/api/v1/health')
+    def health():
+        return jsonify({"status": "synced", "engine": "Llama 4 Maverick", "bot": "online"})
+
+    def run_flask():
+        flask_app.run(host='0.0.0.0', port=7860, use_reloader=False)
+
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    print(">>> [HF] Flask health server started on port 7860", flush=True)
+
+    # --- Telegram Bot ---
     print(">>> [4/5] CHECKING SECRETS...", flush=True)
     if not TELEGRAM_TOKEN or not GROQ_API_KEY:
         print(">>> [CRITICAL] MISSING API KEYS! Check Settings > Secrets.", flush=True)
-    
+
     check_dns()
     init_db()
-    
+
     print(">>> [5/5] CONNECTING TO TELEGRAM...", flush=True)
     try:
-        # Robust request settings for potentially restricted/slow networks
-        # We increase the connection pool size and timeouts
         request = HTTPXRequest(connect_timeout=30, read_timeout=30, write_timeout=30)
-        
         application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
         application.add_handler(CommandHandler('start', start))
         application.add_handler(CommandHandler('search', search_command))
@@ -367,9 +386,10 @@ if __name__ == '__main__':
         application.add_handler(CallbackQueryHandler(handle_callback))
         application.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_attachment))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-        
+
         print(">>> 🚀 MAVERICK IS FULLY OPERATIONAL!", flush=True)
         application.run_polling(drop_pending_updates=True)
     except Exception as e:
         print(f">>> [FATAL] BOT CRASHED: {e}", flush=True)
         sys.exit(1)
+
