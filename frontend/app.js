@@ -42,8 +42,8 @@ var isVercel = window.location.hostname.includes('vercel.app');
 // Main biomedical search API
 var HF_BACKEND_URL = 'https://sasidhara123-biomed-scholar-api.hf.space/api/v1';
 
-// Maverick AI Bot (separate deployment)
-var MAVERICK_API_URL = 'https://sasidhara123-maverick-ai-bot.hf.space/api/v1';
+// Maverick AI Bot (separate deployment - only has / and /logs routes)
+var MAVERICK_API_URL = 'https://sasidhara123-maverick-ai-bot.hf.space';
 
 var API_BASE_URL = (isLocal && window.location.search.includes('local=true')) ?
     'http://localhost:8000/api/v1' : HF_BACKEND_URL;
@@ -5823,8 +5823,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (r.ok) {
                         dot.className = 'status-dot connected';
                         txt.textContent = 'System Online';
+                    } else if (r.status === 503) {
+                        // HF Space sleeping — not a real error, just warming up
+                        dot.className = 'status-dot warning';
+                        txt.textContent = 'Starting...';
                     } else {
-                        throw new Error('API Error');
+                        throw new Error('API Error ' + r.status);
                     }
                 })
                 .catch(e => {
@@ -5833,8 +5837,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
         }
 
-        // Maverick Sync Status
-        fetch(MAVERICK_API_URL + '/health')
+        // Maverick Bot Space — just ping the landing page (no /api/v1/health)
+        fetch(MAVERICK_API_URL + '/', { method: 'HEAD' })
             .then(r => {
                 if (r.ok) updateSyncStatus('synced');
                 else updateSyncStatus('offline');
