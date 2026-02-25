@@ -183,10 +183,23 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not query:
         await update.message.reply_text("💠 Usage: `/search <topic>`", parse_mode='Markdown')
         return
-    
-    await update.message.reply_text(f"💠 *Maverick Search Initiative*: Commencing deep-web search for `{query}`...")
-    update.message.text = f"Research the following topic on the internet: {query}"
-    await handle_message(update, context)
+
+    user_id = update.effective_user.id
+    await update.message.reply_text(
+        f"💠 *Maverick Search Initiative*: Synthesizing biomedical literature for `{query}`...",
+        parse_mode='Markdown'
+    )
+    prompt = (
+        f'Conduct a comprehensive biomedical literature synthesis for: "{query}".\n\n'
+        "Please provide:\n"
+        "1. Overview of this research topic (2-3 sentences)\n"
+        "2. Key findings from recent literature (bullet points)\n"
+        "3. Important clinical considerations\n"
+        "4. Evidence quality and study design insights\n\n"
+        "Be precise and evidence-based."
+    )
+    save_message(user_id, "user", f"/search {query}")
+    await ai_reply(update, user_id, prompt, save_user_msg=False)
 
 async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
@@ -201,53 +214,85 @@ async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode='Markdown')
 
 async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    url = context.args[0] if context.args else "https://biomed-scholar.web.app"
-    keyboard = [
-        [InlineKeyboardButton("Open Platform", url="https://biomed-scholar.web.app")],
-        [InlineKeyboardButton("Research Chat", url="https://biomed-scholar.web.app/#chat")]
-    ]
-    await update.message.reply_text(
-        f"💠 *Maverick Audit Initiative*: Launching technical verification for `{url}`...\n\n"
-        "Click below to access the full research suite:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode='Markdown'
-    )
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_text = update.message.text
     user_id = update.effective_user.id
-    if not user_text: return
+    url = context.args[0] if context.args else None
 
+    if url:
+        await update.message.reply_text(
+            f"💠 *Maverick Audit Initiative*: Launching technical analysis for `{url}`...",
+            parse_mode='Markdown'
+        )
+        prompt = (
+            f"Perform a technical audit and content analysis of this website: {url}\n\n"
+            "Please cover:\n"
+            "1. Purpose and credibility of the website\n"
+            "2. Key content or research available\n"
+            "3. Technical quality and trustworthiness\n"
+            "4. Recommendations for a biomedical researcher"
+        )
+        save_message(user_id, "user", f"/test {url}")
+        await ai_reply(update, user_id, prompt, save_user_msg=False)
+    else:
+        keyboard = [
+            [InlineKeyboardButton("Open BioMedScholar AI", url="https://biomed-scholar.web.app")],
+            [InlineKeyboardButton("PubMed Search", url="https://biomed-scholar.web.app/#articles")],
+            [InlineKeyboardButton("Maverick AI Chat", url="https://biomed-scholar.web.app/#chat")],
+        ]
+        await update.message.reply_text(
+            "💠 *BioMedScholar AI — Web Platform*\n\n"
+            "Access the full research suite with 35M+ PubMed articles, clinical trials, and Maverick AI chat.\n\n"
+            "Tip: Use `/test <url>` to analyze any website.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
+
+async def ai_reply(update: Update, user_id: int, prompt: str, save_user_msg: bool = True):
+    """Core AI call — sends a prompt to Groq and replies. Reusable by all commands."""
     try:
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-        save_message(user_id, "user", user_text)
-        
+        try:
+            await update.get_bot().send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        except Exception:
+            pass
+
+        if save_user_msg:
+            save_message(user_id, "user", prompt)
+
         history = get_history(user_id)
         messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
-        
+        if not history or history[-1].get("content") != prompt:
+            messages.append({"role": "user", "content": prompt})
+
         response = groq_client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
             temperature=0.3,
             max_tokens=2048
         )
-        
+
         answer = response.choices[0].message.content
-        if "💠" not in answer[:15]: answer = "💠 " + answer
-        
+        if "💠" not in answer[:15]:
+            answer = "💠 " + answer
+
         save_message(user_id, "assistant", answer)
-        
-        # Split long messages and send safely
+
         chunks = [answer[i:i+4000] for i in range(0, len(answer), 4000)]
         for chunk in chunks:
             try:
                 await update.message.reply_text(safe_markdown(chunk), parse_mode='Markdown')
-            except:
+            except Exception:
                 await update.message.reply_text(chunk)
-                
+
     except Exception as e:
-        logger.error(f"Error: {e}")
-        await update.message.reply_text(f"💠 Maverick Alert: A node disturbance occurred. ({str(e)[:50]})")
+        logger.error(f"ai_reply error: {e}")
+        await update.message.reply_text(f"💠 Maverick Alert: A node disturbance occurred. ({str(e)[:80]})")
+
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
+    user_id = update.effective_user.id
+    if not user_text:
+        return
+    await ai_reply(update, user_id, user_text, save_user_msg=True)
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
