@@ -9,51 +9,59 @@ _original_getaddrinfo = socket.getaddrinfo
 
 # Known flaky hosts that we want to handle with priority
 DNS_PRIORITY_HOSTS = ["api.telegram.org", "api.groq.com", "google.com", "huggingface.co"]
-# Telegram has multiple IPs; providing a list helps if one is blocked/slow
-TELEGRAM_IPS = ["149.154.167.220", "149.154.167.219", "149.154.167.221"]
+# More comprehensive Telegram IP list
+TELEGRAM_IPS = [
+    "149.154.167.220", "149.154.167.219", "149.154.167.221",
+    "149.154.166.110", "149.154.166.111", "91.108.4.4", "91.108.56.110"
+]
 
 def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-    # Handle cases where host is passed as bytes (common in some libraries)
     host_str = host.decode('utf-8') if isinstance(host, bytes) else str(host)
     host_clean = host_str.lower().strip('.')
     
-    # Priority handling for known flaky hosts
-    if any(h in host_clean for h in DNS_PRIORITY_HOSTS):
-        print(f">>> [DNS PATCH] Priority resolving: {host_clean}", flush=True)
-        # 1. Try Custom DNS (Google/Cloudflare)
-        try:
-            import dns.resolver
-            resolver = dns.resolver.Resolver()
-            resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
-            resolver.timeout = 2
-            resolver.lifetime = 2
-            answers = resolver.resolve(host_clean, 'A')
-            if answers:
-                ips = [str(ans) for ans in answers]
-                print(f">>> [DNS PATCH] Custom DNS resolved {host_clean} to {ips}", flush=True)
-                return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (ip, int(port) if port else 443)) for ip in ips]
-        except Exception as e:
-            print(f">>> [DNS PATCH] Custom DNS failed for {host_clean}: {e}", flush=True)
-
-        # 2. Hardcoded fallback for Telegram
-        if "telegram" in host_clean:
-            print(f">>> [DNS PATCH] HARDCODED FALLBACK: {host_clean} -> {TELEGRAM_IPS}", flush=True)
-            return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (ip, int(port) if port else 443)) for ip in TELEGRAM_IPS]
-
-    # For all other hosts, or if custom resolution failed, try original (system) DNS
+    # 1. Try original system DNS first
     try:
         return _original_getaddrinfo(host, port, family, type, proto, flags)
-    except Exception as e:
-        raise e
+    except Exception:
+        # If it fails, only then do we try our priority/fallback logic
+        if any(h in host_clean for h in DNS_PRIORITY_HOSTS):
+            print(f">>> [DNS PATCH] System DNS failed. Priority resolving: {host_clean}", flush=True)
+            ips = []
+            # Try Custom DNS (Google/Cloudflare)
+            try:
+                import dns.resolver
+                resolver = dns.resolver.Resolver()
+                resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+                resolver.timeout = 2
+                resolver.lifetime = 2
+                answers = resolver.resolve(host_clean, 'A')
+                if answers:
+                    ips = [str(ans) for ans in answers]
+                    print(f">>> [DNS PATCH] Custom DNS resolved {host_clean} to {ips}", flush=True)
+            except Exception as e:
+                print(f">>> [DNS PATCH] Custom DNS failed for {host_clean}: {e}", flush=True)
+
+            # Hardcoded fallback for Telegram if DNS failed
+            if not ips and "telegram" in host_clean:
+                ips = TELEGRAM_IPS
+                print(f">>> [DNS PATCH] HARDCODED FALLBACK used for {host_clean}", flush=True)
+
+            if ips:
+                results = []
+                for ip in ips:
+                    try:
+                        # Use system resolution for the IP to get correct struct
+                        results.extend(_original_getaddrinfo(ip, port, family, type, proto, flags))
+                    except:
+                        # Final manual fallback if even IP resolution fails
+                        results.append((socket.AF_INET, type or socket.SOCK_STREAM, proto or 6, '', (ip, int(port) or 443)))
+                return results
+        
+        # Re-raise the original error if we couldn't resolve it ourselves
+        raise
 
 socket.getaddrinfo = custom_getaddrinfo
-print(">>> [DNS PATCH] Priority-based socket monkeypatch applied.", flush=True)
-
-socket.getaddrinfo = custom_getaddrinfo
-print(">>> [DNS PATCH] Priority-based socket monkeypatch applied.", flush=True)
-
-socket.getaddrinfo = custom_getaddrinfo
-print(">>> [DNS PATCH] Global socket monkeypatch applied at startup.", flush=True)
+print(">>> [DNS PATCH] Robust socket monkeypatch applied.", flush=True)
 
 import logging
 import sqlite3
@@ -143,6 +151,13 @@ def save_message(user_id, role, content):
         conn.commit()
         conn.close()
     except: pass
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log the error and prevent bot crash."""
+    logger.error(f"Maverick Error Handler: {context.error}")
+    # Connection errors are already logged by the library, but we can add more info here
+    if "Connection" in str(context.error):
+        print(">>> [NETWORK] Periodic connection blip detected. Retrying...", flush=True)
 
 def get_history(user_id, limit=10):
     try:
@@ -338,11 +353,20 @@ async def ai_call(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: i
         )
 
         messages = [{"role": "system", "content": system_content}]
+        
+        # Merge consecutive roles to satisfy Groq requirements
+        last_role = "system"
         for entry in history:
-            messages.append({"role": entry["role"], "content": entry["content"]})
+            if entry["role"] == last_role:
+                messages[-1]["content"] += "\n" + entry["content"]
+            else:
+                messages.append({"role": entry["role"], "content": entry["content"]})
+                last_role = entry["role"]
 
-        # Only add user turn if not already in history (commands pre-save before calling ai_call)
-        if not history or history[-1].get("content") != user_text:
+        # Add current user message, merging if last was user
+        if last_role == "user":
+            messages[-1]["content"] += "\n" + user_text
+        else:
             messages.append({"role": "user", "content": user_text})
 
         client = Groq(api_key=GROQ_API_KEY)
@@ -517,10 +541,19 @@ if __name__ == '__main__':
             )
 
             messages = [{"role": "system", "content": system_content}]
+            last_role = "system"
             for turn in context:
                 if turn.get('role') in ('user', 'assistant'):
-                    messages.append({"role": turn['role'], "content": turn.get('content', '')})
-            messages.append({"role": "user", "content": question})
+                    if turn['role'] == last_role:
+                        messages[-1]['content'] += "\n" + turn.get('content', '')
+                    else:
+                        messages.append({"role": turn['role'], "content": turn.get('content', '')})
+                        last_role = turn['role']
+            
+            if last_role == 'user':
+                messages[-1]['content'] += "\n" + question
+            else:
+                messages.append({"role": "user", "content": question})
 
             client = Groq(api_key=GROQ_API_KEY)
             response = client.chat.completions.create(
@@ -562,19 +595,31 @@ if __name__ == '__main__':
     init_db()
 
     print(">>> [5/5] CONNECTING TO TELEGRAM...", flush=True)
-    try:
-        request = HTTPXRequest(connect_timeout=30, read_timeout=30, write_timeout=30)
-        application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
-        application.add_handler(CommandHandler('start', start))
-        application.add_handler(CommandHandler('search', search_command))
-        application.add_handler(CommandHandler('test', test_command))
-        application.add_handler(CallbackQueryHandler(handle_callback))
-        application.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_attachment))
-        application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    
+    # Retry loop for initial connection
+    max_startup_retries = 5
+    for attempt in range(max_startup_retries):
+        try:
+            request = HTTPXRequest(connect_timeout=30, read_timeout=30, write_timeout=30)
+            application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
+            application.add_handler(CommandHandler('start', start))
+            application.add_handler(CommandHandler('search', search_command))
+            application.add_handler(CommandHandler('test', test_command))
+            application.add_handler(CallbackQueryHandler(handle_callback))
+            application.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_attachment))
+            application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+            
+            # Add error handler
+            application.add_error_handler(error_handler)
 
-        print(">>> 🚀 MAVERICK IS FULLY OPERATIONAL!", flush=True)
-        application.run_polling(drop_pending_updates=True)
-    except Exception as e:
-        print(f">>> [FATAL] BOT CRASHED: {e}", flush=True)
-        sys.exit(1)
+            print(f">>> 🚀 MAVERICK IS FULLY OPERATIONAL! (Attempt {attempt+1})", flush=True)
+            application.run_polling(drop_pending_updates=True)
+            break # Exit loop if polling ends normally
+        except Exception as e:
+            print(f">>> [RETRY {attempt+1}/{max_startup_retries}] Connection failed: {e}", flush=True)
+            if attempt < max_startup_retries - 1:
+                time.sleep(15)
+            else:
+                print(">>> [FATAL] BOT CRASHED after multiple attempts.", flush=True)
+                sys.exit(1)
 

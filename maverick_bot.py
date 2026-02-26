@@ -18,29 +18,41 @@ load_dotenv()
 # --- DNS GLOBAL MONKEYPATCH (For stability on Hugging Face) ---
 _original_getaddrinfo = socket.getaddrinfo
 DNS_PRIORITY_HOSTS = ["api.telegram.org", "api.groq.com", "google.com", "huggingface.co"]
-TELEGRAM_IPS = ["149.154.167.220", "149.154.167.219", "149.154.167.221"]
+# More comprehensive Telegram IP list
+TELEGRAM_IPS = [
+    "149.154.167.220", "149.154.167.219", "149.154.167.221",
+    "149.154.166.110", "149.154.166.111", "91.108.4.4", "91.108.56.110"
+]
 
 def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
     host_str = host.decode('utf-8') if isinstance(host, bytes) else str(host)
     host_clean = host_str.lower().strip('.')
-    if any(h in host_clean for h in DNS_PRIORITY_HOSTS):
-        try:
-            import dns.resolver
-            resolver = dns.resolver.Resolver()
-            resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
-            resolver.timeout = 2
-            resolver.lifetime = 2
-            answers = resolver.resolve(host_clean, 'A')
-            if answers:
-                ips = [str(ans) for ans in answers]
-                return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (ip, int(port) if port else 443)) for ip in ips]
-        except: pass
-        if "telegram" in host_clean:
-            return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (ip, int(port) if port else 443)) for ip in TELEGRAM_IPS]
+    
+    # 1. Try original system DNS first
     try:
         return _original_getaddrinfo(host, port, family, type, proto, flags)
-    except Exception as e:
-        raise e
+    except Exception:
+        # If it fails, only then do we try our priority/fallback logic
+        if any(h in host_clean for h in DNS_PRIORITY_HOSTS):
+            # Try Custom DNS (Google/Cloudflare)
+            try:
+                import dns.resolver
+                resolver = dns.resolver.Resolver()
+                resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+                resolver.timeout = 2
+                resolver.lifetime = 2
+                answers = resolver.resolve(host_clean, 'A')
+                if answers:
+                    ips = [str(ans) for ans in answers]
+                    return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (ip, int(port) if port else 443)) for ip in ips]
+            except: pass
+
+            # 2. Hardcoded fallback for Telegram
+            if "telegram" in host_clean:
+                return [(socket.AF_INET, type if type != 0 else socket.SOCK_STREAM, proto if proto != 0 else 6, '', (ip, int(port) if port else 443)) for ip in TELEGRAM_IPS]
+        
+        # Re-raise original if we couldn't help
+        raise
 
 socket.getaddrinfo = custom_getaddrinfo
 
@@ -78,6 +90,10 @@ def save_message(user_id, role, content):
         conn.close()
     except Exception as e:
         logger.error(f"Save message failed: {e}")
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log the error and prevent bot crash."""
+    logger.error(f"Telegram Bot error: {context.error}")
 
 def get_history(user_id, limit=10):
     try:
@@ -258,8 +274,20 @@ async def ai_reply(update: Update, user_id: int, prompt: str, save_user_msg: boo
             save_message(user_id, "user", prompt)
 
         history = get_history(user_id)
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
-        if not history or history[-1].get("content") != prompt:
+        
+        # Build messages list efficiently
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        last_role = "system"
+        for h in history:
+            if h['role'] == last_role:
+                messages[-1]['content'] += "\n" + h['content']
+            else:
+                messages.append(h)
+                last_role = h['role']
+        
+        if last_role == "user":
+            messages[-1]['content'] += "\n" + prompt
+        else:
             messages.append({"role": "user", "content": prompt})
 
         response = groq_client.chat.completions.create(
@@ -318,6 +346,7 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler('test', test_command))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    application.add_error_handler(error_handler)
     
     print("-" * 30)
     print("MAVERICK AI RESEARCH ENGINE IS ONLINE")

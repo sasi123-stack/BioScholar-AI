@@ -30,7 +30,7 @@ class GroqGenerator:
                 self.client = None
             
             
-        # Llama 4 Maverick — highest performance on Groq
+        # Llama 4 Maverick — elite performance for BioMedScholar
         self.model_name = 'meta-llama/llama-4-maverick-17b-128e-instruct'
 
     def generate_answer(self, question: str, passages: List[Dict], history_context: Optional[str] = None) -> Dict:

@@ -83,20 +83,27 @@ def whatsapp_reply():
         # Get history
         history = get_history(sender_number)
         
-        # Prepare messages for Llama 4 Maverick
+        # Prepare messages for Llama 3.3
         messages = [
             {
                 "role": "system", 
                 "content": (
                     "You are the Maverick Suite (💠), a premium analytical biomedical research engine. "
                     "Your identity is sharp, precise, and authoritative. "
-                    "You are powered by Llama 4 Maverick architecture. "
+                    "You are powered by Llama 3.3 Maverick architecture. "
                     "You are communicating with the user via WhatsApp. "
                     "You maintain active knowledge memory to ensure research continuity."
                 )
             }
         ]
-        messages.extend(history)
+        
+        last_role = "system"
+        for h in history:
+            if h['role'] == last_role:
+                messages[-1]['content'] += "\n" + h['content']
+            else:
+                messages.append(h)
+                last_role = h['role']
         
         # Generate completion
         completion = groq_client.chat.completions.create(

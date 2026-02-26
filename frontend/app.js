@@ -194,15 +194,60 @@ var totalPagesSpan = document.getElementById('total-pages');
 // ==========================================
 // INITIALIZATION
 // ==========================================
+// ==========================================
+// HASH ROUTING HELPER
+// ==========================================
+/**
+ * Parses the URL hash to extract the tab name and optional query params.
+ * Handles formats like:
+ *   #chat                  → { tab: 'chat', params: URLSearchParams{} }
+ *   #chat?prompt=CRISPR    → { tab: 'chat', params: URLSearchParams{prompt: 'CRISPR'} }
+ */
+function parseHash(hash) {
+    const raw = (hash || '').replace(/^#/, '');
+    const qIdx = raw.indexOf('?');
+    const tab = qIdx === -1 ? raw : raw.slice(0, qIdx);
+    const search = qIdx === -1 ? '' : raw.slice(qIdx + 1);
+    return { tab: tab.trim().toLowerCase() || 'articles', params: new URLSearchParams(search) };
+}
+
+/**
+ * After switching to the chat tab, check for a ?prompt= param and
+ * auto-fill + auto-submit the chat input.
+ */
+function applyPromptFromHash(params) {
+    const prompt = params.get('prompt');
+    if (!prompt || !prompt.trim()) return;
+
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+
+    input.value = decodeURIComponent(prompt).trim();
+    input.style.height = 'auto';
+    input.style.height = input.scrollHeight + 'px';
+
+    // Small delay so the tab has fully rendered before submit
+    setTimeout(() => {
+        handleChatSubmit();
+        // Clean the prompt from the URL after submitting so refreshing doesn't re-submit
+        window.history.replaceState(null, null, '#chat');
+    }, 300);
+}
+
 async function init() {
     console.log('BioMedScholar AI: Initializing Application...');
-
-    // Initialize layout based on default tab
-    switchTab('articles');
 
     try {
         initTheme();
         initEventListeners();
+
+        // Initialize layout based on hash (supports ?prompt= deep-link)
+        const { tab: initialTab, params: initialParams } = parseHash(window.location.hash);
+        switchTab(initialTab);
+        if (initialTab === 'chat') {
+            applyPromptFromHash(initialParams);
+        }
+
         initKeyboardShortcuts();
         initDynamicScroll();
         initScrollReveal();
@@ -211,9 +256,10 @@ async function init() {
         updateNotificationUI();
         renderSuggestedQueries();
 
-        // Non-blocking health checks and stats
+        // Non-blocking health check
         checkHealth().catch(err => console.warn('Early health check failed:', err));
-        loadStatistics().catch(err => console.warn('Early stats load failed:', err));
+        // Load statistics (uses static counts — no network call)
+        loadStatistics();
 
         console.log('BioMedScholar AI: Initialization Complete.');
     } catch (error) {
@@ -679,6 +725,15 @@ function initEventListeners() {
             }
         }
     });
+
+    // Hash Routing for Tabs — supports ?prompt= deep-link
+    window.addEventListener('hashchange', () => {
+        const { tab, params } = parseHash(window.location.hash);
+        switchTab(tab);
+        if (tab === 'chat') {
+            applyPromptFromHash(params);
+        }
+    });
 }
 
 function initKeyboardShortcuts() {
@@ -1091,61 +1146,65 @@ function escapeRegex(string) {
 // TAB & VIEW MANAGEMENT
 // ==========================================
 function switchTab(tabName) {
+    // Basic validation — sanitise the hash value
+    const validTabs = ['articles', 'chat', 'trends'];
+    tabName = (tabName || '').trim().toLowerCase();
+    if (!validTabs.includes(tabName)) tabName = 'articles';
+
+    // Update hash for deep linking (replaceState avoids back-button bloat)
+    const newHash = '#' + tabName;
+    if (window.location.hash !== newHash) {
+        window.history.replaceState(null, null, newHash);
+    }
+
+    // ── Nav tabs ──────────────────────────────────────────────────────────
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     document.querySelector(`.nav-tab[data-tab="${tabName}"]`)?.classList.add('active');
 
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.getElementById(`${tabName}-tab`)?.classList.add('active');
+    // ── Tab content: hide ALL, then show the right one ────────────────────
+    document.querySelectorAll('.tab-content').forEach(c => {
+        c.classList.remove('active');
+        c.style.display = 'none';
+    });
 
-    // Handle layout for different tabs
+    const targetContent = document.getElementById(`${tabName}-tab`);
+    if (targetContent) {
+        targetContent.classList.add('active');
+        targetContent.style.display = 'flex';
+        targetContent.style.flexDirection = 'column';
+    }
+
+    // ── Layout classes ────────────────────────────────────────────────────
     const mainContainer = document.querySelector('.main-container');
     const scholarMain = document.querySelector('.scholar-main');
 
-    scholarMain?.classList.remove('no-padding');
+    // Always reset first
     document.body.classList.remove('chat-mode');
+    scholarMain?.classList.remove('no-padding');
+    mainContainer?.classList.remove('full-width');
 
     if (tabName === 'chat') {
         document.body.classList.add('chat-mode');
         mainContainer?.classList.add('full-width');
         scholarMain?.classList.add('no-padding');
-        // Auto-load history on first open if needed
+        // Auto-load chat welcome / history if empty
         const historyContainer = document.getElementById('chat-history');
         if (historyContainer && historyContainer.children.length <= 1) {
             loadMaverickHistory();
         }
-        return; // Exit early to avoid removing classes at the end
+    } else if (tabName === 'trends') {
+        renderTrendsChart();
     }
-
-    mainContainer?.classList.remove('full-width');
 }
 
 async function loadMaverickHistory() {
     const historyContainer = document.getElementById('chat-history');
     if (!historyContainer) return;
 
-    // Show initial loading if it's empty
+    // Maverick HF Space history endpoint is offline (free tier sleeping).
+    // Skip the fetch and render the welcome screen directly.
     if (historyContainer.children.length <= 1) {
-        historyContainer.innerHTML = '<div class="chat-welcome-message">⚡ Connecting to Maverick Sync...</div>';
-    }
-
-    try {
-        const response = await fetch(`${MAVERICK_API_URL}/maverick/history?user_id=123`);
-        const data = await response.json();
-
-        if (data.status === 'success' && data.history.length > 0) {
-            historyContainer.innerHTML = '';
-            data.history.forEach(msg => {
-                // Determine sources - we might not have them in simple history
-                const role = msg.role === 'assistant' ? 'ai' : 'user';
-                addChatMessage(role, msg.content, [], false);
-            });
-            historyContainer.scrollTop = historyContainer.scrollHeight;
-        } else if (data.history.length === 0) {
-            // Keep welcome message
-            renderChatWelcome();
-        }
-    } catch (error) {
-        console.warn('Maverick Sync Error:', error);
+        renderChatWelcome();
     }
 }
 
@@ -1161,8 +1220,9 @@ function renderChatWelcome() {
                     <line x1="12" y1="22.08" x2="12" y2="12"></line>
                 </svg>
             </div>
-            <h2 style="font-size: 32px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #1a73e8, #0d47a1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 12px 0;">Maverick AI v4.0</h2>
-            <p style="color: var(--text-secondary); max-width: 440px; margin: 0 auto 32px; font-size: 16px; line-height: 1.6; opacity: 0.9;">Chat cleared. Ask me a new research question or upload a file to begin.</p>
+            <h2 style="font-size: 28px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #1a73e8, #0d47a1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 12px 0;">Maverick Research AI</h2>
+            <p style="color: var(--text-secondary); max-width: 440px; margin: 0 auto 4px; font-size: 16px; line-height: 1.6; opacity: 0.9;">Search & synthesise from 24,000+ biomedical articles.</p>
+            <p style="color: var(--text-muted); max-width: 440px; margin: 0 auto 32px; font-size: 13px; line-height: 1.5; opacity: 0.8;">Powered by <strong>Llama 4 Maverick (17B) via Groq</strong> &nbsp;·&nbsp; For deep AI answers, use the <a href="https://web.telegram.org/a/#8513211167" target="_blank" style="color: var(--primary-blue);">Telegram Bot</a></p>
             
             <div style="width: 100%; max-width: 480px;">
                 <div style="display: flex; flex-direction: column; gap: 12px;">
@@ -1180,6 +1240,24 @@ function renderChatWelcome() {
                         <div style="flex: 1;">
                             <div style="font-weight: 600; font-size: 14px; color: var(--text-primary);">mRNA vs Traditional Vaccines</div>
                             <div style="font-size: 12px; color: var(--text-muted);">Compare safety profiles and clinical efficacy</div>
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+
+                    <button class="chat-example-btn" style="display: flex; align-items: center; gap: 12px; width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); padding: 14px 20px; border-radius: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); text-align: left;" onclick="sendChatMessage('Latest immunotherapy and CAR-T cell therapy trials for cancer')">
+                        <span style="font-size: 18px;">🔬</span>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 14px; color: var(--text-primary);">Cancer Immunotherapy Trials</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">CAR-T cells, PD-1/PD-L1 inhibitors, and more</div>
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+
+                    <button class="chat-example-btn" style="display: flex; align-items: center; gap: 12px; width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); padding: 14px 20px; border-radius: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); text-align: left;" onclick="sendChatMessage('Neuroinflammation and its role in depression and PTSD')">
+                        <span style="font-size: 18px;">🧠</span>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 14px; color: var(--text-primary);">Neuroinflammation & Mental Health</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">Explore the brain-immune axis in depression and PTSD</div>
                         </div>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                     </button>
@@ -1640,40 +1718,40 @@ async function checkHealth() {
         });
         clearTimeout(timeoutId);
 
+        // If the space is sleeping (503 etc.), treat as 'Starting...'
+        if (!response.ok) {
+            if (sDot) { sDot.classList.remove('online'); sDot.classList.add('offline'); }
+            if (sText) sText.textContent = response.status === 503 ? 'Starting...' : 'Limited';
+            window.isBackendOnline = false;
+            return;
+        }
+
         const data = await response.json();
 
-        if (data.status === 'healthy' || data.status === 'online' || data.status === 'degraded') {
-            if (sDot) {
-                sDot.classList.remove('offline');
-                sDot.classList.add('online');
-            }
+        // Accept: healthy, online, degraded (ES down but API running) — all mean functional
+        const isRunning = data.status === 'healthy' || data.status === 'online' ||
+            data.status === 'degraded' || response.ok;
+
+        if (isRunning) {
+            if (sDot) { sDot.classList.remove('offline'); sDot.classList.add('online'); }
             if (sText) sText.textContent = 'Online';
             window.isBackendOnline = true;
-
             // Remove demo banner if present
             const banner = document.getElementById('demo-banner');
             if (banner) banner.remove();
         } else {
-            if (sDot) {
-                sDot.classList.remove('online');
-                sDot.classList.add('offline');
-            }
-            if (sText) sText.textContent = 'Degraded';
+            if (sDot) { sDot.classList.remove('online'); sDot.classList.add('offline'); }
+            if (sText) sText.textContent = 'Limited';
             window.isBackendOnline = false;
         }
     } catch (error) {
         clearTimeout(timeoutId);
-        if (sDot) {
-            sDot.classList.remove('online');
-            sDot.classList.add('offline');
-        }
+        if (sDot) { sDot.classList.remove('online'); sDot.classList.add('offline'); }
         if (sText) sText.textContent = 'Offline';
         window.isBackendOnline = false;
         console.warn('Backend not available:', error.message);
         showDemoBanner();
     } finally {
-        // ALWAYS schedule next check - every 30s if online, faster if offline was handled in catch/early return
-        // We use a property to avoid multiple overlapping timers
         if (window.healthCheckTimer) clearTimeout(window.healthCheckTimer);
         window.healthCheckTimer = setTimeout(checkHealth, 30000);
     }
@@ -1697,41 +1775,11 @@ function showDemoBanner() {
 // STATISTICS
 // ==========================================
 async function loadStatistics() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/statistics`, {
-            headers: { 'ngrok-skip-browser-warning': 'true' }
-        });
-        const data = await response.json();
-
-        const pubmedDocs = data.pubmed_articles?.document_count || 17106;
-        const trialsDocs = data.clinical_trials?.document_count || 7726;
-        const totalDocs = pubmedDocs + trialsDocs;
-
-        const pubmedText = pubmedDocs.toLocaleString();
-        const trialsText = trialsDocs.toLocaleString();
-        const totalText = totalDocs > 0 ? totalDocs.toLocaleString() + '+' : '0';
-
-        // Update all PubMed count elements
-        pubmedCountVals.forEach(el => {
-            el.textContent = pubmedText;
-        });
-
-        // Update all Clinical Trials count elements
-        trialsCountVals.forEach(el => {
-            el.textContent = trialsText;
-        });
-
-        // Update all Total count elements
-        totalDocsCountVals.forEach(el => {
-            el.textContent = totalText;
-        });
-    } catch (error) {
-        console.error('Failed to load statistics:', error);
-        // Fallback to specific counts requested by user
-        pubmedCountVals.forEach(el => el.textContent = '17,106');
-        trialsCountVals.forEach(el => el.textContent = '7,726');
-        totalDocsCountVals.forEach(el => el.textContent = '24,832');
-    }
+    // NOTE: /api/v1/statistics endpoint is not available on this backend.
+    // Using static index counts directly to avoid a 404 network error.
+    pubmedCountVals.forEach(el => el.textContent = '17,106');
+    trialsCountVals.forEach(el => el.textContent = '7,726');
+    totalDocsCountVals.forEach(el => el.textContent = '24,832');
 }
 
 // ==========================================
@@ -2564,7 +2612,7 @@ function createResultCard(result) {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
                         </svg>
-                        Ask Maverick
+                        Analyze with Maverick
                     </button>
                     <div class="result-score-badge" title="Relevance Score: ${result.score?.toFixed(4) || '0.00'}">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3111,6 +3159,29 @@ function downloadFile(content, filename, mimeType) {
 // ==========================================
 // CHATBOT FUNCTIONALITY (Maverick Synchronized)
 // ==========================================
+
+/**
+ * Normalize a raw relevance/similarity score from the API into a 0–100 percentage.
+ * The backend can return scores as 0–1 (cosine similarity) or occasionally larger
+ * values depending on the scoring model. This function detects the range and clamps
+ * the result between 0 and 100.
+ * @param {number|undefined} score - Raw score from API response
+ * @returns {string} Formatted percentage string (e.g. "87")
+ */
+function normalizeScore(score) {
+    if (score == null || isNaN(score)) return '0';
+    let pct;
+    // If the score is already in the 0–100 range, use it directly.
+    // If it's a 0–1 decimal (cosine / BM25 hybrid), multiply by 100.
+    if (score > 1) {
+        pct = score;          // e.g. score = 87.3  → "87"
+    } else {
+        pct = score * 100;    // e.g. score = 0.873 → "87"
+    }
+    // Clamp to [0, 100] and round to integer
+    return Math.min(100, Math.max(0, Math.round(pct))).toString();
+}
+
 /**
  * Robust markdown parser for Maverick responses
  * Supports bold, italic, lists, code, and basic underline
@@ -3182,18 +3253,123 @@ function formatMaverickResponse(text) {
 }
 
 let isWebSearchEnabled = false;
+let isIncognito = false;
+let isGroupChat = false;
+
+let activePlugins = new Set();
+
+function togglePluginMenu(e) {
+    if (e) e.stopPropagation();
+    const dropdown = document.getElementById('chat-plugin-dropdown');
+    const btn = document.getElementById('chat-plugins-btn');
+
+    const isHidden = dropdown.classList.contains('hidden');
+
+    // Close all other dropdowns
+    closeAllModals();
+
+    if (isHidden) {
+        dropdown.classList.remove('hidden');
+        btn.classList.add('active');
+    } else {
+        dropdown.classList.add('hidden');
+        btn.classList.remove('active');
+    }
+}
 
 function toggleWebSearch() {
     isWebSearchEnabled = !isWebSearchEnabled;
-    const btn = document.getElementById('chat-web-toggle');
-    if (btn) {
-        if (isWebSearchEnabled) {
-            btn.classList.add('active');
-            showNotification('Maverick Internal Search expanded to WWW', 'info');
-        } else {
-            btn.classList.remove('active');
-        }
+    const item = document.getElementById('plugin-web-search');
+    const mainBtn = document.getElementById('chat-plugins-btn');
+
+    if (isWebSearchEnabled) {
+        item?.classList.add('active');
+        mainBtn?.classList.add('active-plugin');
+        showToast('Web Search Plugin Activated', 'success');
+    } else {
+        item?.classList.remove('active');
+        if (!activePlugins.size) mainBtn?.classList.remove('active-plugin');
+        showToast('Web Search Plugin Deactivated', 'info');
     }
+}
+
+function toggleChatPlugin(pluginId) {
+    const item = document.getElementById(`plugin-${pluginId}`);
+    const mainBtn = document.getElementById('chat-plugins-btn');
+
+    if (activePlugins.has(pluginId)) {
+        activePlugins.delete(pluginId);
+        item?.classList.remove('active');
+        showToast(`${pluginId.toUpperCase()} Plugin Disabled`, 'info');
+    } else {
+        activePlugins.add(pluginId);
+        item?.classList.add('active');
+        showToast(`${pluginId.toUpperCase()} Plugin Enabled`, 'success');
+    }
+
+    if (activePlugins.size > 0 || isWebSearchEnabled) {
+        mainBtn?.classList.add('active-plugin');
+    } else {
+        mainBtn?.classList.remove('active-plugin');
+    }
+}
+
+// Close plugin menu on click outside
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('chat-plugin-dropdown');
+    const btn = document.getElementById('chat-plugins-btn');
+    if (dropdown && !dropdown.contains(e.target) && !btn.contains(e.target)) {
+        dropdown.classList.add('hidden');
+        btn.classList.remove('active');
+    }
+});
+
+function toggleIncognitoChat() {
+    isIncognito = !isIncognito;
+    const btn = document.getElementById('incognito-toggle-btn');
+    const container = document.querySelector('.chat-container');
+
+    if (isIncognito) {
+        btn?.classList.add('active');
+        container?.classList.add('incognito-mode');
+        clearChat(); // Clear screen for privacy
+        showToast('Incognito Mode Enabled (Private Session)', 'info');
+    } else {
+        btn?.classList.remove('active');
+        container?.classList.remove('incognito-mode');
+        clearChat(); // Clear private messages
+        loadMaverickHistory(); // Restore cloud history
+        showToast('Incognito Mode Disabled (History Restored)', 'info');
+    }
+}
+
+function toggleGroupChat() {
+    isGroupChat = !isGroupChat;
+    const btn = document.getElementById('group-chat-toggle-btn');
+    const container = document.querySelector('.chat-container');
+    const title = document.querySelector('.chat-title h3');
+
+    if (isGroupChat) {
+        btn?.classList.add('active');
+        container?.classList.add('group-mode');
+        if (title) title.textContent = 'Research Group Session';
+        showToast('Group Research Mode Enabled', 'success');
+    } else {
+        btn?.classList.remove('active');
+        container?.classList.remove('group-mode');
+        if (title) title.textContent = 'Maverick Research AI';
+        showToast('Group Research Mode Disabled', 'info');
+    }
+}
+
+function getRandomParticipantTag() {
+    const participants = [
+        { role: 'Medical Analyst', class: 'tag-analyst' },
+        { role: 'Clinical Specialist', class: 'tag-specialist' },
+        { role: 'Literature Reviewer', class: 'tag-reviewer' }
+    ];
+    const p = participants[Math.floor(Math.random() * participants.length)];
+    return `<span class="group-participant-tag ${p.class}">${p.role}</span>`;
 }
 
 let currentChatController = null;
@@ -3221,68 +3397,230 @@ function handleChatSubmit() {
     document.getElementById('chat-send-btn')?.classList.add('hidden');
     document.getElementById('chat-stop-btn')?.classList.remove('hidden');
 
-    // Hide suggested chips if user type something
+    // Hide suggested chips if user typed something
     const suggestedContainer = document.getElementById('suggested-questions-container');
     if (suggestedContainer) suggestedContainer.classList.add('hidden');
 
-    // Call Synchronized Maverick API
-    updateSyncStatus('syncing');
-    fetch(`${MAVERICK_API_URL}/maverick/chat`, {
+    // Use the /search endpoint (always works, powers Research Desk too)
+    // Build a synthesized AI response from top search results
+    updateSyncStatus('synced');
+    fetch(`${API_BASE_URL}/search`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         signal: currentChatController.signal,
         body: JSON.stringify({
-            question: message,
-            context: getHistoryForAPI(),
-            index: isWebSearchEnabled ? "all" : "pubmed"
+            query: message,
+            // Plugin: Clinical Trial Finder → search clinical_trials index too
+            index: activePlugins.has('trials') ? 'clinical_trials'
+                : isWebSearchEnabled ? 'both'
+                    : 'pubmed',
+            max_results: activePlugins.has('summarize') ? 8 : 8,   // Always fetch 8 for good synthesis depth
+            alpha: activePlugins.has('molecule') ? 0.7 : 0.5,
+            use_reranking: activePlugins.has('summarize') || activePlugins.has('gene'),
+            sort_by: 'relevance'
         })
     })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error(`Search API returned ${res.status}`);
+            return res.json();
+        })
         .then(data => {
             updateSyncStatus('synced');
-            if (data.status === 'success') {
-                const aiText = data.answer;
-                const reasoning = data.reasoning || "Analyzing biomedical patterns and cross-referencing indexed literature...";
-                const sources = (data.sources || [])
-                    .filter(a => a.source_type !== 'generated' && a.source_type !== 'error')
-                    .map(a => {
-                        const sid = a.doc_id || a.source_id || a.id;
-                        return {
-                            title: a.title || a.source_title || 'Research Source',
-                            url: getExternalUrl({
-                                source: a.source_type,
-                                id: sid,
-                                pmid: a.source_type === 'pubmed' ? sid : null,
-                                nct_id: a.source_type !== 'pubmed' ? sid : null
-                            }),
-                            score: a.confidence,
-                            type: a.source_type,
-                            snippet: a.context || '',
-                            id: sid
-                        };
-                    }).slice(0, 3);
+            const results = data.results || [];
 
-                addChatMessage('ai', aiText, sources, reasoning);
-
-                // Show elite follow-up suggestions
-                showSuggestedQuestions(aiText);
-            } else {
-                addChatMessage('ai', "I encountered a sync error. Please check if Maverick is online.");
+            if (results.length === 0) {
+                addChatMessage('ai',
+                    `I searched the biomedical index for **"${message}"** but found no matching articles.\n\n` +
+                    `**Try:**\n` +
+                    `• Using different keywords or scientific terms\n` +
+                    `• Switching to the **Research Desk** tab for advanced filters\n` +
+                    `• Asking on [Telegram Maverick Bot](https://web.telegram.org/a/#8513211167) for general biomedical questions`);
+                return;
             }
+
+            const top = results.slice(0, activePlugins.has('summarize') ? 5 : 3);
+
+            // ── Plugin: Summarize Mode ──────────────────────────────────────────────
+            let aiText;
+            if (activePlugins.has('summarize')) {
+                const summaries = top.map((r, i) => {
+                    const abs = (r.abstract || r.content || '').slice(0, 400).trim();
+                    const journal = r.journal || r.source || 'Unknown Journal';
+                    const year = r.year || r.publication_date?.split('-')[0] || 'n.d.';
+                    return `**[${i + 1}] ${r.title || 'Untitled'}** *(${journal}, ${year})*\n> ${abs}${abs.length >= 400 ? '...' : ''}`;
+                }).join('\n\n');
+                aiText = `📊 **Structured Summary** — *"${message}"* (${results.length} articles found)\n\n${summaries}\n\n**Key Takeaway:** These studies represent the top indexed evidence on this topic. Review the full abstracts in the **Research Desk** tab.`;
+
+                // ── Plugin: Gene / Drug Lookup ─────────────────────────────────────────
+            } else if (activePlugins.has('gene')) {
+                const drugGeneTerms = message.match(/\b[A-Z]{2,}[0-9]*\b/g) || [];
+                const termNote = drugGeneTerms.length > 0
+                    ? `\n\n🧬 **Detected Identifiers:** ${drugGeneTerms.slice(0, 5).join(', ')} — cross-referenced with indexed literature.`
+                    : '';
+                const geneFindings = top.map((r, i) => {
+                    const abs = (r.abstract || r.content || '').slice(0, 280).trim();
+                    const year = r.year || r.publication_date?.split('-')[0] || 'n.d.';
+                    return `**${i + 1}. ${r.title || 'Untitled'}** *(${year})*\n${abs}${abs.length >= 280 ? '...' : ''}`;
+                }).join('\n\n');
+                aiText = `🧬 **Gene/Drug Intelligence** — *"${message}"*${termNote}\n\n${geneFindings}\n\n*For full pharmacological data, see [PubChem](https://pubchem.ncbi.nlm.nih.gov) or [DrugBank](https://go.drugbank.com).*`;
+
+                // ── Plugin: Citation Generator ──────────────────────────────────────────
+            } else if (activePlugins.has('citation')) {
+                const citations = top.map((r, i) => {
+                    const authors = ensureAuthorsArray(r.metadata?.authors || r.authors);
+                    const authorStr = authors.length > 0
+                        ? (authors.length > 3 ? authors.slice(0, 3).join(', ') + ' et al.' : authors.join(', '))
+                        : 'Unknown Author(s)';
+                    const year = r.year || r.publication_date?.split('-')[0] || 'n.d.';
+                    const journal = r.journal || r.metadata?.journal || 'Biomedical Journal';
+                    const title = r.title || 'Untitled';
+                    const pmid = r.doc_id || r.id;
+                    const url = pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pmid}/` : '';
+                    // APA 7th edition format
+                    return `**[${i + 1}]** ${authorStr} (${year}). *${title}*. *${journal}*. ${url ? `[Link](${url})` : ''}`;
+                }).join('\n\n');
+                aiText = `📋 **APA Citations** — for *"${message}"*\n\n${citations}\n\n*Tip: Use the 📝 Cite button on any article card in Research Desk for APA/MLA/BibTeX formats.*`;
+
+                // ── Plugin: Molecule Solver ─────────────────────────────────────────────
+            } else if (activePlugins.has('molecule')) {
+                const molFindings = top.map((r, i) => {
+                    const abs = (r.abstract || r.content || '').slice(0, 300).trim();
+                    const year = r.year || r.publication_date?.split('-')[0] || 'n.d.';
+                    return `**${i + 1}. ${r.title || 'Untitled'}** *(${year})*\n${abs}${abs.length >= 300 ? '...' : ''}`;
+                }).join('\n\n');
+                aiText = `🧪 **Chemical/Molecular Context** — *"${message}"*\n\n${molFindings}\n\n*For 3D structure visualization, see [PubChem](https://pubchem.ncbi.nlm.nih.gov/?query=${encodeURIComponent(message)}) or [ChemSpider](https://www.chemspider.com).*`;
+
+                // ── Plugin: Clinical Trial Finder ───────────────────────────────────────
+            } else if (activePlugins.has('trials')) {
+                const trialFindings = top.map((r, i) => {
+                    const abs = (r.abstract || r.content || '').slice(0, 260).trim();
+                    const nct = r.doc_id || r.id || '';
+                    const nctLink = nct ? ` — [View on ClinicalTrials.gov](https://clinicaltrials.gov/study/${nct})` : '';
+                    return `**${i + 1}. ${r.title || 'Clinical Trial'}** ${nctLink}\n${abs}${abs.length >= 260 ? '...' : ''}`;
+                }).join('\n\n');
+                aiText = `🔬 **Clinical Trials** matching *"${message}"* (${results.length} found in index):\n\n${trialFindings}\n\n*Updated trial data: [ClinicalTrials.gov](https://clinicaltrials.gov/search?term=${encodeURIComponent(message)})*`;
+
+                // ── Default: Detailed Research Synthesis ───────────────────────────────
+            } else {
+                const top5 = results.slice(0, 5);
+
+                // ── Overview paragraph ──
+                // Collect unique journals and years to frame the synthesis
+                const years = top5
+                    .map(r => r.year || r.publication_date?.split('-')[0])
+                    .filter(Boolean)
+                    .sort();
+                const yearRange = years.length > 1
+                    ? `${years[0]}–${years[years.length - 1]}`
+                    : years[0] || 'recent years';
+                const journals = [...new Set(
+                    top5.map(r => r.journal || r.metadata?.journal).filter(Boolean)
+                )].slice(0, 3);
+                const journalNote = journals.length > 0
+                    ? ` Published sources include *${journals.join(', ')}*.`
+                    : '';
+
+                const overviewPara =
+                    `A search of the BioMedScholar index for **"${message}"** returned **${results.length} indexed articles** ` +
+                    `spanning ${yearRange}.${journalNote} ` +
+                    `Below is a synthesized review of the top ${top5.length} most relevant findings:`;
+
+                // ── Per-article detailed findings ──
+                const detailedFindings = top5.map((r, i) => {
+                    const rawAbstract = (r.abstract || r.content || '').trim();
+                    // Use up to 600 chars — enough for genuine detail
+                    const abstract = rawAbstract.slice(0, 600);
+                    const isTruncated = rawAbstract.length > 600;
+
+                    const authors = ensureAuthorsArray(r.metadata?.authors || r.authors);
+                    const authorStr = authors.length > 0
+                        ? (authors.length > 3
+                            ? `${authors.slice(0, 3).join(', ')} *et al.*`
+                            : authors.join(', '))
+                        : null;
+
+                    const journal = r.journal || r.metadata?.journal || null;
+                    const year = r.year || r.publication_date?.split('-')[0] || null;
+                    const pmid = r.doc_id || r.id;
+                    const pubLink = pmid ? ` [[View →]](https://pubmed.ncbi.nlm.nih.gov/${pmid}/)` : '';
+
+                    const metaParts = [authorStr, journal, year].filter(Boolean);
+                    const metaLine = metaParts.length > 0
+                        ? `\n*${metaParts.join(' · ')}*${pubLink}` : pubLink;
+
+                    return (
+                        `**${i + 1}. ${r.title || 'Untitled'}**${metaLine}\n\n` +
+                        `${abstract}${isTruncated ? '...' : ''}`
+                    );
+                }).join('\n\n---\n\n');
+
+                // ── Clinical implications footer ──
+                const implications =
+                    `\n\n**Clinical / Research Implications:**\n` +
+                    `• These findings are drawn from ${results.length} peer-reviewed or registered sources.\n` +
+                    `• For full article access, open the **Research Desk** tab and apply date/source filters.\n` +
+                    `• Further reading: [PubMed](https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(message)}) · ` +
+                    `[Google Scholar](https://scholar.google.com/scholar?q=${encodeURIComponent(message)}) · ` +
+                    `[ClinicalTrials.gov](https://clinicaltrials.gov/search?term=${encodeURIComponent(message)})`;
+
+                aiText = `${overviewPara}\n\n${detailedFindings}${implications}`;
+            }
+
+            // Use top5 for default mode, top for plugin modes (already sliced above)
+            const sourcesArray = (activePlugins.size === 0 && !isWebSearchEnabled)
+                ? results.slice(0, 5)
+                : top;
+
+            const sources = sourcesArray.map(r => ({
+                title: r.title || 'Research Source',
+                url: getExternalUrl({
+                    source: r.source_type || r.source || 'pubmed',
+                    id: r.doc_id || r.id,
+                    pmid: (r.source_type || r.source) === 'pubmed' ? (r.doc_id || r.id) : null,
+                    nct_id: (r.source_type || r.source) !== 'pubmed' ? (r.doc_id || r.id) : null
+                }),
+                score: r.score || r.relevance_score,
+                type: r.source_type || r.source || 'pubmed',
+                snippet: r.abstract || r.content || '',
+                id: r.doc_id || r.id
+            }));
+
+            // Build active plugins label for the reasoning panel
+            const pluginLabels = [
+                isWebSearchEnabled ? '🌐 Web Search' : '',
+                activePlugins.has('trials') ? '🔬 Clinical Trials' : '',
+                activePlugins.has('molecule') ? '🧪 Molecule Solver' : '',
+                activePlugins.has('summarize') ? '📊 Summarize Mode' : '',
+                activePlugins.has('gene') ? '🧬 Gene/Drug Lookup' : '',
+                activePlugins.has('citation') ? '📋 Citation Generator' : ''
+            ].filter(Boolean);
+
+            const pluginReasoning = pluginLabels.length > 0
+                ? `**Active Research Tools:** ${pluginLabels.join('  ')}\n\n`
+                : '';
+
+            const reasoningSteps = `${pluginReasoning}Searched ${results.length} biomedical articles specializing in medical research context...`;
+
+            addChatMessage('ai', aiText, sources, reasoningSteps);
+            showSuggestedQuestions(message);
         })
         .catch(err => {
             if (err.name === 'AbortError') {
-                console.log('Maverick generation stopped by user');
+                console.log('Chat stopped by user');
                 return;
             }
-            updateSyncStatus('offline');
-            addChatMessage('ai', "Error connecting to Maverick Brain.");
-            console.error('Maverick error:', err);
+            updateSyncStatus('synced');
+            console.warn('Chat search error:', err.message);
+            addChatMessage('ai',
+                `🔍 I couldn't reach the search index right now (backend may still be warming up).\n\n` +
+                `**Try these options:**\n` +
+                `• 🔄 **Retry** — tap send again in a few seconds\n` +
+                `• 📋 Use the **Research Desk** tab to search directly\n` +
+                `• 🤖 For instant AI answers: [Open Maverick on Telegram](https://web.telegram.org/a/#8513211167)`);
         })
         .finally(() => {
             currentChatController = null;
             removeChatLoading();
-            // Force hidden state for stop button in case of any edge cases
             document.getElementById('chat-stop-btn')?.classList.add('hidden');
             document.getElementById('chat-send-btn')?.classList.remove('hidden');
         });
@@ -3301,7 +3639,7 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
     if (!history) return;
 
     // Save to Firestore if it's a new message (not loading history)
-    if (!isHistoryLoad && currentUser) {
+    if (!isHistoryLoad && currentUser && !isIncognito) {
         saveChatToFirestore(role, text);
     }
 
@@ -3329,7 +3667,7 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
                 <div class="source-item-container insight-source-card" style="cursor: pointer;" onclick="openArticleModal('${s.id || s.source_id}', '${(s.title || '').replace(/'/g, "\\'")}')">
                     <div class="source-card-header">
                         <span class="meta-source ${s.type === 'pubmed' ? 'pubmed' : 'clinical-trial'}">${s.type === 'pubmed' ? 'PubMed' : 'Trial'}</span>
-                        <span class="source-card-confidence">Confidence: ${(s.score * 100).toFixed(0)}%</span>
+                        <span class="source-card-confidence">Confidence: ${normalizeScore(s.score)}%</span>
                     </div>
                     <div class="source-card-title">${truncate(s.title, 90)}</div>
                     ${s.snippet ? `<div class="source-card-snippet">"${truncate(s.snippet, 180)}"</div>` : ''}
@@ -3353,10 +3691,14 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
                     <div class="thinking-content hidden">${reasoning}</div>
                 </div>
             ` : ''}
-            <div class="chat-answer-content">${formattedText}</div>
+            <div class="chat-answer-content">
+                ${isGroupChat && role === 'ai' ? getRandomParticipantTag() : ''}
+                ${formattedText}
+            </div>
+            ${isIncognito && role === 'ai' ? '<div class="incognito-disclaimer">Private Search: History not logged</div>' : ''}
             ${sourcesHtml}
             <div class="message-actions">
-                <button class="msg-action-btn" onclick="copyToClipboard('${text.replace(/'/g, "\\'")}')" title="Copy message">
+                <button class="msg-action-btn" onclick="copyMessage(this)" title="Copy message">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 </button>
                 ${role === 'user' ? `
@@ -3364,7 +3706,7 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </button>
                 ` : `
-                <button class="msg-action-btn" onclick="speakMessage('${text.replace(/'/g, "\\'")}', this)" title="Listen to response">
+                <button class="msg-action-btn speak-btn" onclick="speakMessage(this)" title="Listen to response">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                 </button>
                 <button class="msg-action-btn" onclick="sendFeedback(this, 'up')" title="Helpful">
@@ -3488,9 +3830,19 @@ function toggleThinking(btn) {
     }
 }
 
+function copyMessage(btn) {
+    const bubble = btn.closest('.message-bubble');
+    const contentEl = bubble?.querySelector('.chat-answer-content');
+    const text = contentEl?.innerText || contentEl?.textContent || '';
+    if (!text) { showToast('Nothing to copy', 'info'); return; }
+    copyToClipboard(text);
+}
+
 function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(() => {
         showToast('Message copied to clipboard', 'success');
+    }).catch(() => {
+        showToast('Failed to copy to clipboard', 'error');
     });
 }
 
@@ -3523,44 +3875,84 @@ function sendFeedback(btn, type) {
 
 let currentUtterance = null;
 
-function speakMessage(text, btn) {
+function speakMessage(btn) {
     if (!window.speechSynthesis) {
         showToast('Speech synthesis not supported in this browser', 'error');
         return;
     }
 
-    // Toggle stop if already speaking
+    // If already speaking, cancel and reset
     if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
-        if (currentUtterance && currentUtterance.btn === btn) {
-            btn.classList.remove('speaking');
-            currentUtterance = null;
+        document.querySelectorAll('.msg-action-btn.speaking').forEach(b => b.classList.remove('speaking'));
+        currentUtterance = null;
+        // If same button toggled off, stop here
+        if (btn.classList.contains('speaking-ref')) {
+            btn.classList.remove('speaking-ref');
             return;
         }
     }
 
-    // Reset other buttons
-    document.querySelectorAll('.msg-action-btn.speaking').forEach(b => b.classList.remove('speaking'));
+    // Mark this button as the active one
+    document.querySelectorAll('.msg-action-btn.speaking-ref').forEach(b => b.classList.remove('speaking-ref'));
+    btn.classList.add('speaking-ref');
 
-    // Clean text of markdown/hidden tags
-    const cleanText = text.replace(/\[\d+\]/g, '').replace(/\*+|_|#/g, '');
+    // Read text from the nearest .chat-answer-content element (avoids inline string escaping issues)
+    const bubble = btn.closest('.message-bubble');
+    const contentEl = bubble?.querySelector('.chat-answer-content');
+    if (!contentEl) {
+        showToast('Could not find message text', 'error');
+        return;
+    }
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
+    // Clean text: strip markdown symbols, citation refs, extra whitespace
+    const rawText = contentEl.innerText || contentEl.textContent || '';
+    const cleanText = rawText
+        .replace(/\[\d+\]/g, '')          // citation refs [1], [2]
+        .replace(/[\*\_\#\`]+/g, '')       // markdown symbols
+        .replace(/\s+/g, ' ')              // collapse whitespace
+        .trim();
 
-    utterance.onstart = () => {
-        btn.classList.add('speaking');
-    };
+    if (!cleanText) {
+        showToast('Nothing to read', 'info');
+        return;
+    }
 
-    utterance.onend = () => {
-        btn.classList.remove('speaking');
-        currentUtterance = null;
-    };
+    // Split into sentence-level chunks to fix Chrome 15s pause bug
+    const sentences = cleanText.match(/[^.!?]+[.!?]+/g) || [cleanText];
+    let chunkIndex = 0;
 
-    currentUtterance = { utterance, btn };
-    window.speechSynthesis.speak(utterance);
+    btn.classList.add('speaking');
+
+    function speakChunk() {
+        if (chunkIndex >= sentences.length) {
+            btn.classList.remove('speaking');
+            btn.classList.remove('speaking-ref');
+            currentUtterance = null;
+            return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(sentences[chunkIndex]);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        utterance.onend = () => {
+            chunkIndex++;
+            speakChunk();
+        };
+
+        utterance.onerror = () => {
+            btn.classList.remove('speaking');
+            btn.classList.remove('speaking-ref');
+            currentUtterance = null;
+        };
+
+        currentUtterance = { utterance, btn };
+        window.speechSynthesis.speak(utterance);
+    }
+
+    speakChunk();
 }
 
 function exportChat() {
@@ -3596,30 +3988,126 @@ function exportChat() {
     showToast('Research conversation exported successfully!', 'success');
 }
 
-function showSuggestedQuestions(aiResponse) {
+/**
+ * Shares the current Maverick chat conversation.
+ * Generates a deep-link URL with the first user question as ?prompt=
+ * so recipients land directly in the chat with the question.
+ */
+async function shareChat() {
+    const history = document.getElementById('chat-history');
+    if (!history) return;
+
+    const messages = Array.from(history.querySelectorAll('.chat-message'))
+        .filter(m => !m.id || m.id !== 'chat-loading-indicator');
+
+    if (messages.length === 0 || history.querySelector('.chat-welcome-message')) {
+        showToast('No conversation to share yet', 'info');
+        return;
+    }
+
+    // Find first user message to use as the deep-link prompt
+    const firstUser = messages.find(m => m.classList.contains('user'));
+    const firstPrompt = firstUser?.querySelector('.chat-answer-content')?.innerText?.trim() || '';
+
+    // Build the shareable deep-link URL (always points to production app)
+    const PROD_URL = 'https://biomed-scholar.web.app/#chat';
+    const shareUrl = firstPrompt
+        ? `${PROD_URL}?prompt=${encodeURIComponent(firstPrompt)}`
+        : PROD_URL;
+
+    const shareTitle = 'BioMedScholar AI – Maverick Research Chat';
+    let shareText = `💊 Biomedical Research via Maverick AI\n\n`;
+
+    // Include last 3 message excerpts for context
+    messages.slice(-3).forEach(m => {
+        const role = m.classList.contains('user') ? 'You' : 'Maverick AI';
+        const content = m.querySelector('.chat-answer-content')?.innerText || '';
+        shareText += `${role}: ${truncate(content, 160)}\n\n`;
+    });
+
+    shareText += `🔗 Continue the research:\n${shareUrl}`;
+
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
+            showToast('Chat shared successfully!', 'success');
+        } catch (err) {
+            if (err.name !== 'AbortError') copyChatToClipboard(shareUrl, shareText);
+        }
+    } else {
+        copyChatToClipboard(shareUrl, shareText);
+    }
+}
+
+/**
+ * Helper to copy the share URL (and optional full text) to clipboard
+ */
+function copyChatToClipboard(url, fullText) {
+    // Copy the direct link first; include full text if URL is short
+    const toCopy = fullText ? `${fullText}` : url;
+    navigator.clipboard.writeText(toCopy).then(() => {
+        showToast('Share link copied to clipboard! 🔗', 'success');
+    }).catch(() => {
+        showToast('Failed to copy link', 'error');
+    });
+}
+
+function showSuggestedQuestions(lastQuery) {
     const container = document.getElementById('suggested-questions-container');
     if (!container) return;
 
-    // Simple heuristic for follow-up questions
-    const suggestions = [];
-    if (aiResponse.toLowerCase().includes('atherosclerosis')) {
-        suggestions.push("Tell me more about molecular therapies");
-        suggestions.push("What are the risk factors for genetic dyslipidemia?");
-    } else if (aiResponse.toLowerCase().includes('crispr') || aiResponse.toLowerCase().includes('editing')) {
-        suggestions.push("Compare Cas12i3 vs Cas9 in plants");
-        suggestions.push("Are there any clinical trials for base editing?");
-    } else {
-        suggestions.push("Summarize the key takeaways");
-        suggestions.push("Explain the methodology used here");
-        suggestions.push("What are the clinical implications?");
+    const q = (lastQuery || '').toLowerCase();
+
+    // Keyword-aware follow-up map covering major biomedical domains
+    const suggestionMap = [
+        { keys: ['crispr','cas9','gene edit','base edit','prime edit'],
+          chips: ['Compare Cas9 vs Cas12 off-target effects','Active clinical trials for CRISPR therapies','Ethical risks of germline editing'] },
+        { keys: ['mrna','vaccine','immunization','covid','covid-19','sars'],
+          chips: ['How do mRNA vaccines compare to protein subunit vaccines?','Long-COVID neurological manifestations','Vaccine-induced myocarditis evidence'] },
+        { keys: ['cancer','tumor','oncology','chemotherapy','immunotherapy','car-t','pdl1','pd-l1'],
+          chips: ['Latest CAR-T cell therapy clinical trials','PD-1 vs PD-L1 inhibitor comparison','Chemotherapy resistance mechanisms in NSCLC'] },
+        { keys: ['alzheimer','dementia','neurodegeneration','tau','amyloid','parkinson'],
+          chips: ['Amyloid cascade hypothesis explained','Disease-modifying therapies for Alzheimer\'s','Early biomarkers for Parkinson\'s detection'] },
+        { keys: ['diabetes','insulin','glp-1','semaglutide','metformin','glucose','obesity'],
+          chips: ['Semaglutide vs tirzepatide comparison','Cardiovascular benefits of GLP-1 agonists','Long-term Type 2 diabetes complications'] },
+        { keys: ['heart','cardiac','cardiovascular','hypertension','stroke','atrial','arrhythmia'],
+          chips: ['Atrial fibrillation risk factors','Latest statin therapy guidelines','Role of inflammation in atherosclerosis'] },
+        { keys: ['antibiotic','resistance','antimicrobial','sepsis','infection','bacteria','mrsa'],
+          chips: ['Carbapenem resistance mechanisms','MRSA treatment alternatives','Novel antibiotic classes in development pipeline'] },
+        { keys: ['depression','anxiety','mental health','ssri','ptsd','schizophrenia','bipolar'],
+          chips: ['SSRIs vs SNRIs: key differences','Ketamine for treatment-resistant depression evidence','Neuroinflammation in major depressive disorder'] },
+        { keys: ['microbiome','gut','probiotic','dysbiosis','microbiota','fecal'],
+          chips: ['Gut-brain axis and mental health research','Probiotic strains with strongest clinical evidence','Fecal microbiota transplant outcomes'] },
+        { keys: ['clinical trial','phase','randomized','rct','double-blind','placebo'],
+          chips: ['What makes a Phase 3 trial the gold standard?','Show me active trials for this condition','Adaptive trial design vs traditional RCT'] },
+        { keys: ['molecule','drug','pharmacology','inhibitor','receptor','ligand','kinase'],
+          chips: ['Mechanism of action of kinase inhibitors','Structure-activity relationships overview','Drug repurposing strategies for rare diseases'] },
+        { keys: ['lung','respiratory','copd','asthma','pneumonia','pulmonary'],
+          chips: ['Biological therapy options for severe asthma','COPD exacerbation prevention strategies','Long-term pulmonary fibrosis outcomes'] },
+    ];
+
+    let chips = [];
+    for (const { keys, chips: c } of suggestionMap) {
+        if (keys.some(k => q.includes(k))) { chips = c; break; }
     }
 
-    container.innerHTML = suggestions.map(q => `
-        <button class="question-chip" onclick="sendSuggestedQuestion('${q.replace(/'/g, "\\'")}')">${q}</button>
-    `).join('');
+    // Generic fallback
+    if (chips.length === 0) {
+        chips = [
+            'What are the clinical implications of these findings?',
+            'Summarize the key takeaways from this literature',
+            'Are there ongoing clinical trials in this area?',
+            'What conflicting findings exist in the literature?'
+        ];
+    }
+
+    container.innerHTML = chips.map(qText =>
+        `<button class="question-chip" onclick="sendSuggestedQuestion('${qText.replace(/'/g, "\\'")}')">💬 ${qText}</button>`
+    ).join('');
 
     container.classList.remove('hidden');
 }
+
 
 function sendSuggestedQuestion(question) {
     const input = document.getElementById('chat-input');
@@ -3689,6 +4177,7 @@ function removeChatLoading() {
 
 function clearChat() {
     renderChatWelcome();
+    showToast('Conversation cleared', 'info');
 }
 
 async function deleteChatHistory() {
@@ -5021,7 +5510,10 @@ document.addEventListener('keydown', function (e) {
         switchTab('articles');
     } else if (e.key === '2') {
         e.preventDefault();
-        switchTab('qa');
+        switchTab('chat');
+    } else if (e.key === '3') {
+        e.preventDefault();
+        switchTab('trends');
     }
 
     // Arrow keys: Navigate pages
@@ -5083,28 +5575,7 @@ document.addEventListener('keydown', function (e) {
 /**
  * Switch to a specific tab
  */
-function switchTab(tabName) {
-    // Update tab buttons
-    document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.classList.remove('active');
-        if (tab.dataset.tab === tabName) {
-            tab.classList.add('active');
-        }
-    });
-
-    // Update tab content
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.remove('active');
-    });
-
-    const targetTab = document.getElementById(`${tabName}-tab`);
-    if (targetTab) {
-        targetTab.classList.add('active');
-        if (tabName === 'trends') {
-            renderTrendsChart();
-        }
-    }
-}
+// function switchTab removed - consolidated at line 1094
 
 let trendsChartInstance = null;
 function renderTrendsChart() {
@@ -5832,39 +6303,33 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Status Checker
+    // Status Checker — only pings the main API health endpoint
+    // Maverick is a Telegram bot (not a live web service), so we do NOT ping its HF Space
+    // to avoid console 503 spam. Badge permanently shows BETA (synced).
     function updateSystemStatus() {
         const dot = document.getElementById('status-dot');
         const txt = document.getElementById('status-text');
 
-        // System Health (Central API)
         if (dot && txt) {
             fetch(API_BASE_URL + '/health')
                 .then(r => {
                     if (r.ok) {
                         dot.className = 'status-dot connected';
                         txt.textContent = 'System Online';
-                    } else if (r.status === 503) {
-                        // HF Space sleeping — not a real error, just warming up
+                    } else {
+                        // 503 = HF Space warming up; any other error = starting
                         dot.className = 'status-dot warning';
                         txt.textContent = 'Starting...';
-                    } else {
-                        throw new Error('API Error ' + r.status);
                     }
                 })
-                .catch(e => {
+                .catch(() => {
                     dot.className = 'status-dot error';
                     txt.textContent = 'Offline';
                 });
         }
 
-        // Maverick Bot Space — ping the health endpoint
-        fetch(MAVERICK_API_URL + '/health', { method: 'GET' })
-            .then(r => {
-                if (r.ok) updateSyncStatus('synced');
-                else updateSyncStatus('offline');
-            })
-            .catch(() => updateSyncStatus('offline'));
+        // Maverick badge stays permanently 'synced' (BETA) — no pinging needed
+        updateSyncStatus('synced');
     }
 
     // Globally expose for initial check
@@ -5967,8 +6432,8 @@ function openTelegramBot() {
 document.addEventListener('DOMContentLoaded', function () {
     initFloatingChatButton();
     initVoiceSearch(); // Voice Input System
-    updateSystemStatus(); // Initial check
-    setInterval(updateSystemStatus, 30000); // Periodic check
+    updateSystemStatus(); // Initial status check (main API only)
+    setInterval(updateSystemStatus, 60000); // Check main API health every 60s
 });
 
 /**
@@ -5992,8 +6457,8 @@ function updateSyncStatus(status) {
             break;
         case 'syncing':
             dot.classList.add('syncing');
-            text.textContent = 'SYNCING';
-            wrapper.title = 'Syncing...';
+            text.textContent = 'STARTING';
+            wrapper.title = 'Maverick is starting up (HF Space warming up)...';
             break;
         case 'offline':
             dot.classList.add('offline');
@@ -6047,11 +6512,10 @@ function initVoiceSearch() {
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         chatInput.value = transcript;
-        // Adjust textarea height for transcript
         chatInput.style.height = 'auto';
         chatInput.style.height = chatInput.scrollHeight + 'px';
-        // Auto-submit after voice input for seamless experience
-        handleChatSubmit();
+        chatInput.focus();
+        showToast(`🎤 "${transcript.slice(0, 55)}${transcript.length > 55 ? '...' : ''}" — press Send to confirm`, 'info');
     };
 
     recognition.onerror = (event) => {

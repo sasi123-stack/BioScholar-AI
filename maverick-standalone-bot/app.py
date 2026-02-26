@@ -233,7 +233,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_message(user_id, "user", user_text)
         
         history = get_history(user_id)
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+        
+        # Build messages list efficiently
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        last_role = "system"
+        for h in history:
+            if h['role'] == last_role:
+                messages[-1]['content'] += "\n" + h['content']
+            else:
+                messages.append(h)
+                last_role = h['role']
+        
+        if last_role == "user":
+            messages[-1]['content'] += "\n" + user_text
+        else:
+            messages.append({"role": "user", "content": user_text})
         
         response = groq_client.chat.completions.create(
             model=MODEL_NAME,
