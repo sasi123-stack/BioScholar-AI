@@ -37,15 +37,21 @@ app_port: 7860
 
 ## ✨ Features
 
-### 🌐 Web Application
-- **35M+ PubMed articles** with semantic search
-- **Clinical Trials database** integration
-- **Maverick AI Chat** — in-browser AI assistant
-- **Research Trends** — publication analytics
-- **Advanced Filters** — year, source, evidence level
-- **Reading List** — save & export articles (CSV / BibTeX)
-- **Dark Mode** + responsive design
+### 🧠 Maverick AI Bot (In-Browser Assistant)
+Powered by Groq's low-latency Llama 4 (17B) platform, Maverick acts as a dedicated research counterpart:
+- **Smart Plugins & Tools**: Switch on specific research lenses, including **Clinical Trial Finder**, **Molecule Solver** (semantic weighting for chemical structures), **Summarize Mode**, **Gene/Drug Lookup** (auto-detects and links biological targets), and **Citation Generator** (APA 7th edition).
+- **Deep Research Synthesis**: Default mode fetches up to 8 top hits, dynamically generates an overview framing the publication timeline, extracts multi-paragraph findings with proper citations, and provides clinical implications.
+- **Context-Aware Follow-Ups**: Dynamically maps 12 unique biomedical domains (Oncology, Cardiology, CRISPR, etc.) to generate intelligent, specialized click-to-ask follow-up questions.
+- **Voice Dictation & Transcription**: Native Web Speech API integration allows for seamless dictation without auto-submitting unreviewed text.
+- **Collaboration & Privacy Modes**: Toggle **Group Session** mode for multi-persona analysis or **Incognito Mode** to prevent the session from saving to cloud history.
 
+### 🔬 Research Desk (Analytical Engine)
+A high-density workspace for literature review and data extraction:
+- **Hybrid Search Engine**: Seamlessly blend traditional BM25 keyword matching with dense Vector Embeddings.
+- **Advanced Filtering Deck**: Instantly slice 35M+ articles by Date Range, Source Database (PubMed vs ClinicalTrials.gov), and specific evidence tiers (Meta-Analysis, RCTs, Case Studies).
+- **Deep-Dive Modals**: Expanding an article generates a full-screen view exposing structured abstracts, sanitized metadata, and external DOI resolution routing.
+- **Bulk Export & Citation Management**: Select clusters of articles and bulk-export metadata directly to `.ris`, `.tsv`, or `.json` for reference managers. Build and save custom Reading Lists to local storage or cloud.
+- **Dark Mode & Responsive UI**: Fully responsive frontend built on CSS Grid/Flexbox with semantic variable theming.
 ### 🤖 Maverick Telegram Bot (`@Meverick_AI_bot`)
 | Command | Description |
 |---|---|
