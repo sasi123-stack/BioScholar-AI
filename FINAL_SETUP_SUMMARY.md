@@ -1,4 +1,4 @@
-# ✅ FINAL SETUP SUMMARY - Node 24 + Free Llama 3.3 70B
+# ✅ FINAL SETUP SUMMARY - Node 24 + Free Llama 4 Maverick
 
 ## 🎉 Everything is Ready!
 
@@ -122,7 +122,7 @@ Want 14,400 free requests/day instead of 50?
    OPENCLAW_API_BASE=https://api.groq.com/openai/v1
    ```
 
-2. Update model to: `llama-3.3-70b-versatile`
+2. Update model to: `meta-llama/llama-4-maverick-17b-128e-instruct`
 
 3. See `FREE_GROQ_SETUP.md` for details
 
@@ -230,7 +230,7 @@ You'll know it's working when:
 
 ---
 
-**Made with ❤️ using Node 24, OpenRouter, Llama 3.3 70B, and OpenClaw**
+**Made with ❤️ using Node 24, Groq, Llama 4 Maverick, and OpenClaw**
 
 *Total setup time: ~10 minutes*  
 *Total cost: $0.00*  

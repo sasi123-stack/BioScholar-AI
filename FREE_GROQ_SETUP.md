@@ -2,13 +2,13 @@
 
 ## ✅ You're Already Set Up!
 
-Good news! Your OpenClaw is now configured to use **Groq's FREE tier** with **Llama 3.3 Maverick** - and you already have a Groq API key in your `.env` file!
+Good news! Your OpenClaw is now configured to use **Groq's FREE tier** with **Llama 4 Maverick** - and you already have a Groq API key in your `.env` file!
 
 ---
 
 ## 🚀 What You Get (100% FREE)
 
-- **Model**: Llama 3.3 Maverick (70B)
+- **Model**: Llama 4 Maverick (17B Optimized)
 - **Speed**: ⚡ Blazing fast (up to 800 tokens/second!)
 - **Free Tier Limits**:
   - 30 requests per minute
@@ -29,7 +29,7 @@ Good news! Your OpenClaw is now configured to use **Groq's FREE tier** with **Ll
    OPENCLAW_API_BASE=https://api.groq.com/openai/v1
    ```
 
-2. **`src/qa_module/groq_generator.py`** - Using `llama-3.3-70b-versatile`
+2. **`src/qa_module/groq_generator.py`** - Using `meta-llama/llama-4-maverick-17b-128e-instruct`
 
 3. **`openclaw-hf/Dockerfile`** - Configured for Groq
 
@@ -60,7 +60,7 @@ curl -X POST "http://localhost:8000/api/v1/qa" \
 
 ---
 
-## 🎨 Features of Llama 3.3 70B
+## 🎨 Features of Llama 4 Maverick
 
 - ✅ **Excellent for Biomedical Q&A**: Strong reasoning capabilities
 - ✅ **Fast Responses**: 1-3 seconds (vs 5-15s for paid models)
@@ -131,7 +131,7 @@ If you hit the limit, wait a minute or upgrade to Groq's paid tier for higher li
 - ❌ Costs $0.001-$0.05 per query
 - ⏱️ 5-15 second responses
 
-### After (Groq + Llama 3.3 70B)
+### After (Groq + Llama 4 Maverick)
 - ✅ FREE forever
 - ✅ No credit card needed
 - ✅ Already configured!
@@ -174,4 +174,4 @@ But for most users, the **FREE tier is more than enough**! 🎉
 
 ---
 
-**Made with ❤️ using Groq, Llama 3.3 70B, OpenClaw, and BioSense AI**
+**Made with ❤️ using Groq, Llama 4 Maverick, OpenClaw, and BioSense AI**
