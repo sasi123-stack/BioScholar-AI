@@ -44,7 +44,8 @@ socket.getaddrinfo = custom_getaddrinfo
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct"
+MODEL_NAME = "llama-3.3-70b-versatile"          # Groq production model (fast + smart)
+MODEL_FALLBACK = "llama-3.1-8b-instant"         # Fallback if primary is rate-limited
 DB_FILE = "/tmp/conversation_history.db"  # Use /tmp for HF Spaces
 
 # Setup logging
@@ -108,10 +109,10 @@ except Exception as e:
     groq_client = None
 
 # System Prompt
-SYSTEM_PROMPT = """You are Maverick, the official BioMedScholar AI Research Engine. 
+SYSTEM_PROMPT = """You are Maverick, the official BioMedScholar AI Research Engine.
 You are a sharp, precise, and analytical biomedical research assistant.
 vibe: Sharp, precise, analytical, and highly efficient. emoji: 💠.
-You are powered by Llama 4 Maverick architecture via Groq.
+You are powered by Llama 3.3 70B via Groq.
 You have PERSISTENT LONG-TERM MEMORY and specialized research discovery skills.
 
 Always be precise, cite evidence levels where possible, and use medical terminology appropriately.
@@ -218,9 +219,9 @@ async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "💠 *About Maverick AI*\n\n"
         "Maverick is the premium AI research engine powering BioMedScholar AI. "
         "Built for evidence-based biomedical discovery.\n\n"
-        "*Architecture:* Llama 4 Maverick (17B Optimized)\n"
+        "*Architecture:* Llama 3.3 70B (Groq Production)\n"
         "*Provider:* Groq Intelligence\n"
-        "*Capabilities:* RAG-enhanced synthesis, Clinical trial auditing, Real-time literature discovery.\n\n"
+        "*Capabilities:* Deep literature synthesis, Clinical trial analysis, Real-time research discovery.\n\n"
         "Official Web Platform: https://biomed-scholar.web.app"
     )
     await update.message.reply_text(msg, parse_mode='Markdown')
@@ -273,14 +274,25 @@ async def ai_reply(update: Update, user_id: int, prompt: str, save_user_msg: boo
         if not history or history[-1].get("content") != prompt:
             messages.append({"role": "user", "content": prompt})
 
-        response = groq_client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=messages,
-            temperature=0.3,
-            max_tokens=2048
-        )
+        # Try primary model, fall back to smaller one if rate-limited/unavailable
+        answer = None
+        for model in [MODEL_NAME, MODEL_FALLBACK]:
+            try:
+                response = groq_client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.3,
+                    max_tokens=2048
+                )
+                answer = response.choices[0].message.content
+                break
+            except Exception as model_err:
+                logger.warning(f"Model {model} failed: {model_err}")
+                continue
 
-        answer = response.choices[0].message.content
+        if not answer:
+            raise Exception("All models failed")
+
         if "💠" not in answer[:15]:
             answer = "💠 " + answer
 
