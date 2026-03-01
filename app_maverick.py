@@ -600,7 +600,18 @@ if __name__ == '__main__':
     max_startup_retries = 5
     for attempt in range(max_startup_retries):
         try:
-            request = HTTPXRequest(connect_timeout=30, read_timeout=30, write_timeout=30)
+            # Detect environment proxy (Essential for Hugging Face Spaces)
+            proxy_url = os.getenv("https_proxy") or os.getenv("http_proxy") or os.getenv("ALL_PROXY")
+            if proxy_url:
+                print(f">>> [NETWORK] Egress proxy detected: {proxy_url}", flush=True)
+            
+            request = HTTPXRequest(
+                connect_timeout=30, 
+                read_timeout=30, 
+                write_timeout=30,
+                proxy_url=proxy_url
+            )
+            
             application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
             application.add_handler(CommandHandler('start', start))
             application.add_handler(CommandHandler('search', search_command))
@@ -613,12 +624,18 @@ if __name__ == '__main__':
             application.add_error_handler(error_handler)
 
             print(f">>> 🚀 MAVERICK IS FULLY OPERATIONAL! (Attempt {attempt+1})", flush=True)
-            application.run_polling(drop_pending_updates=True)
+            
+            # Initialise and start the application explicitly to catch errors before polling
+            # application.run_polling() handles this, but we want to be sure.
+            application.run_polling(drop_pending_updates=True, close_loop=False)
             break # Exit loop if polling ends normally
         except Exception as e:
             print(f">>> [RETRY {attempt+1}/{max_startup_retries}] Connection failed: {e}", flush=True)
             if attempt < max_startup_retries - 1:
-                time.sleep(15)
+                # Exponential backoff
+                wait_time = 15 * (attempt + 1)
+                print(f">>> [WAIT] Sleeping {wait_time}s before next attempt...", flush=True)
+                time.sleep(wait_time)
             else:
                 print(">>> [FATAL] BOT CRASHED after multiple attempts.", flush=True)
                 sys.exit(1)

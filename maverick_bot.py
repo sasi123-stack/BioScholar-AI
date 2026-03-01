@@ -333,7 +333,15 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # Build Application with timeouts
-    request = HTTPXRequest(connect_timeout=30, read_timeout=30)
+    # Detect environment proxy (Essential for Hugging Face Spaces)
+    proxy_url = os.getenv("https_proxy") or os.getenv("http_proxy") or os.getenv("ALL_PROXY")
+    
+    # Build Application with timeouts and proxy support
+    request = HTTPXRequest(
+        connect_timeout=30, 
+        read_timeout=30, 
+        proxy_url=proxy_url
+    )
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).request(request).build()
     
     # Add Handlers
