@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Core NLP and ML
 # Using CPU-only torch to reduce image size and build time
 --extra-index-url https://download.pytorch.org/whl/cpu
@@ -63,3 +64,10 @@ dnspython
 selenium
 webdriver-manager
 twilio
+=======
+python-telegram-bot>=20.0
+groq>=0.4.2
+python-dotenv>=1.0.0
+flask
+dnspython
+>>>>>>> d489031b3ff5fc30ba3c3bcb7fe894f22eec20a2
