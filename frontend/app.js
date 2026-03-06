@@ -6602,6 +6602,15 @@ function initScheduledActions() {
     console.log('BioMedScholar AI: Scheduled Actions Initialized.');
     renderScheduledActions();
 
+    // Enable plugin visually in the menu
+    if (typeof activePlugins !== 'undefined') {
+        activePlugins.add('scheduler');
+        const item = document.getElementById('plugin-scheduler');
+        if (item) item.classList.add('active');
+        const mainBtn = document.getElementById('chat-plugins-btn');
+        if (mainBtn) mainBtn.classList.add('active-plugin');
+    }
+
     // Check every minute
     setInterval(checkScheduledActions, 60000);
     // Final check on load
