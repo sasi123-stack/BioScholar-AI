@@ -59,8 +59,9 @@
 }
 
 .chat-status {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text-secondary);
+    font-weight: 500;
 }
 
 .chat-action-btn {
@@ -95,7 +96,8 @@
     justify-content: center;
     height: 100%;
     text-align: center;
-    color: var(--text-secondary);
+    color: var(--text-primary);
+    opacity: 0.9;
     padding: 20px;
 }
 

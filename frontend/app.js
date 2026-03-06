@@ -45,8 +45,7 @@ var HF_BACKEND_URL = 'https://sasidhara123-biomed-scholar-api.hf.space/api/v1';
 // Maverick AI Bot (same API space - endpoints served under /api/v1/)
 var MAVERICK_API_URL = 'https://sasidhara123-maverick-ai-bot.hf.space/api/v1';
 
-var API_BASE_URL = (isLocal && window.location.search.includes('local=true')) ?
-    'http://localhost:8000/api/v1' : HF_BACKEND_URL;
+var API_BASE_URL = isLocal ? 'http://localhost:8000/api/v1' : HF_BACKEND_URL;
 
 if (isNative) {
     API_BASE_URL = HF_BACKEND_URL;
@@ -4060,30 +4059,54 @@ function showSuggestedQuestions(lastQuery) {
 
     // Keyword-aware follow-up map covering major biomedical domains
     const suggestionMap = [
-        { keys: ['crispr','cas9','gene edit','base edit','prime edit'],
-          chips: ['Compare Cas9 vs Cas12 off-target effects','Active clinical trials for CRISPR therapies','Ethical risks of germline editing'] },
-        { keys: ['mrna','vaccine','immunization','covid','covid-19','sars'],
-          chips: ['How do mRNA vaccines compare to protein subunit vaccines?','Long-COVID neurological manifestations','Vaccine-induced myocarditis evidence'] },
-        { keys: ['cancer','tumor','oncology','chemotherapy','immunotherapy','car-t','pdl1','pd-l1'],
-          chips: ['Latest CAR-T cell therapy clinical trials','PD-1 vs PD-L1 inhibitor comparison','Chemotherapy resistance mechanisms in NSCLC'] },
-        { keys: ['alzheimer','dementia','neurodegeneration','tau','amyloid','parkinson'],
-          chips: ['Amyloid cascade hypothesis explained','Disease-modifying therapies for Alzheimer\'s','Early biomarkers for Parkinson\'s detection'] },
-        { keys: ['diabetes','insulin','glp-1','semaglutide','metformin','glucose','obesity'],
-          chips: ['Semaglutide vs tirzepatide comparison','Cardiovascular benefits of GLP-1 agonists','Long-term Type 2 diabetes complications'] },
-        { keys: ['heart','cardiac','cardiovascular','hypertension','stroke','atrial','arrhythmia'],
-          chips: ['Atrial fibrillation risk factors','Latest statin therapy guidelines','Role of inflammation in atherosclerosis'] },
-        { keys: ['antibiotic','resistance','antimicrobial','sepsis','infection','bacteria','mrsa'],
-          chips: ['Carbapenem resistance mechanisms','MRSA treatment alternatives','Novel antibiotic classes in development pipeline'] },
-        { keys: ['depression','anxiety','mental health','ssri','ptsd','schizophrenia','bipolar'],
-          chips: ['SSRIs vs SNRIs: key differences','Ketamine for treatment-resistant depression evidence','Neuroinflammation in major depressive disorder'] },
-        { keys: ['microbiome','gut','probiotic','dysbiosis','microbiota','fecal'],
-          chips: ['Gut-brain axis and mental health research','Probiotic strains with strongest clinical evidence','Fecal microbiota transplant outcomes'] },
-        { keys: ['clinical trial','phase','randomized','rct','double-blind','placebo'],
-          chips: ['What makes a Phase 3 trial the gold standard?','Show me active trials for this condition','Adaptive trial design vs traditional RCT'] },
-        { keys: ['molecule','drug','pharmacology','inhibitor','receptor','ligand','kinase'],
-          chips: ['Mechanism of action of kinase inhibitors','Structure-activity relationships overview','Drug repurposing strategies for rare diseases'] },
-        { keys: ['lung','respiratory','copd','asthma','pneumonia','pulmonary'],
-          chips: ['Biological therapy options for severe asthma','COPD exacerbation prevention strategies','Long-term pulmonary fibrosis outcomes'] },
+        {
+            keys: ['crispr', 'cas9', 'gene edit', 'base edit', 'prime edit'],
+            chips: ['Compare Cas9 vs Cas12 off-target effects', 'Active clinical trials for CRISPR therapies', 'Ethical risks of germline editing']
+        },
+        {
+            keys: ['mrna', 'vaccine', 'immunization', 'covid', 'covid-19', 'sars'],
+            chips: ['How do mRNA vaccines compare to protein subunit vaccines?', 'Long-COVID neurological manifestations', 'Vaccine-induced myocarditis evidence']
+        },
+        {
+            keys: ['cancer', 'tumor', 'oncology', 'chemotherapy', 'immunotherapy', 'car-t', 'pdl1', 'pd-l1'],
+            chips: ['Latest CAR-T cell therapy clinical trials', 'PD-1 vs PD-L1 inhibitor comparison', 'Chemotherapy resistance mechanisms in NSCLC']
+        },
+        {
+            keys: ['alzheimer', 'dementia', 'neurodegeneration', 'tau', 'amyloid', 'parkinson'],
+            chips: ['Amyloid cascade hypothesis explained', 'Disease-modifying therapies for Alzheimer\'s', 'Early biomarkers for Parkinson\'s detection']
+        },
+        {
+            keys: ['diabetes', 'insulin', 'glp-1', 'semaglutide', 'metformin', 'glucose', 'obesity'],
+            chips: ['Semaglutide vs tirzepatide comparison', 'Cardiovascular benefits of GLP-1 agonists', 'Long-term Type 2 diabetes complications']
+        },
+        {
+            keys: ['heart', 'cardiac', 'cardiovascular', 'hypertension', 'stroke', 'atrial', 'arrhythmia'],
+            chips: ['Atrial fibrillation risk factors', 'Latest statin therapy guidelines', 'Role of inflammation in atherosclerosis']
+        },
+        {
+            keys: ['antibiotic', 'resistance', 'antimicrobial', 'sepsis', 'infection', 'bacteria', 'mrsa'],
+            chips: ['Carbapenem resistance mechanisms', 'MRSA treatment alternatives', 'Novel antibiotic classes in development pipeline']
+        },
+        {
+            keys: ['depression', 'anxiety', 'mental health', 'ssri', 'ptsd', 'schizophrenia', 'bipolar'],
+            chips: ['SSRIs vs SNRIs: key differences', 'Ketamine for treatment-resistant depression evidence', 'Neuroinflammation in major depressive disorder']
+        },
+        {
+            keys: ['microbiome', 'gut', 'probiotic', 'dysbiosis', 'microbiota', 'fecal'],
+            chips: ['Gut-brain axis and mental health research', 'Probiotic strains with strongest clinical evidence', 'Fecal microbiota transplant outcomes']
+        },
+        {
+            keys: ['clinical trial', 'phase', 'randomized', 'rct', 'double-blind', 'placebo'],
+            chips: ['What makes a Phase 3 trial the gold standard?', 'Show me active trials for this condition', 'Adaptive trial design vs traditional RCT']
+        },
+        {
+            keys: ['molecule', 'drug', 'pharmacology', 'inhibitor', 'receptor', 'ligand', 'kinase'],
+            chips: ['Mechanism of action of kinase inhibitors', 'Structure-activity relationships overview', 'Drug repurposing strategies for rare diseases']
+        },
+        {
+            keys: ['lung', 'respiratory', 'copd', 'asthma', 'pneumonia', 'pulmonary'],
+            chips: ['Biological therapy options for severe asthma', 'COPD exacerbation prevention strategies', 'Long-term pulmonary fibrosis outcomes']
+        },
     ];
 
     let chips = [];
