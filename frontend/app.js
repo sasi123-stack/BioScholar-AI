@@ -190,14 +190,9 @@ var nextPageBtn = document.getElementById('next-page');
 var currentPageSpan = document.getElementById('current-page');
 var totalPagesSpan = document.getElementById('total-pages');
 
-// DOM Elements
-var headerSearchInput = document.getElementById('header-search-input');
-// ... other elements ...
-
-// Initialize On Load
-document.addEventListener('DOMContentLoaded', () => {
-    initAmbientDNA();
-});
+// ==========================================
+// INITIALIZATION
+// ==========================================
 // ==========================================
 // HASH ROUTING HELPER
 // ==========================================
@@ -738,8 +733,6 @@ function initEventListeners() {
             applyPromptFromHash(params);
         }
     });
-
-    initSearchModeToggle();
 }
 
 function initKeyboardShortcuts() {
@@ -1295,24 +1288,62 @@ if (typeof distributionChart === 'undefined') {
 }
 
 function updateTrendsDashboard() {
-    const ctxTrend = document.getElementById('publication-trend-chart');
+    const ctxTrend = document.getElementById('trendsChart');
+    const ctxDist = document.getElementById('distributionChart');
     if (!ctxTrend) return;
 
     // Reset charts if they exist
-    if (window.trendsChart) window.trendsChart.destroy();
+    if (trendsChart) trendsChart.destroy();
+    if (distributionChart) distributionChart.destroy();
 
     const results = currentResults || [];
-    if (results.length === 0) return;
+    const isDark = document.body.classList.contains('dark-theme');
+    const textColor = isDark ? '#e8eaed' : '#3c4043';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
 
-    // DATA AGGREGATION
+    // Update Processed Count Card
+    const processedCount = document.getElementById('trends-processed-count');
+    if (processedCount) processedCount.textContent = results.length;
+
+    if (results.length === 0) {
+        // Handle empty state for charts
+        const emptyState = '<div class="empty-state">Perform a search to see real-time insights</div>';
+        document.getElementById('trends-topics-cloud').innerHTML = emptyState;
+        document.getElementById('trends-journals-list').innerHTML = emptyState;
+        return;
+    }
+
+    // 1. DATA AGGREGATION
     const yearCounts = {};
+    const journalCounts = {};
+    const typeCounts = { 'Research': 0, 'Review': 0, 'Clinical Trial': 0, 'Other': 0 };
     const keywords = {};
 
-    results.forEach(r => {
-        const year = extractYear(r.metadata?.publication_date || r.publication_date);
-        if (year) yearCounts[year] = (yearCounts[year] || 0) + 1;
+    let totalAge = 0;
+    const currentYear = new Date().getFullYear();
 
-        // Simple keyword extraction for "Emerging Topics"
+    results.forEach(r => {
+        // Years
+        const dateStr = r.metadata?.publication_date || '';
+        const yearMatch = dateStr.match(/\d{4}/);
+        if (yearMatch) {
+            const year = yearMatch[0];
+            yearCounts[year] = (yearCounts[year] || 0) + 1;
+            totalAge += (currentYear - parseInt(year));
+        }
+
+        // Journals
+        const journal = r.metadata?.journal || (r.source === 'pubmed' ? 'Unknown Journal' : 'ClinicalTrials.gov');
+        journalCounts[journal] = (journalCounts[journal] || 0) + 1;
+
+        // Types
+        const type = (r.metadata?.article_type || '').toLowerCase();
+        if (type.includes('review')) typeCounts['Review']++;
+        else if (type.includes('clinical') || r.source === 'clinical_trials') typeCounts['Clinical Trial']++;
+        else if (type.includes('research') || type.includes('article')) typeCounts['Research']++;
+        else typeCounts['Other']++;
+
+        // Keywords from Title (top words > 4 chars)
         const words = (r.title || '').toLowerCase().split(/\W+/);
         words.forEach(w => {
             if (w.length > 5 && !['between', 'results', 'clinical', 'studies', 'study', 'research'].includes(w)) {
@@ -1321,42 +1352,36 @@ function updateTrendsDashboard() {
         });
     });
 
-    // Sort keywords for "Emerging Topics"
-    const topKeywords = Object.entries(keywords)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
-
-    const emergingList = document.querySelector('.trends-list');
-    if (emergingList && topKeywords.length > 0) {
-        emergingList.innerHTML = topKeywords.map(([word, count]) => `
-            <li class="trends-list-item" data-search-term="${word}" onclick="searchTrend(this)">
-                <span class="trends-list-item-label" style="text-transform: capitalize;">${word}</span>
-                <span class="trends-list-item-growth">${count} refs</span>
-            </li>
-        `).join('');
+    // Update Avg Age metric
+    const avgAgeValue = document.querySelector('.metric-card:nth-child(3) .metric-value');
+    if (avgAgeValue) {
+        const avg = results.length > 0 ? (totalAge / results.length).toFixed(1) : '0.0';
+        avgAgeValue.textContent = `${avg} Yrs`;
     }
 
-    // Chart logic
+    // Update Clinical Trials count metric
+    const trialsValue = document.querySelector('.metric-card:nth-child(4) .metric-value');
+    if (trialsValue) {
+        trialsValue.textContent = typeCounts['Clinical Trial'];
+    }
+
+    // 2. MAIN TREND CHART (Line)
     const sortedYears = Object.keys(yearCounts).sort();
-    const trendLabels = sortedYears.slice(-10);
+    const trendLabels = sortedYears.slice(-8); // Last 8 years found
     const trendData = trendLabels.map(y => yearCounts[y]);
 
-    const isDark = document.body.classList.contains('dark-theme');
-
-    window.trendsChart = new Chart(ctxTrend, {
+    trendsChart = new Chart(ctxTrend, {
         type: 'line',
         data: {
             labels: trendLabels,
             datasets: [{
                 label: 'Publications',
                 data: trendData,
-                borderColor: '#4285F4',
-                backgroundColor: 'rgba(66, 133, 244, 0.15)',
+                borderColor: '#1a73e8',
+                backgroundColor: 'rgba(26, 115, 232, 0.1)',
                 fill: true,
                 tension: 0.4,
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                borderWidth: 3
+                pointRadius: 4
             }]
         },
         options: {
@@ -1364,37 +1389,64 @@ function updateTrendsDashboard() {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                tooltip: {
-                    backgroundColor: isDark ? '#202124' : '#ffffff',
-                    titleColor: isDark ? '#ffffff' : '#202124',
-                    bodyColor: isDark ? '#e8eaed' : '#3c4043',
-                    borderColor: '#4285F4',
-                    borderWidth: 1
-                }
+                tooltip: { mode: 'index', intersect: false }
             },
             scales: {
-                x: { grid: { display: false } },
-                y: {
-                    beginAtZero: true,
-                    grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }
-                }
+                x: { grid: { display: false }, ticks: { color: textColor } },
+                y: { grid: { color: gridColor }, ticks: { color: textColor, stepSize: 1, beginAtZero: true } }
             }
         }
     });
-});
 
-// 4. TOPICS CLOUD (Dynamic)
-const topKeywordsAll = Object.entries(keywords)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
+    // 3. DISTRIBUTION CHART (Doughnut)
+    if (ctxDist) {
+        distributionChart = new Chart(ctxDist, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(typeCounts),
+                datasets: [{
+                    data: Object.values(typeCounts),
+                    backgroundColor: ['#1a73e8', '#34a853', '#fabc05', '#ea4335'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: textColor, padding: 15, font: { size: 11 } } }
+                }
+            }
+        });
+    }
 
-const topicsCloud = document.getElementById('trends-topics-cloud');
-if (topicsCloud) {
-    topicsCloud.innerHTML = topKeywordsAll.map(([t]) => `<div class="topic-tag">${t}</div>`).join('');
+    // 4. TOPICS CLOUD
+    const topTopics = Object.entries(keywords)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(entry => entry[0]);
+
+    const topicsCloud = document.getElementById('trends-topics-cloud');
+    if (topicsCloud) {
+        topicsCloud.innerHTML = topTopics.map(t => `<div class="topic-tag">${t}</div>`).join('');
+    }
+
+    // 5. JOURNALS LIST
+    const topJournals = Object.entries(journalCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+
+    const journalsList = document.getElementById('trends-journals-list');
+    if (journalsList) {
+        journalsList.innerHTML = topJournals.map(j => `
+            <div class="journal-item">
+                <span class="journal-name" title="${j[0]}">${truncate(j[0], 30)}</span>
+                <span class="journal-count">${j[1]}</span>
+            </div>
+        `).join('');
+    }
 }
-}
-
-
 
 function setViewMode(mode) {
     currentView = mode;
@@ -2574,9 +2626,6 @@ function createResultCard(result) {
                             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
                         </svg>
                         Analyze with Maverick
-                    </button>
-                    <button class="quick-tldr-btn" onclick="event.stopPropagation(); quickTLDR('${result.id}', this)" title="AI-Powered 2-sentence summary">
-                        ⚡ Quick TL;DR
                     </button>
                     <div class="result-score-badge" title="Relevance Score: ${result.score?.toFixed(4) || '0.00'}">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -6534,92 +6583,6 @@ function initVoiceSearch() {
         isRecording = false;
         voiceBtn.classList.remove('recording');
         chatInput.placeholder = "Ask Maverick about biomedical research...";
-    }
-}
-
-/**
- * FEATURE 1: Ambient DNA Background System
- */
-function initAmbientDNA() {
-    const container = document.getElementById('dna-canvas');
-    if (!container) return;
-    container.innerHTML = '';
-    const count = 35;
-    for (let i = 0; i < count; i++) {
-        const dot = document.createElement('div');
-        dot.className = 'dna-strand';
-        const left = Math.random() * 100;
-        const delay = Math.random() * 15;
-        const duration = 15 + Math.random() * 15;
-        const size = 2 + Math.random() * 4;
-        dot.style.left = `${left}%`;
-        dot.style.animationDelay = `-${delay}s`;
-        dot.style.animationDuration = `${duration}s`;
-        dot.style.width = `${size}px`;
-        dot.style.height = `${size}px`;
-        dot.style.opacity = (0.2 + Math.random() * 0.4).toString();
-        container.appendChild(dot);
-    }
-}
-
-/**
- * FEATURE 6: Search Intelligence Mode Toggle
- */
-function initSearchModeToggle() {
-    const toggleContainer = document.getElementById('search-mode-toggle');
-    if (!toggleContainer) return;
-    const chips = toggleContainer.querySelectorAll('.mode-chip');
-    chips.forEach(chip => {
-        chip.addEventListener('click', () => {
-            const mode = chip.dataset.mode;
-            chips.forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-            if (mode === 'keyword') currentFilters.alpha = 0;
-            else if (mode === 'semantic') currentFilters.alpha = 100;
-            else currentFilters.alpha = 50;
-            const slider = document.getElementById('alpha-slider');
-            if (slider) {
-                slider.value = currentFilters.alpha;
-                updateAlphaLabel(currentFilters.alpha);
-            }
-            if (headerSearchInput && headerSearchInput.value.trim()) performSearch();
-            showToast(`Search mode: ${mode.toUpperCase()}`, 'info');
-        });
-    });
-}
-
-/**
- * FEATURE 2: Quick TL;DR AI Synthesis
- */
-async function quickTLDR(id, btn) {
-    if (btn.disabled) return;
-    const card = btn.closest('.result-card');
-    const result = currentResults.find(r => String(r.id) === String(id));
-    if (!result) return;
-    const originalContent = btn.innerHTML;
-    btn.innerHTML = `<svg class="spinner" viewBox="0 0 50 50" style="width:14px; height:14px; margin-right:6px;"><circle class="path" cx="25" cy="25" r="20" fill="none" stroke="white" stroke-width="8"></circle></svg><span>Summarizing...</span>`;
-    btn.disabled = true;
-    try {
-        const response = await fetch(`${MAVERICK_API_URL}/maverick/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question: `Summarize this medical paper in exactly 2 concise sentences focusing on key findings: "${result.title}". ${result.abstract || ''}` })
-        });
-        const data = await response.json();
-        if (data.status === 'success') {
-            const existing = card.querySelector('.tldr-content');
-            if (existing) existing.remove();
-            const tldrDiv = document.createElement('div');
-            tldrDiv.className = 'tldr-content';
-            tldrDiv.innerHTML = `⚡ <strong>AI TL;DR:</strong> ${data.answer.replace(/^Summary:|^TL;DR:/i, '').trim()}`;
-            card.querySelector('.result-snippet').insertAdjacentElement('afterend', tldrDiv);
-            btn.innerHTML = `⚡ Done`;
-            btn.style.background = '#22c55e';
-            btn.style.color = 'white';
-        } else throw new Error();
-    } catch (e) {
-        btn.innerHTML = `❌ Error`;
-        setTimeout(() => { btn.innerHTML = originalContent; btn.disabled = false; }, 2000);
     }
 }
 
