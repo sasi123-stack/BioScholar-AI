@@ -903,113 +903,115 @@
                                             <div class="plugin-status-dot"></div>
                                         </div>
                                     </div>
-                                    <div class="plugin-status-dot"></div>
+                                </div>
+                                <textarea id="chat-input" placeholder="Ask Maverick about biomedical research..."
+                                    rows="1"
+                                    oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+
+                                <button id="chat-voice-btn" class="chat-secondary-btn" title="Voice Input">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                                    </svg>
+                                </button>
+                                <button id="chat-stop-btn" class="hidden" title="Stop Generation"
+                                    onclick="stopChatGeneration()">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                        <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
+                                    </svg>
+                                </button>
+                                <button id="chat-send-btn" title="Send Message">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <line x1="22" y1="2" x2="11" y2="13" />
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="chat-disclaimer">
+                                Maverick uses RAG to ground answers in the BioMedScholar database. Always verify
+                                critical medical data.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Research Trends Tab -->
+                <div id="trends-tab" class="tab-content trends-container">
+                    <div class="trends-wrapper">
+                        <div class="trends-header">
+                            <h2>Macro Research Trends</h2>
+                            <p>Live analysis of biomedical publication volumes and emerging focal areas.</p>
+                        </div>
+
+                        <div class="trends-grid">
+                            <!-- Fast-Emerging Topics Card -->
+                            <div class="trends-card trends-card-primary">
+                                <div class="trends-card-header">
+                                    <span>🔥</span>
+                                    <h3>Fast-Emerging Topics</h3>
+                                </div>
+                                <ul class="trends-list">
+                                    <li class="trends-list-item" data-search-term="GLP-1 Agonists"
+                                        onclick="searchTrend(this)">
+                                        <span class="trends-list-item-label">GLP-1 Agonists</span>
+                                        <span class="trends-list-item-growth">+245%</span>
+                                    </li>
+                                    <li class="trends-list-item" data-search-term="CRISPR-Cas9 Editing"
+                                        onclick="searchTrend(this)">
+                                        <span class="trends-list-item-label">CRISPR-Cas9 Editing</span>
+                                        <span class="trends-list-item-growth">+182%</span>
+                                    </li>
+                                    <li class="trends-list-item" data-search-term="mRNA Immunotherapy"
+                                        onclick="searchTrend(this)">
+                                        <span class="trends-list-item-label">mRNA Immunotherapy</span>
+                                        <span class="trends-list-item-growth">+134%</span>
+                                    </li>
+                                    <li class="trends-list-item" data-search-term="AI in Radiology"
+                                        onclick="searchTrend(this)">
+                                        <span class="trends-list-item-label">AI in Radiology</span>
+                                        <span class="trends-list-item-growth">+115%</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- Highest Volume Card -->
+                            <div class="trends-card trends-card-secondary">
+                                <div class="trends-card-header">
+                                    <span>📚</span>
+                                    <h3>Highest Volume (All-Time)</h3>
+                                </div>
+                                <div class="trends-tags">
+                                    <span class="trends-tag" data-search-term="Type 2 Diabetes"
+                                        onclick="searchTrend(this)">Type
+                                        2 Diabetes</span>
+                                    <span class="trends-tag" data-search-term="Breast Cancer"
+                                        onclick="searchTrend(this)">Breast
+                                        Cancer</span>
+                                    <span class="trends-tag" data-search-term="COVID-19"
+                                        onclick="searchTrend(this)">COVID-19</span>
+                                    <span class="trends-tag" data-search-term="Hypertension"
+                                        onclick="searchTrend(this)">Hypertension</span>
+                                    <span class="trends-tag" data-search-term="Alzheimer's"
+                                        onclick="searchTrend(this)">Alzheimer's</span>
+                                    <span class="trends-tag" data-search-term="Depression"
+                                        onclick="searchTrend(this)">Depression</span>
                                 </div>
                             </div>
                         </div>
-                        <textarea id="chat-input" placeholder="Ask Maverick about biomedical research..." rows="1"
-                            oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
 
-                        <button id="chat-voice-btn" class="chat-secondary-btn" title="Voice Input">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                                <line x1="12" y1="19" x2="12" y2="23"></line>
-                                <line x1="8" y1="23" x2="16" y2="23"></line>
-                            </svg>
-                        </button>
-                        <button id="chat-stop-btn" class="hidden" title="Stop Generation"
-                            onclick="stopChatGeneration()">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                                <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
-                            </svg>
-                        </button>
-                        <button id="chat-send-btn" title="Send Message">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <line x1="22" y1="2" x2="11" y2="13" />
-                                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="chat-disclaimer">
-                        Maverick uses RAG to ground answers in the BioMedScholar database. Always verify
-                        critical medical data.
+                        <div class="trends-chart-section">
+                            <h3>Publication Volume by Year</h3>
+                            <div class="trends-chart-container">
+                                <canvas id="publication-trend-chart"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Research Trends Tab -->
-        <div id="trends-tab" class="tab-content trends-container">
-            <div class="trends-wrapper">
-                <div class="trends-header">
-                    <h2>Macro Research Trends</h2>
-                    <p>Live analysis of biomedical publication volumes and emerging focal areas.</p>
-                </div>
-
-                <div class="trends-grid">
-                    <!-- Fast-Emerging Topics Card -->
-                    <div class="trends-card trends-card-primary">
-                        <div class="trends-card-header">
-                            <span>🔥</span>
-                            <h3>Fast-Emerging Topics</h3>
-                        </div>
-                        <ul class="trends-list">
-                            <li class="trends-list-item" data-search-term="GLP-1 Agonists" onclick="searchTrend(this)">
-                                <span class="trends-list-item-label">GLP-1 Agonists</span>
-                                <span class="trends-list-item-growth">+245%</span>
-                            </li>
-                            <li class="trends-list-item" data-search-term="CRISPR-Cas9 Editing"
-                                onclick="searchTrend(this)">
-                                <span class="trends-list-item-label">CRISPR-Cas9 Editing</span>
-                                <span class="trends-list-item-growth">+182%</span>
-                            </li>
-                            <li class="trends-list-item" data-search-term="mRNA Immunotherapy"
-                                onclick="searchTrend(this)">
-                                <span class="trends-list-item-label">mRNA Immunotherapy</span>
-                                <span class="trends-list-item-growth">+134%</span>
-                            </li>
-                            <li class="trends-list-item" data-search-term="AI in Radiology" onclick="searchTrend(this)">
-                                <span class="trends-list-item-label">AI in Radiology</span>
-                                <span class="trends-list-item-growth">+115%</span>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <!-- Highest Volume Card -->
-                    <div class="trends-card trends-card-secondary">
-                        <div class="trends-card-header">
-                            <span>📚</span>
-                            <h3>Highest Volume (All-Time)</h3>
-                        </div>
-                        <div class="trends-tags">
-                            <span class="trends-tag" data-search-term="Type 2 Diabetes" onclick="searchTrend(this)">Type
-                                2 Diabetes</span>
-                            <span class="trends-tag" data-search-term="Breast Cancer" onclick="searchTrend(this)">Breast
-                                Cancer</span>
-                            <span class="trends-tag" data-search-term="COVID-19"
-                                onclick="searchTrend(this)">COVID-19</span>
-                            <span class="trends-tag" data-search-term="Hypertension"
-                                onclick="searchTrend(this)">Hypertension</span>
-                            <span class="trends-tag" data-search-term="Alzheimer's"
-                                onclick="searchTrend(this)">Alzheimer's</span>
-                            <span class="trends-tag" data-search-term="Depression"
-                                onclick="searchTrend(this)">Depression</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="trends-chart-section">
-                    <h3>Publication Volume by Year</h3>
-                    <div class="trends-chart-container">
-                        <canvas id="publication-trend-chart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-        </div>
     </main>
 
     <!-- Footer -->
@@ -2123,19 +2125,6 @@
 
 
 
-    <footer class="app-footer">
-        <div class="footer-content" style="font-weight: 700; color: var(--text-primary);">
-            <div class="footer-powered-by">
-                <strong>Powered by BioMedScholar Engine</strong>
-                <span class="footer-divider">|</span>
-                <span style="font-weight: 800; color: var(--primary-blue);">v0.9.0-BETA Teaser</span>
-            </div>
-            <div class="footer-attribution">
-                <strong>© 2026 Crafted by</strong> <span class="attribution-name"
-                    style="font-weight: 800; color: var(--primary-blue);">Sasidhara</span>
-            </div>
-        </div>
-    </footer>
 
     <!-- Scheduled Actions Modal -->
     <div id="scheduler-modal" class="modal">
@@ -2189,6 +2178,8 @@
             </div>
         </div>
     </div>
+
+
 
     <footer class="app-footer">
         <div class="footer-content" style="font-weight: 700; color: var(--text-primary);">
