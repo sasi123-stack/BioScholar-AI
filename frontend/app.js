@@ -1774,11 +1774,25 @@ function showDemoBanner() {
 // STATISTICS
 // ==========================================
 async function loadStatistics() {
-    // NOTE: /api/v1/statistics endpoint is not available on this backend.
-    // Using static index counts directly to avoid a 404 network error.
-    pubmedCountVals.forEach(el => el.textContent = '17,106');
-    trialsCountVals.forEach(el => el.textContent = '7,726');
-    totalDocsCountVals.forEach(el => el.textContent = '24,832');
+    try {
+        const response = await fetch(`${API_BASE_URL}/statistics`);
+        if (!response.ok) throw new Error('Statistics not available');
+        const data = await response.json();
+
+        const pubmed = data.pubmed_articles?.document_count || 17464;
+        const trials = data.clinical_trials?.document_count || 19749;
+        const total = pubmed + trials;
+
+        pubmedCountVals.forEach(el => el.textContent = pubmed.toLocaleString());
+        trialsCountVals.forEach(el => el.textContent = trials.toLocaleString());
+        totalDocsCountVals.forEach(el => el.textContent = total.toLocaleString());
+    } catch (error) {
+        console.warn('Backend statistics fetch failed, using known local counts:', error);
+        // Fallback to latest known counts
+        pubmedCountVals.forEach(el => el.textContent = '17,464');
+        trialsCountVals.forEach(el => el.textContent = '19,749');
+        totalDocsCountVals.forEach(el => el.textContent = '37,213');
+    }
 }
 
 // ==========================================
