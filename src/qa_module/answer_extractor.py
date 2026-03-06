@@ -29,28 +29,34 @@ class AnswerExtractor:
         self.model_loader = model_loader or ModelLoader()
         self.confidence_threshold = confidence_threshold
         self.max_answer_length = max_answer_length
-        
-        # Load QA model
-        logger.info("Loading QA model...")
-        self.model, self.tokenizer = self.model_loader.load_qa_model()
+        self.model = None
+        self.tokenizer = None
         self.device = self.model_loader.get_device()
         
-        logger.info(f"AnswerExtractor initialized on {self.device}")
+        # Check for low memory mode
+        import os
+        if os.getenv('LOW_MEMORY_MODE', 'false').lower() == 'true':
+            logger.warning("⚠️ Skipping local QA model loading (LOW_MEMORY_MODE=true)")
+        else:
+            # Load QA model
+            logger.info("Loading QA model...")
+            self.model, self.tokenizer = self.model_loader.load_qa_model()
+            logger.info(f"AnswerExtractor initialized on {self.device}")
     
     def extract_answer(
         self,
         question: str,
         context: str
     ) -> Dict:
-        """Extract answer from a single context passage.
+        """Extract answer from a single context passage."""
+        if not self.model or not self.tokenizer:
+            return {
+                'answer': "",
+                'confidence': 0.0,
+                'start_idx': 0,
+                'end_idx': 0
+            }
         
-        Args:
-            question: User question
-            context: Context passage
-            
-        Returns:
-            Dictionary with answer, score, and positions
-        """
         # Tokenize
         inputs = self.tokenizer(
             question,
@@ -115,6 +121,10 @@ class AnswerExtractor:
         """
         logger.info(f"Extracting answers from {len(passages)} passages")
         
+        if not self.model:
+            logger.warning("Local QA model not loaded, skipping extraction.")
+            return []
+            
         answers = []
         
         for passage in passages:

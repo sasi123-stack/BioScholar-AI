@@ -63,9 +63,8 @@ def get_qa_engine() -> Optional[QuestionAnsweringEngine]:
     """Get question answering engine instance (singleton)."""
     global _qa_engine
     
-    if IS_LOW_MEMORY:
-        logger.warning("⚠️ QA Engine disabled (LOW_MEMORY_MODE=true)")
-        return None
+    # We allow QuestionAnsweringEngine even in low memory mode
+    # because it can still use cloud-based Groq/Gemini generators.
     
     if _qa_engine is None:
         _qa_engine = QuestionAnsweringEngine()
