@@ -6482,29 +6482,29 @@ function updateSyncStatus(status) {
     const dot = wrapper?.querySelector('.sync-dot');
     const text = wrapper?.querySelector('.sync-text');
 
-    if (!wrapper || !dot || !text) return;
+    if (!wrapper || !dot) return;
 
     dot.classList.remove('synced', 'syncing', 'offline');
 
     switch (status) {
         case 'synced':
             dot.classList.add('synced');
-            text.textContent = 'LIVE';
+            if (text) text.textContent = '';
             wrapper.title = 'Maverick Synced & Online';
             break;
         case 'syncing':
             dot.classList.add('syncing');
-            text.textContent = 'STARTING';
+            if (text) text.textContent = 'STARTING';
             wrapper.title = 'Maverick is starting up (HF Space warming up)...';
             break;
         case 'offline':
             dot.classList.add('offline');
-            text.textContent = 'OFFLINE';
+            if (text) text.textContent = 'OFFLINE';
             wrapper.title = 'Maverick Offline';
             break;
         default:
             dot.classList.add('offline');
-            text.textContent = 'ERROR';
+            if (text) text.textContent = 'ERROR';
             break;
     }
 }
