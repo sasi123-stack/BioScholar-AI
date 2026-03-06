@@ -70,7 +70,7 @@ async def health_check(
             status="healthy" if es_connected else "degraded",
             elasticsearch=es_connected,
             models_loaded=qa_engine is not None,
-            version="1.0.2",
+            version="1.0.3",
             features={
                 "qa_enabled": qa_engine is not None,
                 "reranking_enabled": reranker is not None,
