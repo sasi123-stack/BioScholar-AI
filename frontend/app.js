@@ -6586,3 +6586,137 @@ function initVoiceSearch() {
     }
 }
 
+/**
+ * Scheduled Actions Module (v0.9.0-BETA Teaser)
+ */
+let scheduledActions = JSON.parse(localStorage.getItem('maverick_scheduled_actions') || '[]');
+
+// Pre-load March 9th if not exists (Teaser requirement)
+const bdayEntry = { id: Date.now(), desc: "Wish me Happy Birthday (March 9th)", date: "03-09", type: "wish", completed: false };
+if (!scheduledActions.some(a => a.date === "03-09" && a.type === "wish")) {
+    scheduledActions.push(bdayEntry);
+    localStorage.setItem('maverick_scheduled_actions', JSON.stringify(scheduledActions));
+}
+
+function initScheduledActions() {
+    console.log('BioMedScholar AI: Scheduled Actions Initialized.');
+    renderScheduledActions();
+
+    // Check every minute
+    setInterval(checkScheduledActions, 60000);
+    // Final check on load
+    setTimeout(checkScheduledActions, 2000);
+}
+
+function openScheduledActionsModal() {
+    const modal = document.getElementById('scheduler-modal');
+    if (modal) modal.classList.add('active');
+    renderScheduledActions();
+}
+
+function closeScheduledActionsModal() {
+    const modal = document.getElementById('scheduler-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+function addScheduledAction() {
+    const desc = document.getElementById('sched-desc').value.trim();
+    const date = document.getElementById('sched-date').value.trim();
+    const type = document.getElementById('sched-type').value;
+
+    if (!desc || !date) {
+        showToast('Please fill in all fields', 'error');
+        return;
+    }
+
+    // Simple date validation (MM-DD)
+    if (!/^\d{2}-\d{2}$/.test(date)) {
+        showToast('Date must be in MM-DD format (e.g., 03-09)', 'error');
+        return;
+    }
+
+    const newAction = {
+        id: Date.now(),
+        desc,
+        date,
+        type,
+        completed: false
+    };
+
+    scheduledActions.push(newAction);
+    localStorage.setItem('maverick_scheduled_actions', JSON.stringify(scheduledActions));
+    renderScheduledActions();
+
+    document.getElementById('sched-desc').value = '';
+    document.getElementById('sched-date').value = '';
+    showToast('Action scheduled successfully', 'success');
+}
+
+function renderScheduledActions() {
+    const list = document.getElementById('scheduler-list');
+    if (!list) return;
+
+    if (scheduledActions.length === 0) {
+        list.innerHTML = '<div class="empty-state">No active scheduled actions.</div>';
+        return;
+    }
+
+    list.innerHTML = scheduledActions.map(action => `
+        <div class="scheduler-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border-light); background: ${action.completed ? 'rgba(0,0,0,0.05)' : 'transparent'}">
+            <div>
+                <div style="font-weight: 600; font-size: 14px; text-decoration: ${action.completed ? 'line-through' : 'none'}">${action.desc}</div>
+                <div style="font-size: 11px; color: var(--text-muted)">Type: ${action.type.toUpperCase()} | Due: ${action.date}</div>
+            </div>
+            <button onclick="removeScheduledAction(${action.id})" style="background: none; border: none; color: #ff6b6b; cursor: pointer;">✕</button>
+        </div>
+    `).join('');
+}
+
+function removeScheduledAction(id) {
+    scheduledActions = scheduledActions.filter(a => a.id !== id);
+    localStorage.setItem('maverick_scheduled_actions', JSON.stringify(scheduledActions));
+    renderScheduledActions();
+}
+
+function checkScheduledActions() {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${month}-${day}`;
+
+    let handled = false;
+    scheduledActions.forEach(action => {
+        if (action.date === todayStr && !action.completed) {
+            triggerAction(action);
+            action.completed = true;
+            handled = true;
+        }
+    });
+
+    if (handled) {
+        localStorage.setItem('maverick_scheduled_actions', JSON.stringify(scheduledActions));
+        renderScheduledActions();
+    }
+}
+
+function triggerAction(action) {
+    console.log('Triggering Scheduled Action:', action.desc);
+
+    if (action.type === 'wish') {
+        const message = `🌟 **BioMedScholar AI Celebration** 🌟\n\nMaverick here! Sending you the warmest wishes on your special day. Happy Birthday! 🎂🎉\n\n"May your curiosity continue to illuminate the frontiers of biomedical science."`;
+        addMaverickMessage(message);
+        showToast('🎂 Special Greeting Received!', 'success');
+
+        // Open chat tab to show message
+        if (typeof switchTab === 'function') switchTab('chat');
+    } else {
+        showToast(`⏰ Reminder: ${action.desc}`, 'info');
+    }
+}
+
+// Add Scheduled Actions to main initialization
+document.addEventListener('DOMContentLoaded', () => {
+    // Other initializers...
+    setTimeout(initScheduledActions, 1000);
+});
+

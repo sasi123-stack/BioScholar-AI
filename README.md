@@ -44,6 +44,7 @@ Powered by Groq's low-latency Llama 4 (17B) platform, Maverick acts as a dedicat
 - **Context-Aware Follow-Ups**: Dynamically maps 12 unique biomedical domains (Oncology, Cardiology, CRISPR, etc.) to generate intelligent, specialized click-to-ask follow-up questions.
 - **Voice Dictation & Transcription**: Native Web Speech API integration allows for seamless dictation without auto-submitting unreviewed text.
 - **Collaboration & Privacy Modes**: Toggle **Group Session** mode for multi-persona analysis or **Incognito Mode** to prevent the session from saving to cloud history.
+- **Scheduled Actions (NEW v0.9.0)**: Proactive automation tools for setting research reminders, automated reports, and personalized triggers (e.g., anniversary wishes or periodic synthesis).
 
 ### 🔬 Research Desk (Analytical Engine)
 A high-density workspace for literature review and data extraction:
@@ -144,7 +145,7 @@ A high-density workspace for literature review and data extraction:
 
 **Built with ❤️ for the Biomedical Research Community**
 
-*Last updated: February 2026*
+*Last updated: March 6, 2026 (v0.9.0-BETA Teaser)*
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
