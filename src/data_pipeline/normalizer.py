@@ -152,12 +152,12 @@ class DataNormalizer:
             ]
             
             # Extract year from start_date
-            publication_date = trial.get("start_date", "")
+            publication_date = trial.get("start_date") or None
             publication_year = ""
             if publication_date:
                 # Try to extract YYYY from various formats
                 import re
-                year_match = re.search(r'\d{4}', publication_date)
+                year_match = re.search(r'\d{4}', str(publication_date))
                 if year_match:
                     publication_year = year_match.group(0)
             
@@ -175,8 +175,8 @@ class DataNormalizer:
                 "phases": trial.get("phases", []),
                 "status": trial.get("status", ""),
                 "enrollment": trial.get("enrollment", 0),
-                "start_date": trial.get("start_date", ""),
-                "completion_date": trial.get("completion_date", ""),
+                "start_date": trial.get("start_date") or None,
+                "completion_date": trial.get("completion_date") or None,
                 "publication_date": publication_date,
                 "publication_year": publication_year,
                 "sponsor": self.text_cleaner.clean(
@@ -250,7 +250,7 @@ class DataNormalizer:
             Date string in YYYY-MM format or YYYY
         """
         if not year:
-            return ""
+            return None
         
         if month:
             # Convert month name to number

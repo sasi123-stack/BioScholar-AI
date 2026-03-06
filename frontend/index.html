@@ -517,13 +517,9 @@
                         </button>
                         <!-- Quick Filters Sidebar (Left Side) -->
                         <div class="quick-filters" id="quick-filters">
-                            <div class="filters-header"
-                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid var(--primary-blue-light); padding-bottom: 12px;">
-                                <span class="quick-filters-label"
-                                    style="margin-bottom: 0; padding-bottom: 0; border: none;">Full Research
-                                    Filters</span>
-                                <button onclick="toggleSidebar()" class="sidebar-toggle-btn" title="Hide Sidebar"
-                                    style="background: none; border: none; cursor: pointer; color: var(--text-muted);">
+                            <div class="filters-header">
+                                <span class="quick-filters-label">Full Research Filters</span>
+                                <button onclick="toggleSidebar()" class="sidebar-toggle-btn" title="Hide Sidebar">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                         stroke-width="2">
                                         <path d="M18 6L6 18M6 6l12 12" />
@@ -532,7 +528,7 @@
                             </div>
 
                             <div class="quick-filter-section">
-                                <span class="quick-filter-sublabel">Data Source</span>
+                                <span class="quick-filter-sublabel">📊 Data Source</span>
                                 <div class="quick-filter-group">
                                     <button class="quick-filter-chip" data-type="source" data-value="all"
                                         onclick="toggleQuickFilter('source', 'all')">All
@@ -549,7 +545,7 @@
                             <div class="quick-filter-divider"></div>
 
                             <div class="quick-filter-section">
-                                <span class="quick-filter-sublabel">Publication Year</span>
+                                <span class="quick-filter-sublabel">📅 Publication Year</span>
                                 <div class="quick-filter-group">
                                     <button class="quick-filter-chip" data-type="dateRange" data-value="2026"
                                         onclick="toggleQuickFilter('dateRange', '2026')">2026</button>
@@ -569,7 +565,7 @@
                             </div>
 
                             <div class="quick-filter-section">
-                                <span class="quick-filter-sublabel">Time Horizon</span>
+                                <span class="quick-filter-sublabel">⏳ Time Horizon</span>
                                 <div class="quick-filter-group">
                                     <button class="quick-filter-chip" data-type="dateRange" data-value="any"
                                         onclick="toggleQuickFilter('dateRange', 'any')">All Time</button>
@@ -585,7 +581,7 @@
                             <div class="quick-filter-divider"></div>
 
                             <div class="quick-filter-section">
-                                <span class="quick-filter-sublabel">Sort Order</span>
+                                <span class="quick-filter-sublabel">🔃 Sort Order</span>
                                 <div class="quick-filter-group">
                                     <button class="quick-filter-chip"
                                         onclick="toggleQuickFilter('sortBy', 'relevance')">Relevance</button>
@@ -599,7 +595,7 @@
                             <div class="quick-filter-divider"></div>
 
                             <div class="quick-filter-section">
-                                <span class="quick-filter-sublabel">Search Engine Mode</span>
+                                <span class="quick-filter-sublabel">⚙️ Search Engine Mode</span>
                                 <div class="quick-alpha-container" title="Adjust Semantic Weight">
                                     <span class="quick-alpha-text">Key</span>
                                     <input type="range" id="quick-alpha-slider" min="0" max="100" value="50" step="10"
@@ -611,7 +607,7 @@
                             <div class="quick-filter-divider"></div>
 
                             <div class="quick-filter-section">
-                                <span class="quick-filter-sublabel">Real-time Index Health</span>
+                                <span class="quick-filter-sublabel">🩺 Real-time Index Health</span>
                                 <div class="quick-stats-badge" title="PubMed Articles">
                                     <span class="badge-label">PubMed Papers:</span>
                                     <span class="badge-value pubmed-count-val">17,106</span>

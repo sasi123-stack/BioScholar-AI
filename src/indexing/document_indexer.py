@@ -1,5 +1,6 @@
 """Document indexing for Elasticsearch."""
 
+import traceback
 from typing import Dict, List, Optional
 
 from elasticsearch import helpers
@@ -27,16 +28,7 @@ class DocumentIndexer:
         document: Dict,
         doc_id: Optional[str] = None
     ) -> bool:
-        """Index a single document.
-        
-        Args:
-            index_name: Name of the index
-            document: Document to index
-            doc_id: Optional document ID (uses document['id'] if not provided)
-            
-        Returns:
-            True if indexed successfully
-        """
+        """Index a single document."""
         try:
             if doc_id is None:
                 doc_id = document.get('id')
@@ -45,17 +37,31 @@ class DocumentIndexer:
                 logger.error("Document must have an ID")
                 return False
             
-            self.es_client.client.index(
-                index=index_name,
-                id=doc_id,
-                document=document
-            )
+            client = self.es_client.client
             
-            logger.debug(f"Indexed document {doc_id} to {index_name}")
-            return True
+            # Universal indexing approach:
+            # Try keyword 'document' (ES 8.x), then 'body' (ES < 8 or OpenSearch)
+            try:
+                # Attempt newer ES style
+                client.index(index=index_name, id=doc_id, document=document)
+                return True
+            except TypeError:
+                # Fallback to body (OpenSearch / older ES)
+                try:
+                    client.index(index=index_name, id=doc_id, body=document)
+                    return True
+                except Exception as inner_e:
+                    logger.error(f"Fallback indexing failed for document {doc_id}: {inner_e}")
+                    raise
+            except Exception as e:
+                # If it's not a TypeError, pass it up to catch logic rejection (like 400 Bad Request)
+                raise e
             
         except Exception as e:
             logger.error(f"Failed to index document {doc_id}: {e}")
+            # Log full traceback for debugging mapping errors
+            if "RequestError" in str(e) or "400" in str(e):
+                logger.debug(traceback.format_exc())
             return False
     
     def index_batch(
@@ -64,16 +70,7 @@ class DocumentIndexer:
         documents: List[Dict],
         batch_size: int = 500
     ) -> tuple[int, int]:
-        """Index a batch of documents using bulk API.
-        
-        Args:
-            index_name: Name of the index
-            documents: List of documents to index
-            batch_size: Number of documents per batch
-            
-        Returns:
-            Tuple of (successful_count, failed_count)
-        """
+        """Index a batch of documents using bulk API."""
         if not documents:
             logger.warning("No documents to index")
             return 0, 0
@@ -84,7 +81,6 @@ class DocumentIndexer:
             for doc in documents:
                 doc_id = doc.get('id')
                 if not doc_id:
-                    logger.warning("Skipping document without ID")
                     continue
                 
                 action = {
@@ -111,122 +107,47 @@ class DocumentIndexer:
                 success_count += success
                 failed_count += len(batch) - success
                 
-                logger.info(
-                    f"Indexed batch {i//batch_size + 1}: "
-                    f"{success} successful, {len(batch) - success} failed"
-                )
-            
-            logger.info(
-                f"Batch indexing complete: {success_count} successful, "
-                f"{failed_count} failed"
-            )
-            
             return success_count, failed_count
             
         except Exception as e:
             logger.error(f"Failed to index batch: {e}")
             raise
     
-    def update_document(
-        self,
-        index_name: str,
-        doc_id: str,
-        updates: Dict
-    ) -> bool:
-        """Update a document.
-        
-        Args:
-            index_name: Name of the index
-            doc_id: Document ID
-            updates: Fields to update
-            
-        Returns:
-            True if updated successfully
-        """
+    def update_document(self, index_name: str, doc_id: str, updates: Dict) -> bool:
+        """Update a document."""
         try:
+            # update still uses body usually
             self.es_client.client.update(
                 index=index_name,
                 id=doc_id,
                 body={'doc': updates}
             )
-            
-            logger.debug(f"Updated document {doc_id} in {index_name}")
             return True
-            
         except Exception as e:
             logger.error(f"Failed to update document {doc_id}: {e}")
             return False
     
-    def delete_document(
-        self,
-        index_name: str,
-        doc_id: str
-    ) -> bool:
-        """Delete a document.
-        
-        Args:
-            index_name: Name of the index
-            doc_id: Document ID
-            
-        Returns:
-            True if deleted successfully
-        """
+    def delete_document(self, index_name: str, doc_id: str) -> bool:
+        """Delete a document."""
         try:
-            self.es_client.client.delete(
-                index=index_name,
-                id=doc_id
-            )
-            
-            logger.debug(f"Deleted document {doc_id} from {index_name}")
+            self.es_client.client.delete(index=index_name, id=doc_id)
             return True
-            
         except Exception as e:
             logger.error(f"Failed to delete document {doc_id}: {e}")
             return False
     
-    def get_document(
-        self,
-        index_name: str,
-        doc_id: str
-    ) -> Optional[Dict]:
-        """Get a document by ID.
-        
-        Args:
-            index_name: Name of the index
-            doc_id: Document ID
-            
-        Returns:
-            Document dictionary or None if not found
-        """
+    def get_document(self, index_name: str, doc_id: str) -> Optional[Dict]:
+        """Get a document by ID."""
         try:
-            result = self.es_client.client.get(
-                index=index_name,
-                id=doc_id
-            )
+            result = self.es_client.client.get(index=index_name, id=doc_id)
             return result['_source']
-            
         except Exception as e:
             logger.error(f"Failed to get document {doc_id}: {e}")
             return None
     
-    def document_exists(
-        self,
-        index_name: str,
-        doc_id: str
-    ) -> bool:
-        """Check if a document exists.
-        
-        Args:
-            index_name: Name of the index
-            doc_id: Document ID
-            
-        Returns:
-            True if exists
-        """
+    def document_exists(self, index_name: str, doc_id: str) -> bool:
+        """Check if a document exists."""
         try:
-            return self.es_client.client.exists(
-                index=index_name,
-                id=doc_id
-            )
+            return self.es_client.client.exists(index=index_name, id=doc_id)
         except:
             return False
