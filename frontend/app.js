@@ -6489,7 +6489,7 @@ function updateSyncStatus(status) {
     switch (status) {
         case 'synced':
             dot.classList.add('synced');
-            text.textContent = 'BETA';
+            text.textContent = 'LIVE';
             wrapper.title = 'Maverick Synced & Online';
             break;
         case 'syncing':
