@@ -2191,7 +2191,6 @@ function displayCurrentResults() {
         if (resultsCount) resultsCount.innerHTML = `No results found for "<strong>${escapeHtml(currentQuery)}</strong>"`;
         if (searchResults) searchResults.innerHTML = showEmptyState('No results found', 'Try different keywords or adjust filters');
         pagination?.classList.add('hidden');
-        hideFloatingChatButton();
         return;
     }
 
@@ -2209,7 +2208,6 @@ function displayCurrentResults() {
         if (resultsCount) resultsCount.innerHTML = `No results match your filters`;
         if (searchResults) searchResults.innerHTML = showEmptyState('No matching results', 'Try adjusting your filters or search terms');
         pagination?.classList.add('hidden');
-        hideFloatingChatButton();
         return;
     }
 
@@ -2249,8 +2247,7 @@ function displayCurrentResults() {
         // searchResults.style.paddingBottom = '80px';
     }
 
-    // Show floating chat button when there are results
-    showFloatingChatButton();
+
 
 
 
