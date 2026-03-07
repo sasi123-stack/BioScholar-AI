@@ -58,7 +58,7 @@
                     <circle cx="24" cy="24" r="1.5" fill="white" />
                 </svg>
                 <span class="logo-text">BioMedScholar <span class="logo-scholar">AI</span></span>
-                <span class="beta-badge indicator-badge" id="maverick-sync-indicator" title="Maverick System Status">
+                <span class="beta-badge indicator-badge" id="maverick-sync-indicator" title="System Status">
                     <div class="sync-dot synced"></div>
                     <span class="sync-text">LIVE</span>
                 </span>
@@ -175,14 +175,15 @@
                         </svg>
                         <span>Shortcuts</span>
                     </button>
-                    <button class="menu-item" onclick="openIntelligenceModal(event)">
+                    <button class="menu-item" onclick="openScheduledActionsModal(event)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
-                            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" />
-                            <path d="M12 16v-4" />
-                            <path d="M12 8h.01" />
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
                         </svg>
-                        <span>System Intelligence</span>
+                        <span>Scheduled Actions</span>
                     </button>
                     <div class="menu-divider"></div>
                     <button class="menu-item" onclick="showHelpModal(event)">
@@ -635,7 +636,7 @@
                                 <div class="insight-header">
                                     <div class="insight-logo">🦞</div>
                                     <div class="insight-title-area">
-                                        <span class="insight-label">MAVERICK INSIGHT</span>
+                                        <span class="insight-label">RESEARCH INSIGHT</span>
                                         <span class="insight-badge">Synthesized AI Analysis</span>
                                     </div>
                                     <div class="insight-controls">
@@ -722,7 +723,7 @@
                                     </svg>
                                 </div>
                                 <div class="chat-title">
-                                    <h3>Maverick Research AI</h3>
+                                    <h3>Research AI Chat</h3>
                                     <span class="chat-status chat-secondary-text">Connected to Secure Research
                                         Node</span>
                                 </div>
@@ -904,7 +905,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <textarea id="chat-input" placeholder="Ask Maverick about biomedical research..."
+                                <textarea id="chat-input" placeholder="Ask Research AI about biomedical research..."
                                     rows="1"
                                     oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
 
@@ -932,8 +933,8 @@
                                 </button>
                             </div>
                             <div class="chat-disclaimer">
-                                Maverick uses RAG to ground answers in the BioMedScholar database. Always verify
-                                critical medical data.
+                                BioMedScholar AI uses RAG to ground answers in the database. Always verify critical
+                                medical data.
                             </div>
                         </div>
                     </div>
@@ -1039,9 +1040,9 @@
                         style="vertical-align: middle; margin-right: 4px; color: #1a73e8;">
                         <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                     </svg>
-                    Powered by <strong>Llama 4 Maverick (17B)</strong> via Groq
+                    Powered by <strong>Llama 4 Research AI (17B)</strong> via Groq
                     <span class="footer-divider">|</span>
-                    Built with ❤️ by <span class="attribution-name">Sasidhara Kashyap (Maverick)</span>
+                    Built with ❤️ by <span class="attribution-name">Sasidhara Kashyap</span>
                 </span>
             </div>
             <div class="footer-right">
@@ -1279,11 +1280,11 @@
                         </div>
 
                         <div class="help-card">
-                            <h4>🤖 Ask Maverick</h4>
+                            <h4>🤖 Research AI Chat</h4>
                             <ol>
-                                <li>Click the "Ask Maverick" link below any search results</li>
-                                <li>Launch the Telegram bot for deep biomedical analysis via Llama 4 Maverick</li>
-                                <li>The AI remembers your previous research context and provides cited evidence</li>
+                                <li>Switch to the "Research AI Chat" tab</li>
+                                <li>Ask complex biomedical questions directly to our integrated Llama 4 AI</li>
+                                <li>Get synthesized answers with citations from indexed literature</li>
                             </ol>
                         </div>
 
@@ -1887,26 +1888,7 @@
                     </div>
                 </div>
 
-                <div class="help-section">
-                    <h3>🤖 Maverick AI (Telegram Bot)</h3>
-                    <div class="help-card">
-                        <h4>Ask Maverick</h4>
-                        <p>Maverick is now optimized as a standalone <strong>Telegram Intelligence Bot</strong>. It
-                            provide 24/7 access to biomedical synthesis, clinical trial audits, and live research
-                            discovery.</p>
-                    </div>
-                    <div class="help-card">
-                        <h4>Persistent Memory</h4>
-                        <p>Maverick remembers your research threads! You can continue complex analytical discussions
-                            about specific genes, therapies, or trials over days or weeks.</p>
-                    </div>
-                    <div class="help-card">
-                        <h4>Live Connection</h4>
-                        <p>Launch the suite via the <a href="https://web.telegram.org/a/#8513211167" target="_blank"
-                                style="color: var(--primary-blue); font-weight: 600;">Ask Maverick</a> links found in
-                            the header and results desk.</p>
-                    </div>
-                </div>
+
 
                 <div class="help-section">
                     <h3>📚 Managing Articles</h3>
@@ -2056,72 +2038,7 @@
         </div>
     </div>
 
-    <!-- Intelligence Modal -->
-    <div id="intelligence-modal" class="modal">
-        <div class="modal-content glass-modal intelligence-modal">
-            <div class="modal-header">
-                <h2><span class="icon">🦞</span> Maverick System Intelligence</h2>
-                <button class="close-modal" aria-label="Close" onclick="closeIntelligenceModal()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="intelligence-grid">
-                    <div class="intel-card">
-                        <div class="intel-icon">🧠</div>
-                        <div class="intel-text">
-                            <h3>NLP and NLU</h3>
-                            <p>Natural Language Processing and Understanding allow Maverick to interpret user intent,
-                                context, and sentiment, even with misspellings or varying sentence structures.</p>
-                        </div>
-                    </div>
-                    <div class="intel-card">
-                        <div class="intel-icon">📈</div>
-                        <div class="intel-text">
-                            <h3>Machine Learning (ML)</h3>
-                            <p>Enables the chatbot to learn from past interactions, improving its accuracy and
-                                conversational ability over time through active feedback loops.</p>
-                        </div>
-                    </div>
-                    <div class="intel-card">
-                        <div class="intel-icon">🔄</div>
-                        <div class="intel-text">
-                            <h3>Dialog Management</h3>
-                            <p>Pre-built, structured conversation flows that guide the interaction, ensuring research
-                                queries are refined and precise.</p>
-                        </div>
-                    </div>
-                    <div class="intel-card">
-                        <div class="intel-icon">🌐</div>
-                        <div class="intel-text">
-                            <h3>Multichannel Integration</h3>
-                            <p>Capability to function across various platforms, including websites, messaging apps
-                                (Telegram), and future voice-enabled devices.</p>
-                        </div>
-                    </div>
-                    <div class="intel-card">
-                        <div class="intel-icon">📂</div>
-                        <div class="intel-text">
-                            <h3>Contextual Awareness</h3>
-                            <p>The ability to remember previous parts of the conversation to provide relevant, coherent,
-                                and consistent scholarly responses.</p>
-                        </div>
-                    </div>
-                    <div class="intel-card">
-                        <div class="intel-icon">📊</div>
-                        <div class="intel-text">
-                            <h3>Analytics and Reporting</h3>
-                            <p>Tools that track performance and user interactions to improve the chatbot's effectiveness
-                                and reliability in clinical settings.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+
 
 
 
@@ -2134,7 +2051,7 @@
                 <button class="modal-close" onclick="closeScheduledActionsModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <p class="modal-desc">Configure Maverick to perform specific tasks or reminders at certain times.</p>
+                <p class="modal-desc">Configure the system to perform specific tasks or reminders at certain times.</p>
                 <div class="scheduler-container">
                     <div id="scheduler-list" class="scheduler-list">
                         <!-- Items injected by JS -->

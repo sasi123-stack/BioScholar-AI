@@ -1219,9 +1219,9 @@ function renderChatWelcome() {
                     <line x1="12" y1="22.08" x2="12" y2="12"></line>
                 </svg>
             </div>
-            <h2 style="font-size: 28px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #1a73e8, #0d47a1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 12px 0;">Maverick Research AI</h2>
+            <h2 style="font-size: 28px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #1a73e8, #0d47a1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 12px 0;">Research AI Chat</h2>
             <p style="color: var(--text-secondary); max-width: 440px; margin: 0 auto 4px; font-size: 16px; line-height: 1.6; opacity: 0.9;">Search & synthesise from 24,000+ biomedical articles.</p>
-            <p style="color: var(--text-muted); max-width: 440px; margin: 0 auto 32px; font-size: 13px; line-height: 1.5; opacity: 0.8;">Powered by <strong>Llama 4 Maverick (17B) via Groq</strong> &nbsp;·&nbsp; For deep AI answers, use the <a href="https://web.telegram.org/a/#8513211167" target="_blank" style="color: var(--primary-blue);">Telegram Bot</a></p>
+            <p style="color: var(--text-muted); max-width: 440px; margin: 0 auto 32px; font-size: 13px; line-height: 1.5; opacity: 0.8;">Powered by <strong>Llama 4 Research AI (17B) via Groq</strong></p>
             
             <div style="width: 100%; max-width: 480px;">
                 <div style="display: flex; flex-direction: column; gap: 12px;">
@@ -3447,7 +3447,7 @@ function handleChatSubmit() {
                     `**Try:**\n` +
                     `• Using different keywords or scientific terms\n` +
                     `• Switching to the **Research Desk** tab for advanced filters\n` +
-                    `• Asking on [Telegram Maverick Bot](https://web.telegram.org/a/#8513211167) for general biomedical questions`);
+                    `• Access deep biomedical insights through our Research AI Chat`);
                 return;
             }
 
@@ -3629,7 +3629,7 @@ function handleChatSubmit() {
                 `**Try these options:**\n` +
                 `• 🔄 **Retry** — tap send again in a few seconds\n` +
                 `• 📋 Use the **Research Desk** tab to search directly\n` +
-                `• 🤖 For instant AI answers: [Open Maverick on Telegram](https://web.telegram.org/a/#8513211167)`);
+                `• 🤖 For instant AI answers: Use the Research AI tab`);
         })
         .finally(() => {
             currentChatController = null;
@@ -6340,9 +6340,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Status Checker — only pings the main API health endpoint
-    // Maverick is a Telegram bot (not a live web service), so we do NOT ping its HF Space
-    // to avoid console 503 spam. Badge permanently shows BETA (synced).
     function updateSystemStatus() {
         const dot = document.getElementById('status-dot');
         const txt = document.getElementById('status-text');
@@ -6354,7 +6351,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         dot.className = 'status-dot connected';
                         txt.textContent = 'System Online';
                     } else {
-                        // 503 = HF Space warming up; any other error = starting
                         dot.className = 'status-dot warning';
                         txt.textContent = 'Starting...';
                     }
@@ -6364,30 +6360,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     txt.textContent = 'Offline';
                 });
         }
-
-        // Maverick badge stays permanently 'synced' (BETA) — no pinging needed
-        updateSyncStatus('synced');
     }
 
     // Globally expose for initial check
     window.updateSystemStatus = updateSystemStatus;
 });
 
-function openIntelligenceModal() {
-    const modal = document.getElementById('intelligence-modal');
-    if (modal) {
-        modal.classList.add('open');
-        document.body.style.overflow = 'hidden';
-    }
-}
 
-function closeIntelligenceModal() {
-    const modal = document.getElementById('intelligence-modal');
-    if (modal) {
-        modal.classList.remove('open');
-        document.body.style.overflow = 'auto';
-    }
-}
 
 /**
  * Handle floating chat resizing
@@ -6431,43 +6410,10 @@ function initChatResizer() {
     }
 }
 
-function initFloatingChatButton() {
-    const floatingBtn = document.getElementById('floating-chat-btn');
-    if (floatingBtn) {
-        floatingBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            openTelegramBot();
-            return false;
-        });
-        console.log('✓ Floating chat button initialized and clickable');
-    } else {
-        console.warn('⚠ Floating chat button element not found');
-    }
-}
 
-function showFloatingChatButton() {
-    const floatingBtn = document.getElementById('floating-chat-btn');
-    if (floatingBtn) {
-        floatingBtn.classList.add('visible');
-    }
-}
-
-function hideFloatingChatButton() {
-    const floatingBtn = document.getElementById('floating-chat-btn');
-    if (floatingBtn) {
-        floatingBtn.classList.remove('visible');
-    }
-}
-
-function openTelegramBot() {
-    const telegramBotUrl = 'https://web.telegram.org/a/#8513211167';
-    window.open(telegramBotUrl, 'telegram-bot', 'width=800,height=600,resizable=yes');
-}
 
 // Initialize floating button on page load
 document.addEventListener('DOMContentLoaded', function () {
-    initFloatingChatButton();
     initVoiceSearch(); // Voice Input System
     updateSystemStatus(); // Initial status check (main API only)
     setInterval(updateSystemStatus, 60000); // Check main API health every 60s
@@ -6582,7 +6528,7 @@ function initVoiceSearch() {
     function stopRecording() {
         isRecording = false;
         voiceBtn.classList.remove('recording');
-        chatInput.placeholder = "Ask Maverick about biomedical research...";
+        chatInput.placeholder = "Ask Research AI about biomedical research...";
     }
 }
 
@@ -6601,15 +6547,6 @@ if (!scheduledActions.some(a => a.date === "03-09" && a.type === "wish")) {
 function initScheduledActions() {
     console.log('BioMedScholar AI: Scheduled Actions Initialized.');
     renderScheduledActions();
-
-    // Enable plugin visually in the menu
-    if (typeof activePlugins !== 'undefined') {
-        activePlugins.add('scheduler');
-        const item = document.getElementById('plugin-scheduler');
-        if (item) item.classList.add('active');
-        const mainBtn = document.getElementById('chat-plugins-btn');
-        if (mainBtn) mainBtn.classList.add('active-plugin');
-    }
 
     // Check every minute
     setInterval(checkScheduledActions, 60000);
