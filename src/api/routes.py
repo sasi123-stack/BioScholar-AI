@@ -1,5 +1,5 @@
 """
-API route handlers for biomedical search engine.
+API route handlers for biomedical search engine. Updated: 2026-03-07
 """
 
 import time
