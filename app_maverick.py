@@ -245,6 +245,33 @@ if __name__ == '__main__':
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
 
+    @flask_app.route('/api/v1/statistics', methods=['GET'])
+    def get_statistics():
+        try:
+            from opensearchpy import OpenSearch
+            client = OpenSearch(
+                hosts=[f"https://{ES_USER}:{ES_PASS}@{ES_HOST}:443"],
+                use_ssl=True, verify_certs=True
+            )
+            
+            stats = {}
+            for index_name in ["pubmed_articles", "clinical_trials"]:
+                try:
+                    res = client.count(index=index_name)
+                    stats[index_name] = {
+                        "document_count": res['count'],
+                        "index_exists": True
+                    }
+                except:
+                    stats[index_name] = {
+                        "document_count": 0,
+                        "index_exists": False
+                    }
+            
+            return jsonify(stats)
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+
     @flask_app.route('/api/v1/maverick/chat', methods=['POST', 'OPTIONS'])
     def maverick_chat():
         if flask_request.method == 'OPTIONS':
