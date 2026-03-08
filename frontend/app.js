@@ -5990,6 +5990,32 @@ function playNotificationSound(priority) {
 }
 
 /**
+ * Test function: Schedule birthday reminder for 5 seconds from now
+ * For testing purposes - removes itself after first use
+ */
+window.testBirthdayReminder = function() {
+    const testTime = new Date(Date.now() + 5000); // 5 seconds from now
+    console.log('🧪 Testing Birthday Reminder - will trigger in 5 seconds...');
+    
+    scheduleNotification(
+        'success',
+        'Happy Birthday! 🎂🎉 [TEST]',
+        'This is a test of the birthday reminder system. Check browserConsole for logs.',
+        testTime.toISOString(),
+        {
+            category: 'birthday',
+            priority: 'high',
+            icon: '🎂',
+            sound: true,
+            persistent: true
+        }
+    );
+    
+    console.log(`✅ Test birthday reminder scheduled for: ${testTime.toLocaleTimeString()}`);
+    console.log('📢 Watch for notification in 5 seconds...');
+};
+
+/**
  * Schedule a birthday reminder for tomorrow at 9 AM IST
  * Uses the existing scheduled notifications system
  */
