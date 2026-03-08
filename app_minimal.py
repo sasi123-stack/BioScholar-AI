@@ -13,6 +13,8 @@ from typing import List, Dict, Any, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 # --- DNS PATCH FOR HUGGING FACE SPACES ---
@@ -139,6 +141,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files (serves favicon.ico, etc.)
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize on startup."""
@@ -160,6 +167,14 @@ async def root():
             "statistics": "/api/v1/statistics"
         }
     }
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Serve favicon from static folder."""
+    favicon_path = os.path.join(os.path.dirname(__file__), "static", "favicon.svg")
+    if os.path.exists(favicon_path):
+        return FileResponse(favicon_path, media_type="image/svg+xml")
+    return {"message": "favicon not found"}
 
 @app.get("/api/v1/health")
 async def health():
