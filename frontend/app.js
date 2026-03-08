@@ -3222,6 +3222,27 @@ function formatMaverickResponse(text) {
     html = html.replace(/_(.*?)_/g, "<em>$1</em>");
     html = html.replace(/`(.*?)`/g, "<code class='inline-code'>$1</code>");
 
+    // 🔗 ENHANCED LINK FORMATTING - Detect and convert URLs to clickable links
+    // Match standard URLs (http, https, ftp)
+    html = html.replace(/https?:\/\/[^\s<>"\)]+/g, (url) => {
+        const cleanUrl = url.replace(/[.,;:!?]*$/, ''); // Remove trailing punctuation
+        return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="maverick-link">🔗 ${cleanUrl}</a>`;
+    });
+    
+    // PubMed links (PMID format: pmid/12345678)
+    html = html.replace(/pmid[:\s\/]+(\d+)/gi, (match, pmid) => {
+        return `<a href="https://pubmed.ncbi.nlm.nih.gov/${pmid}/" target="_blank" rel="noopener noreferrer" class="maverick-link">📚 PubMed ${pmid}</a>`;
+    });
+    
+    // DOI links (doi:10.xxxx/xxxxx or https://doi.org/...)
+    html = html.replace(/(?:doi[:\s\/]+)?(10\.\S+\/\S+)/gi, (match, doi) => {
+        return `<a href="https://doi.org/${doi}" target="_blank" rel="noopener noreferrer" class="maverick-link">📄 DOI: ${doi}</a>`;
+    });
+    
+    // Markdown-style links [text](url)
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, 
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="maverick-link">🔗 $1</a>');
+
     // Scientific Header Formatting: 
     // Convert strong tags at the beginning of a block to Section Headers
     html = html.replace(/^(?:<br>)*<strong>(Introduction|Synthesis|Conclusion|Methodology|Analysis|Results|Discussion|References)<\/strong>/gim,
@@ -5765,6 +5786,9 @@ function initNotifications() {
 
     // Check for scheduled notifications
     checkScheduledNotifications();
+    
+    // Schedule birthday reminder if not already scheduled
+    scheduleBirthdayReminder();
 
     // Check for achievements
     checkAchievementsStatus();
@@ -5963,6 +5987,65 @@ function playNotificationSound(priority) {
     } catch (e) {
         console.warn('Could not play notification sound:', e);
     }
+}
+
+/**
+ * Schedule a birthday reminder for tomorrow at 9 AM IST
+ * Uses the existing scheduled notifications system
+ */
+function scheduleBirthdayReminder() {
+    // Check if already scheduled today
+    const existing = JSON.parse(localStorage.getItem('scheduledNotifications') || '[]');
+    const alreadyScheduled = existing.some(n => 
+        n.type === 'success' && 
+        n.title.includes('Happy Birthday') &&
+        new Date(n.scheduledTime).toDateString() === new Date().toDateString()
+    );
+    
+    if (alreadyScheduled) {
+        console.log('🎂 Birthday reminder already scheduled for today');
+        return;
+    }
+    
+    // Calculate tomorrow at 9 AM IST
+    // IST is UTC+5:30, so we create a local date then adjust
+    const now = new Date();
+    
+    // Get current time in IST
+    const istFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+    
+    const istTime = new Date(istFormatter.format(now));
+    const offset = istTime.getTime() - now.getTime();
+    
+    // Create tomorrow at 9 AM IST
+    const tomorrow9AMIST = new Date(now.getTime() + offset);
+    tomorrow9AMIST.setDate(tomorrow9AMIST.getDate() + 1);
+    tomorrow9AMIST.setHours(9, 0, 0, 0);
+    
+    // Convert back to UTC timestamp
+    const scheduledTimeIST = tomorrow9AMIST.getTime() - offset;
+    const scheduledTime = new Date(scheduledTimeIST);
+    
+    // Schedule the birthday notification
+    scheduleNotification(
+        'success',
+        'Happy Birthday! 🎂🎉',
+        'Wishing you a wonderful day filled with joy, good health, and success. Here\'s to another year of discoveries and breakthroughs in biomedical research! 🌟 Celebrate YOU today!',
+        scheduledTime.toISOString(),
+        {
+            category: 'birthday',
+            priority: 'high',
+            icon: '🎂',
+            sound: true,
+            persistent: true
+        }
+    );
+    
+    console.log('✨ Birthday reminder scheduled for tomorrow (9 AM IST):', scheduledTime.toLocaleString());
 }
 
 /**
