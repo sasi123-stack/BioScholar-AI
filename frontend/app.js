@@ -5990,18 +5990,41 @@ function playNotificationSound(priority) {
 }
 
 /**
- * Test function: Schedule birthday reminder for 5 seconds from now
- * For testing purposes - removes itself after first use
+ * Test function: Schedule birthday reminder for tomorrow at 9 AM IST
+ * For testing purposes - verifies the full scheduling system
  */
 window.testBirthdayReminder = function() {
-    const testTime = new Date(Date.now() + 5000); // 5 seconds from now
-    console.log('🧪 Testing Birthday Reminder - will trigger in 5 seconds...');
+    // Calculate tomorrow at 9 AM IST
+    const now = new Date();
+    
+    // Get current time in IST
+    const istFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+    
+    const istTime = new Date(istFormatter.format(now));
+    const offset = istTime.getTime() - now.getTime();
+    
+    // Create tomorrow at 9 AM IST
+    const tomorrow9AMIST = new Date(now.getTime() + offset);
+    tomorrow9AMIST.setDate(tomorrow9AMIST.getDate() + 1);
+    tomorrow9AMIST.setHours(9, 0, 0, 0);
+    
+    // Convert back to UTC timestamp
+    const scheduledTimeIST = tomorrow9AMIST.getTime() - offset;
+    const scheduledTime = new Date(scheduledTimeIST);
+    
+    console.log('🧪 Testing Birthday Reminder');
+    console.log('📅 Scheduled for tomorrow (March 9, 2026) at 9 AM IST');
+    console.log('⏰ Local time: ' + scheduledTime.toLocaleString());
     
     scheduleNotification(
         'success',
-        'Happy Birthday! 🎂🎉 [TEST]',
-        'This is a test of the birthday reminder system. Check browserConsole for logs.',
-        testTime.toISOString(),
+        'Happy Birthday! 🎂🎉',
+        'Wishing you a wonderful day filled with joy, good health, and success. Here\'s to another year of discoveries and breakthroughs in biomedical research! 🌟 Celebrate YOU today!',
+        scheduledTime.toISOString(),
         {
             category: 'birthday',
             priority: 'high',
@@ -6011,9 +6034,10 @@ window.testBirthdayReminder = function() {
         }
     );
     
-    console.log(`✅ Test birthday reminder scheduled for: ${testTime.toLocaleTimeString()}`);
-    console.log('📢 Watch for notification in 5 seconds...');
+    console.log('✅ Birthday reminder successfully scheduled for March 9, 2026 at 9 AM IST');
+    console.log('📢 Check localStorage to verify: localStorage.getItem("scheduledNotifications")');
 };
+
 
 /**
  * Schedule a birthday reminder for tomorrow at 9 AM IST
