@@ -706,13 +706,13 @@ function initEventListeners() {
         const notificationMenu = document.getElementById('notification-dropdown');
 
         if (headerMenu && !headerMenu.classList.contains('hidden')) {
-            if ((!headerMenu.contains(e.target) || e.target.closest('.menu-item')) && !e.target.closest('.menu-trigger')) {
-                // If it's the notification button, let the toggle run, but hide header
+            if (!headerMenu.contains(e.target) && !e.target.closest('.menu-trigger')) {
+                // Close only if clicked outside the menu entirely, not on menu items
                 headerMenu.classList.add('hidden');
             }
         }
         if (resultsMenu && !resultsMenu.classList.contains('hidden')) {
-            if ((!resultsMenu.contains(e.target) || e.target.closest('.menu-item')) && !e.target.closest('.menu-trigger')) {
+            if (!resultsMenu.contains(e.target) && !e.target.closest('.menu-trigger')) {
                 resultsMenu.classList.add('hidden');
             }
         }
@@ -6684,15 +6684,21 @@ function initScheduledActions() {
     setTimeout(checkScheduledActions, 2000);
 }
 
-function openScheduledActionsModal() {
+function openScheduledActionsModal(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
     const modal = document.getElementById('scheduler-modal');
-    if (modal) modal.classList.add('active');
+    if (modal) modal.classList.add('open');
+    const headerMenu = document.getElementById('header-menu');
+    if (headerMenu) headerMenu.classList.add('hidden');
     renderScheduledActions();
 }
 
 function closeScheduledActionsModal() {
     const modal = document.getElementById('scheduler-modal');
-    if (modal) modal.classList.remove('active');
+    if (modal) modal.classList.remove('open');
 }
 
 function addScheduledAction() {

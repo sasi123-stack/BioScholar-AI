@@ -3579,6 +3579,11 @@ mark {
     opacity: 1;
 }
 
+.modal.active {
+    display: flex;
+    opacity: 1;
+}
+
 .modal-content {
     background: var(--bg-primary);
     width: 90%;
