@@ -62,3 +62,4 @@ dnspython
 selenium
 webdriver-manager
 twilio
+python-telegram-bot>=20.0
