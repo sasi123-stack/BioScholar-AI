@@ -316,12 +316,21 @@ async def maverick_chat(request: ChatRequest):
             messages.append({"role": "user", "content": request.question})
         
         client = AsyncGroq(api_key=GROQ_API_KEY)
-        response = await client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=messages,
-            temperature=0.3,
-            max_tokens=2048
-        )
+        try:
+            response = await client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2048
+            )
+        except Exception as model_err:
+            logger.warning(f"Primary model {MODEL_NAME} failed: {model_err}. Trying fallback...")
+            response = await client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2048
+            )
         
         answer = response.choices[0].message.content
         if "💠" not in answer[:15]:
