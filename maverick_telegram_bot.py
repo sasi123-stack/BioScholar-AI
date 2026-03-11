@@ -167,29 +167,49 @@ def sanitize_for_telegram(text: str) -> str:
     import re
     # 1. Map Headers to Bold
     text = re.sub(r'<(h1|h2|h3|h4|h5|h6)[^>]*>', '<b>', text, flags=re.IGNORECASE)
-    text = re.sub(r'</(h1|h2|h3|h4|h5|h6)>', '</b>\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</(h1|h2|h3|h4|h5|h6)>', '</b>\n\n', text, flags=re.IGNORECASE)
     
     # 2. Map Paragraphs and Divs to line breaks
     text = re.sub(r'<(p|div)[^>]*>', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'</(p|div)>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</(p|div)>', '\n\n', text, flags=re.IGNORECASE)
     
-    # 3. Handle line breaks
+    # 3. Handle line breaks and horizontal rules
     text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<hr\s*/?>', '\n〰️〰️〰️〰️〰️〰️〰️〰️\n', text, flags=re.IGNORECASE)
+
+    # 4. Handle Lists (Convert to text bullets)
+    text = re.sub(r'<li[^>]*>', '• ', text, flags=re.IGNORECASE)
+    text = re.sub(r'</li>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<(ul|ol)[^>]*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</(ul|ol)>', '\n', text, flags=re.IGNORECASE)
+
+    # 5. Handle Tables (Convert to pipe-separated text)
+    text = re.sub(r'<table[^>]*>', '\n📊 <b>Table Data:</b>\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</table>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<tr[^>]*>', '▪️ ', text, flags=re.IGNORECASE)
+    text = re.sub(r'</tr>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<(td|th)[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'</(td|th)>', ' | ', text, flags=re.IGNORECASE)
+    text = re.sub(r' \|\s*\n', '\n', text) # strip trailing pipes
+
+    # 6. Handle Superscripts and Subscripts
+    text = re.sub(r'<sup[^>]*>', '^', text, flags=re.IGNORECASE)
+    text = re.sub(r'</sup>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'<sub[^>]*>', '_', text, flags=re.IGNORECASE)
+    text = re.sub(r'</sub>', '', text, flags=re.IGNORECASE)
     
-    # 4. Remove unsupported tags entirely but keep content
-    # Standard tags: b, i, u, s, strike, del, code, pre, a
+    # 7. Remove unsupported tags entirely but keep inner content
     supported_tags = ['b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del', 'code', 'pre', 'a']
-    
-    # Use regex to find all tags
     all_tags = re.findall(r'<(/?)([a-z0-9]+)(\s*[^>]*)>', text, flags=re.IGNORECASE)
+    
     for is_closing, tag_name, attrs in all_tags:
         if tag_name.lower() not in supported_tags:
-            # Construct exact tag to replace
             full_tag = f"<{is_closing}{tag_name}{attrs}>"
             text = text.replace(full_tag, "")
             
-    # Clean up double line breaks
+    # Clean up double line breaks and HTML entities
     text = re.sub(r'\n{3,}', '\n\n', text)
+    text = text.replace('&nbsp;', ' ')
     
     return text.strip()
 
