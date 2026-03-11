@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct"
+MODEL_NAME = "openai/gpt-oss-120b"
 DB_FILE = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "local_memory.db"
 
 # Search Config (Bonsai/OpenSearch)
@@ -143,7 +143,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /search &lt;topic&gt; - AI literature search & synthesis\n"
         "• /history - Recall your last 5 interactions\n"
         "• /clear - Reset conversation memory\n"
-        "• /about - Learn about the Llama 4 engine\n"
+        "• /about - Learn about the GPT OSS 120B engine\n"
         "• /test - Launch the full Research Desk"
     )
     await update.message.reply_html(help_text)
@@ -152,7 +152,7 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     about_text = (
         "💠 <b>About Maverick AI</b>\n\n"
         "Maverick is a high-performance biomedical synthesis engine powered by Groq's low-latency "
-        "<b>Llama 4 (17B)</b> platform. Optimized for clinical research, oncology, and pharmacology "
+        "<b>GPT OSS 120B</b> platform. Optimized for clinical research, oncology, and pharmacology "
         "data extraction."
     )
     await update.message.reply_html(about_text)

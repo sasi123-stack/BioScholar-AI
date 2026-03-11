@@ -70,7 +70,7 @@ print(">>> [1/5] MAVERICK SYSTEM BOOTING...", flush=True)
 
 # Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct" 
+MODEL_NAME = "openai/gpt-oss-120b" 
 DB_FILE = "/tmp/conversation_history.db" # Use /tmp for HF write safety
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 ES_HOST = os.getenv("ELASTICSEARCH_HOST", "assertive-mahogany-1m2hcasg.us-east-1.bonsaisearch.net")
@@ -163,7 +163,7 @@ if __name__ == '__main__':
     def health():
         return jsonify({
             "status": "synced", 
-            "engine": "Llama 4 Maverick", 
+            "engine": "GPT OSS 120B", 
             "bot": "online",
             "elasticsearch": "connected" # simplified health check
         })
@@ -320,7 +320,7 @@ if __name__ == '__main__':
             return jsonify({
                 "status": "success",
                 "answer": answer,
-                "reasoning": "Maverick AI synthesis via Llama 4 Maverick on Groq",
+                "reasoning": "Maverick AI synthesis via GPT OSS 120B on Groq",
                 "sources": []
             })
         except Exception as e:

@@ -7,7 +7,7 @@ sdk: docker
 pinned: false
 ---
 
-# Maverick WhatsApp Bot (Llama 4)
+# Maverick WhatsApp Bot (GPT OSS 120B)
 
 Unified Research Engine with active knowledge memory on WhatsApp.
 

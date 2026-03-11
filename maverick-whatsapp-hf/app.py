@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct"
+MODEL_NAME = "openai/gpt-oss-120b"
 DB_FILE = "/tmp/whatsapp_memory.db" # Use /tmp for HF Spaces ephemeral write access
 
 # Initialize Groq Client
@@ -59,7 +59,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def health():
-    return "Maverick WhatsApp Bot (Llama 4) is running."
+    return "Maverick WhatsApp Bot (GPT OSS 120B) is running."
 
 @app.route("/whatsapp", methods=['POST'])
 def whatsapp_reply():
@@ -90,7 +90,7 @@ def whatsapp_reply():
                 "content": (
                     "You are the Maverick Suite (💠), a premium analytical biomedical research engine. "
                     "Your identity is sharp, precise, and authoritative. "
-                    "You are powered by Llama 3.3 Maverick architecture. "
+                    "You are powered by GPT OSS 120B Maverick architecture. "
                     "You are communicating with the user via WhatsApp. "
                     "You maintain active knowledge memory to ensure research continuity."
                 )

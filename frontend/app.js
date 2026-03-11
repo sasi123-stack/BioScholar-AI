@@ -34,6 +34,35 @@ function ensureAuthorsArray(authors) {
     return [String(authors)];
 }
 
+/**
+ * Formats Maverick AI response with HTML tags and clean styling
+ */
+function formatMaverickResponse(text) {
+    if (!text) return '';
+
+    let formatted = text;
+
+    // Remove the 💠 prefix if present for internal processing
+    formatted = formatted.replace(/^💠\s*/, '');
+
+    // Convert markdown bold/italic to HTML
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    formatted = formatted.replace(/\*(.*?)\*/g, '<i>$1</i>');
+
+    // Handle line breaks
+    formatted = formatted.replace(/\n/g, '<br>');
+
+    return formatted;
+}
+
+/**
+ * Truncates text to a specified length
+ */
+function truncate(text, length) {
+    if (!text) return '';
+    return text.length > length ? text.substring(0, length) + '...' : text;
+}
+
 var isNgrok = window.location.hostname.includes('ngrok-free') || window.location.hostname.includes('ngrok.io');
 var isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com');
 var isVercel = window.location.hostname.includes('vercel.app');
@@ -1221,7 +1250,7 @@ function renderChatWelcome() {
             </div>
             <h2 style="font-size: 28px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #1a73e8, #0d47a1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 12px 0;">Research AI Chat</h2>
             <p style="color: var(--text-secondary); max-width: 440px; margin: 0 auto 4px; font-size: 16px; line-height: 1.6; opacity: 0.9;">Search & synthesise from 24,000+ biomedical articles.</p>
-            <p style="color: var(--text-muted); max-width: 440px; margin: 0 auto 32px; font-size: 13px; line-height: 1.5; opacity: 0.8;">Powered by <strong>Llama 4 Research AI (17B) via Groq</strong></p>
+            <p style="color: var(--text-muted); max-width: 440px; margin: 0 auto 32px; font-size: 13px; line-height: 1.5; opacity: 0.8;">Powered by <strong>GPT OSS 120B via Groq</strong></p>
             
             <div style="width: 100%; max-width: 480px;">
                 <div style="display: flex; flex-direction: column; gap: 12px;">
@@ -3228,19 +3257,19 @@ function formatMaverickResponse(text) {
         const cleanUrl = url.replace(/[.,;:!?]*$/, ''); // Remove trailing punctuation
         return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="maverick-link">🔗 ${cleanUrl}</a>`;
     });
-    
+
     // PubMed links (PMID format: pmid/12345678)
     html = html.replace(/pmid[:\s\/]+(\d+)/gi, (match, pmid) => {
         return `<a href="https://pubmed.ncbi.nlm.nih.gov/${pmid}/" target="_blank" rel="noopener noreferrer" class="maverick-link">📚 PubMed ${pmid}</a>`;
     });
-    
+
     // DOI links (doi:10.xxxx/xxxxx or https://doi.org/...)
     html = html.replace(/(?:doi[:\s\/]+)?(10\.\S+\/\S+)/gi, (match, doi) => {
         return `<a href="https://doi.org/${doi}" target="_blank" rel="noopener noreferrer" class="maverick-link">📄 DOI: ${doi}</a>`;
     });
-    
+
     // Markdown-style links [text](url)
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, 
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
         '<a href="$2" target="_blank" rel="noopener noreferrer" class="maverick-link">🔗 $1</a>');
 
     // Scientific Header Formatting: 
@@ -5786,7 +5815,7 @@ function initNotifications() {
 
     // Check for scheduled notifications
     checkScheduledNotifications();
-    
+
     // Schedule birthday reminder if not already scheduled
     scheduleBirthdayReminder();
 
@@ -5993,33 +6022,33 @@ function playNotificationSound(priority) {
  * Test function: Schedule birthday reminder for tomorrow at 9 AM IST
  * For testing purposes - verifies the full scheduling system
  */
-window.testBirthdayReminder = function() {
+window.testBirthdayReminder = function () {
     // Calculate tomorrow at 9 AM IST
     const now = new Date();
-    
+
     // Get current time in IST
     const istFormatter = new Intl.DateTimeFormat('en-US', {
         timeZone: 'Asia/Kolkata',
         year: 'numeric', month: '2-digit', day: '2-digit',
         hour: '2-digit', minute: '2-digit', second: '2-digit'
     });
-    
+
     const istTime = new Date(istFormatter.format(now));
     const offset = istTime.getTime() - now.getTime();
-    
+
     // Create tomorrow at 9 AM IST
     const tomorrow9AMIST = new Date(now.getTime() + offset);
     tomorrow9AMIST.setDate(tomorrow9AMIST.getDate() + 1);
     tomorrow9AMIST.setHours(9, 0, 0, 0);
-    
+
     // Convert back to UTC timestamp
     const scheduledTimeIST = tomorrow9AMIST.getTime() - offset;
     const scheduledTime = new Date(scheduledTimeIST);
-    
+
     console.log('🧪 Testing Birthday Reminder');
     console.log('📅 Scheduled for tomorrow (March 9, 2026) at 9 AM IST');
     console.log('⏰ Local time: ' + scheduledTime.toLocaleString());
-    
+
     scheduleNotification(
         'success',
         'Happy Birthday! 🎂🎉',
@@ -6033,7 +6062,7 @@ window.testBirthdayReminder = function() {
             persistent: true
         }
     );
-    
+
     console.log('✅ Birthday reminder successfully scheduled for March 9, 2026 at 9 AM IST');
     console.log('📢 Check localStorage to verify: localStorage.getItem("scheduledNotifications")');
 };
@@ -6046,40 +6075,40 @@ window.testBirthdayReminder = function() {
 function scheduleBirthdayReminder() {
     // Check if already scheduled today
     const existing = JSON.parse(localStorage.getItem('scheduledNotifications') || '[]');
-    const alreadyScheduled = existing.some(n => 
-        n.type === 'success' && 
+    const alreadyScheduled = existing.some(n =>
+        n.type === 'success' &&
         n.title.includes('Happy Birthday') &&
         new Date(n.scheduledTime).toDateString() === new Date().toDateString()
     );
-    
+
     if (alreadyScheduled) {
         console.log('🎂 Birthday reminder already scheduled for today');
         return;
     }
-    
+
     // Calculate tomorrow at 9 AM IST
     // IST is UTC+5:30, so we create a local date then adjust
     const now = new Date();
-    
+
     // Get current time in IST
     const istFormatter = new Intl.DateTimeFormat('en-US', {
         timeZone: 'Asia/Kolkata',
         year: 'numeric', month: '2-digit', day: '2-digit',
         hour: '2-digit', minute: '2-digit', second: '2-digit'
     });
-    
+
     const istTime = new Date(istFormatter.format(now));
     const offset = istTime.getTime() - now.getTime();
-    
+
     // Create tomorrow at 9 AM IST
     const tomorrow9AMIST = new Date(now.getTime() + offset);
     tomorrow9AMIST.setDate(tomorrow9AMIST.getDate() + 1);
     tomorrow9AMIST.setHours(9, 0, 0, 0);
-    
+
     // Convert back to UTC timestamp
     const scheduledTimeIST = tomorrow9AMIST.getTime() - offset;
     const scheduledTime = new Date(scheduledTimeIST);
-    
+
     // Schedule the birthday notification
     scheduleNotification(
         'success',
@@ -6094,7 +6123,7 @@ function scheduleBirthdayReminder() {
             persistent: true
         }
     );
-    
+
     console.log('✨ Birthday reminder scheduled for tomorrow (9 AM IST):', scheduledTime.toLocaleString());
 }
 
