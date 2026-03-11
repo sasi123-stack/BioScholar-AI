@@ -4,7 +4,7 @@ import logging
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
-from groq import Groq
+from groq import AsyncGroq
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -30,7 +30,8 @@ ES_PASS = os.getenv("ELASTICSEARCH_PASSWORD", "38aa998d6c5c2891232c")
 
 # Initialize Groq Client
 try:
-    groq_client = Groq(api_key=GROQ_API_KEY)
+    groq_client = AsyncGroq(api_key=GROQ_API_KEY)
+    logger.info("AsyncGroq client initialized")
 except Exception as e:
     logger.error(f"Failed to initialize Groq client: {e}")
     groq_client = None
@@ -235,12 +236,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
             messages.append({"role": "user", "content": incoming_text})
             
         # 5. Generate completion
-        completion = groq_client.chat.completions.create(
+        logger.info(f"Requesting completion for user {user_id} using model {MODEL_NAME}")
+        completion = await groq_client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
             temperature=0.3,
             max_tokens=2048
         )
+        logger.info(f"Completion received for user {user_id}")
         
         answer = completion.choices[0].message.content
         if "💠" not in answer[:15]:
