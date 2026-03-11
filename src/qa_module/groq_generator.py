@@ -9,7 +9,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 class GroqGenerator:
-    """Generates comprehensive answers using Groq's high-performance LLMs (e.g., Llama 4)."""
+    """Generates comprehensive answers using Groq's high-performance LLMs (e.g., GPT OSS 120B)."""
     
     def __init__(self, api_key: Optional[str] = None):
         """Initialize Groq generator.
@@ -30,8 +30,8 @@ class GroqGenerator:
                 self.client = None
             
             
-        # Llama 4 Maverick — elite performance for BioMedScholar
-        self.model_name = 'meta-llama/llama-4-maverick-17b-128e-instruct'
+        # GPT OSS 120B Maverick — elite performance for BioMedScholar
+        self.model_name = 'openai/gpt-oss-120b'
 
     def generate_answer(self, question: str, passages: List[Dict], history_context: Optional[str] = None) -> Dict:
         """Generate an answer based on the question and retrieved passages.

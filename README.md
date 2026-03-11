@@ -38,7 +38,7 @@ app_port: 7860
 ## ✨ Features
 
 ### 🧠 Maverick AI Bot (In-Browser Assistant)
-Powered by Groq's low-latency Llama 4 (17B) platform, Maverick acts as a dedicated research counterpart:
+Powered by Groq's low-latency GPT OSS 120B platform, Maverick acts as a dedicated research counterpart:
 - **Smart Plugins & Tools**: Switch on specific research lenses, including **Clinical Trial Finder**, **Molecule Solver** (semantic weighting for chemical structures), **Summarize Mode**, **Gene/Drug Lookup** (auto-detects and links biological targets), and **Citation Generator** (APA 7th edition).
 - **Deep Research Synthesis**: Default mode fetches up to 8 top hits, dynamically generates an overview framing the publication timeline, extracts multi-paragraph findings with proper citations, and provides clinical implications.
 - **Context-Aware Follow-Ups**: Dynamically maps 12 unique biomedical domains (Oncology, Cardiology, CRISPR, etc.) to generate intelligent, specialized click-to-ask follow-up questions.
@@ -67,7 +67,7 @@ A high-density workspace for literature review and data extraction:
 ### ⚡ Backend API
 - **FastAPI** with BioBERT semantic search
 - **Elasticsearch (Bonsai)** full-text index
-- **Groq Llama 4 Maverick** AI inference
+- **Groq GPT OSS 120B** AI inference
 - **PubMed + ClinicalTrials.gov** data sources
 
 ---
@@ -89,7 +89,7 @@ A high-density workspace for literature review and data extraction:
 │   Telegram Bot  │   HF Space (Docker)   │
 │   (python-      │   maverick-ai-bot     │
 │    telegram +   │                       │
-│    Groq Llama)  │                       │
+│    Groq GPT)    │                       │
 └─────────────────┴───────────────────────┘
 ```
 
@@ -100,7 +100,7 @@ A high-density workspace for literature review and data extraction:
 ### Backend API Space (`biomed-scholar-api`)
 | Secret | Description |
 |---|---|
-| `GROQ_API_KEY` | Groq API for Llama 4 Maverick |
+| `GROQ_API_KEY` | Groq API for GPT OSS 120B |
 | `ELASTICSEARCH_HOST` | Bonsai Elasticsearch URL |
 | `ELASTICSEARCH_USERNAME` | Bonsai username |
 | `ELASTICSEARCH_PASSWORD` | Bonsai password |
@@ -113,7 +113,7 @@ A high-density workspace for literature review and data extraction:
 | Secret | Description |
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | From @BotFather |
-| `GROQ_API_KEY` | Groq API for Llama 4 Maverick |
+| `GROQ_API_KEY` | Groq API for GPT OSS 120B |
 
 ---
 
@@ -124,7 +124,7 @@ A high-density workspace for literature review and data extraction:
 | **Frontend** | HTML5, CSS3, Vanilla JS |
 | **Hosting** | Firebase Hosting |
 | **Backend** | FastAPI (Python) |
-| **AI/Search** | BioBERT, Groq Llama 4 Maverick |
+| **AI/Search** | BioBERT, Groq GPT OSS 120B |
 | **Database** | Elasticsearch (Bonsai), SQLite |
 | **Auth** | Firebase Authentication |
 | **Bot** | python-telegram-bot, Flask |
@@ -141,7 +141,7 @@ A high-density workspace for literature review and data extraction:
 
 ---
 
-## ✅ System Status Verification (March 8, 2026)
+## ✅ System Status Verification (March 11, 2026)
 
 ### 🎂 Birthday Reminder System ✅ **WORKING**
 
@@ -200,7 +200,7 @@ A high-density workspace for literature review and data extraction:
 
 ✅ **Deployment Status:**
 - ✅ Git commits: e182275, d705462, d06ad15 (pushed to GitHub + HF Spaces)
-- ✅ Firebase hosting: Just deployed (March 8, 2026)
+- ✅ Firebase hosting: Just deployed (March 11, 2026)
 - ✅ CDN: Global distribution via Firebase Edge
 
 ---
@@ -219,7 +219,7 @@ A high-density workspace for literature review and data extraction:
 
 ✅ **Backend Configuration:**
 - FastAPI with Uvicorn
-- Groq LLM: `meta-llama/llama-4-maverick-17b-128e-instruct`
+- Groq LLM: `openai/gpt-oss-120b`
 - OpenSearch: Bonsai cluster (assertive-mahogany-1m2hcasg.us-east-1)
 - SQLite: `/tmp/conversation_history.db`
 
@@ -272,7 +272,7 @@ A high-density workspace for literature review and data extraction:
 
 **Built with ❤️ for the Biomedical Research Community**
 
-*Last updated: March 8, 2026 (v0.9.0 - Birthday Reminder & Enhanced Link Formatting)*
+*Last updated: March 11, 2026 (v1.4.0 - GPT OSS 120B Integration)*
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 

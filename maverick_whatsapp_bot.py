@@ -20,7 +20,7 @@ app = Flask(__name__)
 
 # Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct"
+MODEL_NAME = "openai/gpt-oss-120b"
 DB_FILE = "whatsapp_memory.db"
 
 # Initialize Groq Client
@@ -85,7 +85,7 @@ def whatsapp_reply():
                 "content": (
                     "You are the Maverick Suite (💠), a premium analytical biomedical research engine. "
                     "Your identity is sharp, precise, and authoritative. "
-                    "You are powered by Llama 3.3 Maverick architecture. "
+                    "You are powered by GPT OSS 120B Maverick architecture. "
                     "You are communicating with the user via WhatsApp. "
                     "You maintain active knowledge memory to ensure research continuity. "
                     "Provide clear, evidence-based insights, and keep your tone professional yet engaging."

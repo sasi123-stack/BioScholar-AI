@@ -58,7 +58,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "meta-llama/llama-4-maverick-17b-128e-instruct"
+MODEL_NAME = "openai/gpt-oss-120b"
 DB_FILE = "/tmp/conversation_history.db"
 ES_HOST = os.getenv("ELASTICSEARCH_HOST", "assertive-mahogany-1m2hcasg.us-east-1.bonsaisearch.net")
 ES_USER = os.getenv("ELASTICSEARCH_USER", "0204784e62")
@@ -281,7 +281,7 @@ async def search(request: SearchRequest):
 
 @app.post("/api/v1/maverick/chat")
 async def maverick_chat(request: ChatRequest):
-    """Chat with Maverick AI using Llama 4."""
+    """Chat with Maverick AI using GPT OSS 120B."""
     try:
         if not GROQ_API_KEY:
             raise HTTPException(status_code=503, detail="Groq API not configured")
@@ -330,7 +330,7 @@ async def maverick_chat(request: ChatRequest):
         return {
             "status": "success",
             "answer": answer,
-            "reasoning": "Maverick AI synthesis via Llama 4 on Groq",
+            "reasoning": "Maverick AI synthesis via GPT OSS 120B on Groq",
             "sources": []
         }
         
