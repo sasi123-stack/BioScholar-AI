@@ -8,6 +8,16 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotComm
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
 from groq import AsyncGroq
 from dotenv import load_dotenv
+import sys
+
+# Windows UTF-8 console support
+if sys.platform == 'win32':
+    try:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    except:
+        pass
 
 # --- DNS GLOBAL MONKEYPATCH ---
 # Hugging Face Spaces often have flaky DNS resolution for external APIs.
@@ -188,7 +198,7 @@ async def get_resilient_completion(messages: list, user_id: int):
     models_to_try = [
         MODEL_NAME,                         # Primary: GPT OSS 120B
         "llama-3.3-70b-versatile",         # Fallback 1: Latest Llama
-        "llama3-70b-8192"                  # Fallback 2: Stable Llama 3
+        "llama-3.1-8b-instant"             # Fallback 2: Stable Instant
     ]
     
     last_err = None
@@ -307,7 +317,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
     logger.info(f"Processing message from {user_id}: {incoming_text[:50]}...")
     
     # Send thinking placeholder
-    thinking_msg = await update.message.reply_html("💠 <i>Maverick is synthesizing...</i>")
+    thinking_msg = await update.effective_message.reply_html("💠 <i>Maverick is synthesizing...</i>")
     
     try:
         # Save user message
