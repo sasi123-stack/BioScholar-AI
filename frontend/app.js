@@ -3234,14 +3234,27 @@ function formatMaverickResponse(text) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
+    // Whitelist of safe structural and styling tags sent by the Maverick bot
+    const safeTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'hr', 'ul', 'ol', 'li', 'sup', 'sub', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'b', 'strong', 'i', 'em', 'u', 'span', 'div'];
+
+    safeTags.forEach(tag => {
+        // Revive opening tags (including any attributes)
+        const openRegex = new RegExp(`&lt;${tag}\\b(.*?)&gt;`, 'gi');
+        html = html.replace(openRegex, `<${tag}$1>`);
+        // Revive closing tags
+        const closeRegex = new RegExp(`&lt;\\/${tag}&gt;`, 'gi');
+        html = html.replace(closeRegex, `</${tag}>`);
+    });
+
     // Revive safe formatting tags if they were in the original response
-    html = html.replace(/&lt;b&gt;(.*?)&lt;\/b&gt;/g, "<strong>$1</strong>");
-    html = html.replace(/&lt;i&gt;(.*?)&lt;\/i&gt;/g, "<em>$1</em>");
-    html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/g, "<u>$1</u>");
+    html = html.replace(/&lt;b&gt;(.*?)&lt;\/b&gt;/gi, "<strong>$1</strong>");
+    html = html.replace(/&lt;i&gt;(.*?)&lt;\/i&gt;/gi, "<em>$1</em>");
+    html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/gi, "<u>$1</u>");
 
     // Revive links but ensure they open in new tab and are safe
-    html = html.replace(/&lt;a href=(?:'|")([^'"]+)(?:'|")&gt;(.*?)&lt;\/a&gt;/g,
+    html = html.replace(/&lt;a href=(?:'|")([^'"]+)(?:'|")&gt;(.*?)&lt;\/a&gt;/gi,
         '<a href="$1" target="_blank" rel="noopener noreferrer" class="maverick-link">$2</a>');
+
 
     // Standard Markdown formatting
     html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
