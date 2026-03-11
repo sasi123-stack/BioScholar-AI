@@ -205,7 +205,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_html(welcome_text, reply_markup=reply_markup)
+    if update.effective_message:
+        await update.effective_message.reply_html(welcome_text, reply_markup=reply_markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
@@ -249,19 +250,20 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"<b>{role}:</b> {content}\n\n"
     
     await update.message.reply_html(text)
-
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_html("Please provide a search topic. Example: <code>/search immunotherapy for GBM</code>")
+        if update.effective_message:
+            await update.effective_message.reply_html("Please provide a search topic. Example: <code>/search immunotherapy for GBM</code>")
         return
     
     query = " ".join(context.args)
     await handle_message(update, context, override_msg=query, force_search=True)
 
-async def test_app(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("🚀 Launch BioMedScholar", url="https://biomed-scholar.web.app")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Click below to open the full Research Intelligence Platform:", reply_markup=reply_markup)
+    if update.effective_message:
+        await update.effective_message.reply_text("Click below to open the full Research Intelligence Platform:", reply_markup=reply_markup)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, override_msg=None, force_search=False):
     user_id = update.effective_user.id
@@ -363,6 +365,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
             parse_mode='HTML'
         )
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log the error and send a telegram message to notify the developer."""
+    logger.error(f"Update {update} caused error {context.error}")
+    if isinstance(update, Update) and update.effective_message:
+        try:
+            await update.effective_message.reply_text(f"❌ Internal Bot Error: {str(context.error)[:100]}")
+        except: pass
+
 async def post_init(application: Application):
     """Set bot commands and description during startup."""
     await application.bot.set_my_commands([
@@ -397,6 +407,8 @@ def main():
         print(f">>> [BOT ERROR] Failed to build application: {e}", flush=True)
         return
 
+    app.add_error_handler(error_handler)
+
     # Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
@@ -404,7 +416,7 @@ def main():
     app.add_handler(CommandHandler("clear", clear))
     app.add_handler(CommandHandler("history", history_command))
     app.add_handler(CommandHandler("search", search_command))
-    app.add_handler(CommandHandler("test", test_app))
+    app.add_handler(CommandHandler("test", test_command))
     
     # Regular text messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
