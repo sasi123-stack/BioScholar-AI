@@ -1,7 +1,8 @@
 import os
 import socket
-import logging
+import html
 import sqlite3
+import logging
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
@@ -309,7 +310,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
             
     except Exception as e:
         logger.error(f"Error processing message: {e}")
-        error_text = f"❌ <b>Maverick Error</b>: {str(e)[:100]}"
+        # Escape the error message to avoid Telegram parse errors (like <!doctype)
+        safe_error = html.escape(str(e))[:200]
+        error_text = f"❌ <b>Maverick Error</b>: {safe_error}"
         await context.bot.edit_message_text(
             chat_id=update.effective_chat.id,
             message_id=thinking_msg.message_id,
