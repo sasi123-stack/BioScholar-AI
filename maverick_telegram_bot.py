@@ -1,13 +1,42 @@
-import os
-import sqlite3
-import logging
-import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
+import socket
 from groq import AsyncGroq
 from dotenv import load_dotenv
 
-# Load environment variables
+# --- DNS GLOBAL MONKEYPATCH ---
+# Hugging Face Spaces often have flaky DNS resolution for external APIs.
+_original_getaddrinfo = socket.getaddrinfo
+DNS_PRIORITY_HOSTS = ["api.groq.com", "google.com", "huggingface.co", "api.telegram.org"]
+
+def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    host_str = host.decode('utf-8') if isinstance(host, bytes) else str(host)
+    host_clean = host_str.lower().strip('.')
+    try:
+        return _original_getaddrinfo(host, port, family, type, proto, flags)
+    except Exception:
+        if any(h in host_clean for h in DNS_PRIORITY_HOSTS):
+            print(f">>> [DNS PATCH] System DNS failed. Priority resolving: {host_clean}", flush=True)
+            try:
+                import dns.resolver
+                resolver = dns.resolver.Resolver()
+                resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+                resolver.timeout = 2
+                resolver.lifetime = 2
+                answers = resolver.resolve(host_clean, 'A')
+                if answers:
+                    ips = [str(ans) for ans in answers]
+                    results = []
+                    for ip in ips:
+                        try:
+                            results.extend(_original_getaddrinfo(ip, port, family, type, proto, flags))
+                        except:
+                            results.append((socket.AF_INET, type or socket.SOCK_STREAM, proto or 6, '', (ip, int(port) or 443)))
+                    return results
+            except: pass
+        raise
+
+socket.getaddrinfo = custom_getaddrinfo
+print(">>> [DNS PATCH] Applied to Telegram Bot", flush=True)
+
 load_dotenv()
 
 # Setup logging
@@ -16,6 +45,13 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+import os
+import sqlite3
+import logging
+import asyncio
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
 
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -295,13 +331,20 @@ async def post_init(application: Application):
     ])
 
 def main():
+    print(">>> [BOT] Starting initialization...", flush=True)
     if not TELEGRAM_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN is missing!")
+        print(">>> [BOT ERROR] TELEGRAM_BOT_TOKEN is missing!", flush=True)
         return
 
     init_db()
     
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(post_init).build()
+    try:
+        app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(post_init).build()
+        print(">>> [BOT] Application built successfully", flush=True)
+    except Exception as e:
+        print(f">>> [BOT ERROR] Failed to build application: {e}", flush=True)
+        return
 
     # Handlers
     app.add_handler(CommandHandler("start", start))
