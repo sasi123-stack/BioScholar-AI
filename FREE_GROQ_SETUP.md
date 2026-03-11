@@ -2,13 +2,13 @@
 
 ## ✅ You're Already Set Up!
 
-Good news! Your OpenClaw is now configured to use **Groq's FREE tier** with **Llama 4 Maverick** - and you already have a Groq API key in your `.env` file!
+Good news! Your OpenClaw is now configured to use **Groq's FREE tier** with **GPT OSS 120B** - and you already have a Groq API key in your `.env` file!
 
 ---
 
 ## 🚀 What You Get (100% FREE)
 
-- **Model**: Llama 4 Maverick (17B Optimized)
+- **Model**: GPT OSS 120B
 - **Speed**: ⚡ Blazing fast (up to 800 tokens/second!)
 - **Free Tier Limits**:
   - 30 requests per minute
@@ -29,7 +29,7 @@ Good news! Your OpenClaw is now configured to use **Groq's FREE tier** with **Ll
    OPENCLAW_API_BASE=https://api.groq.com/openai/v1
    ```
 
-2. **`src/qa_module/groq_generator.py`** - Using `meta-llama/llama-4-maverick-17b-128e-instruct`
+2. **`src/qa_module/groq_generator.py`** - Using `openai/gpt-oss-120b`
 
 3. **`openclaw-hf/Dockerfile`** - Configured for Groq
 
@@ -174,4 +174,4 @@ But for most users, the **FREE tier is more than enough**! 🎉
 
 ---
 
-**Made with ❤️ using Groq, Llama 4 Maverick, OpenClaw, and BioSense AI**
+**Made with ❤️ using Groq, GPT OSS 120B, OpenClaw, and BioSense AI**
