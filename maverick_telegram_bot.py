@@ -1,4 +1,10 @@
+import os
 import socket
+import logging
+import sqlite3
+import asyncio
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
 from groq import AsyncGroq
 from dotenv import load_dotenv
 
@@ -45,13 +51,6 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-
-import os
-import sqlite3
-import logging
-import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
 
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -319,7 +318,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
         )
 
 async def post_init(application: Application):
-    """Set bot commands during startup."""
+    """Set bot commands and description during startup."""
     await application.bot.set_my_commands([
         BotCommand("start", "Welcome message"),
         BotCommand("help", "Show all commands"),
@@ -329,6 +328,12 @@ async def post_init(application: Application):
         BotCommand("about", "About Maverick"),
         BotCommand("test", "Open Web App")
     ])
+    try:
+        await application.bot.set_my_description("Maverick AI 🦞: Your advanced clinical research synthesis engine. Powered by GPT OSS 120B.")
+        await application.bot.set_my_short_description("Maverick AI Research Bot (GPT OSS 120B)")
+        logger.info("Bot commands and description updated successfully")
+    except Exception as e:
+        logger.warning(f"Failed to set bot description: {e}")
 
 def main():
     print(">>> [BOT] Starting initialization...", flush=True)
@@ -359,7 +364,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("-" * 30)
-    print("💠 MAVERICK TELEGRAM BOT ONLINE")
+    print("MAVERICK TELEGRAM BOT ONLINE")
     print(f"User DB: {DB_FILE}")
     print("-" * 30)
     
