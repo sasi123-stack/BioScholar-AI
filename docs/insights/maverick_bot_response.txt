@@ -1,0 +1,36 @@
+**Synthesis**
+Since the emergence of SARS‑CoV‑2, >10 vaccine platforms have received regulatory authorization. Clinical trial Vaccine Efficacy (VE) and real-world effectiveness demonstrate high initial protection, though viral variants and waning immunity have necessitated sophisticated booster strategies.
+
+**Methodology**
+This synthesis integrates Phase III clinical trial data with real-world effectiveness (RWE) reports from the US CDC and UK NHS, focusing on neutralising antibody titres and protection against severe disease (hospitalization/death).
+
+**Analysis**
+The global vaccine landscape is currently dominated by four primary platforms:
+
+1. **mRNA-Based (Pfizer & Moderna)**
+   * **Pfizer (BNT162b2):** 95% Phase III VE [1]. RWE shows 94% protection against hospitalization during Delta, falling to 71% against Omicron death without boosters.
+   * **Moderna (mRNA-1273):** 94.1% Phase III VE [2]. Features 1.5–2× higher antigen concentration than Pfizer, correlating with marginally higher durability.
+
+2. **Adenoviral Vectors (AstraZeneca & Janssen)**
+   * **AstraZeneca:** 70.4% overall VE. Notable for pronounced waning; heterologous mRNA boosting is the clinical standard [3].
+   * **Janssen:** 66.9% (moderate-to-severe) in a single-dose regimen. High efficacy against hospitalization (93% Delta).
+
+3. **Recombinant Proteins (Novavax)**
+   * **NVX-CoV2373:** 89.7% VE. Exhibits slower waning signals than adenoviral platforms and excellent safety profiles [4].
+
+4. **Inactivated (Sinovac/Sinopharm)**
+   * **CoronaVac:** 50–60% VE. Waning is rapid (<5 months), necessitating heterologous platforms for Omicron protection.
+
+---
+
+**Results**
+\boxed{Heterologous mRNA boosters restore >90% protection against severe disease for all primary series, including those originally vaccinated with viral vector or inactivated platforms.}
+
+**Conclusion**
+Neutralising antibody titres typically decline by 6–8% monthly from Month 3 onwards. Universal booster strategies consistently demonstrate a robust restoration of protection against severe outcomes across all circulating variants.
+
+**References**
+[1] US CDC Research Portal (Delta/Omicron Comparison)
+[2] Moderna Phase III Trial Data (100 µg Antigen Analysis)
+[3] UK NHS Hospitalization Records (Alpha/Delta Cohorts)
+[4] Novavax Durability Studies (Recombinant Protein Platform)
