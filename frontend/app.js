@@ -1,5 +1,5 @@
-// BioMedScholar AI v1.3.1 - Interactive Platform Scaling & Fixed Sidebars
-// Force browser update - unique id: 20260218-1853
+// BioMedScholar AI v1.4.0 - GPT OSS 120B Integration
+// Force browser update - unique id: 20260311-1010
 
 // Use 'var' (which can be redeclared) or check if it exists first
 if (typeof isLocal === 'undefined') {
@@ -6692,7 +6692,7 @@ function initVoiceSearch() {
 }
 
 /**
- * Scheduled Actions Module (v0.9.0-BETA Teaser)
+ * Scheduled Actions Module (v1.4.0 - PRO)
  */
 let scheduledActions = JSON.parse(localStorage.getItem('maverick_scheduled_actions') || '[]');
 
