@@ -236,15 +236,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
             messages.append({"role": "user", "content": incoming_text})
             
         # 5. Generate completion
-        logger.info(f"Requesting completion for user {user_id} using model {MODEL_NAME}")
-        completion = await groq_client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=messages,
-            temperature=0.3,
-            max_tokens=2048
-        )
-        logger.info(f"Completion received for user {user_id}")
+        logger.info(f"Requesting completion for user {user_id}")
+        try:
+            completion = await groq_client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2048
+            )
+        except Exception as model_err:
+            logger.warning(f"Primary model {MODEL_NAME} failed: {model_err}. Trying fallback...")
+            completion = await groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2048
+            )
         
+        logger.info(f"Completion received for user {user_id}")
         answer = completion.choices[0].message.content
         if "💠" not in answer[:15]:
             answer = "💠 " + answer
