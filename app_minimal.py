@@ -316,24 +316,30 @@ async def maverick_chat(request: ChatRequest):
             messages.append({"role": "user", "content": request.question})
         
         client = AsyncGroq(api_key=GROQ_API_KEY)
-        try:
-            response = await client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=messages,
-                temperature=0.3,
-                max_tokens=2048
-            )
-        except Exception as model_err:
-            logger.warning(f"Primary model {MODEL_NAME} failed: {model_err}. Trying fallback...")
-            response = await client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=messages,
-                temperature=0.3,
-                max_tokens=2048
-            )
+        models_to_try = [MODEL_NAME, "llama-3.3-70b-versatile", "llama3-70b-8192"]
+        answer = None
         
-        answer = response.choices[0].message.content
-        if "💠" not in answer[:15]:
+        for model in models_to_try:
+            try:
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.3,
+                    max_tokens=2048
+                )
+                temp_answer = response.choices[0].message.content
+                if temp_answer and ("<!DOCTYPE" in temp_answer[:20] or "<html>" in temp_answer.lower()[:20]):
+                    logger.warning(f"Model {model} returned HTML error. Trying next...")
+                    continue
+                answer = temp_answer
+                break
+            except Exception as e:
+                logger.warning(f"Model {model} failed: {e}")
+                continue
+        
+        if not answer:
+            answer = "❌ <b>Maverick System Error</b>: Upstream AI interface is currently unstable. Please try again in 1 minute."
+        elif "💠" not in answer[:15]:
             answer = "💠 " + answer
         
         return {

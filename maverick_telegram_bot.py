@@ -183,6 +183,41 @@ def sanitize_for_telegram(text: str) -> str:
     
     return text.strip()
 
+async def get_resilient_completion(messages: list, user_id: int):
+    """Try multiple models and check for HTML/Error responses."""
+    models_to_try = [
+        MODEL_NAME,                         # Primary: GPT OSS 120B
+        "llama-3.3-70b-versatile",         # Fallback 1: Latest Llama
+        "llama3-70b-8192"                  # Fallback 2: Stable Llama 3
+    ]
+    
+    last_err = None
+    for model in models_to_try:
+        try:
+            logger.info(f"Trying model {model} for user {user_id}")
+            completion = await groq_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2048
+            )
+            answer = completion.choices[0].message.content
+            
+            # Check for HTML responses (Gateways/Proxies)
+            if answer and ("<!DOCTYPE" in answer[:20] or "<html>" in answer.lower()[:20]):
+                logger.warning(f"Model {model} returned HTML instead of text. Switching...")
+                continue
+                
+            return answer
+            
+        except Exception as e:
+            logger.warning(f"Model {model} failed: {e}")
+            last_err = e
+            continue
+            
+    # If all fail
+    raise Exception(f"All models failed or returned invalid responses. Final error: {last_err}")
+
 # Command Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -307,34 +342,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
         if not history or history[-1]['content'] != incoming_text:
             messages.append({"role": "user", "content": incoming_text})
             
-        # 5. Generate completion
-        logger.info(f"Requesting completion for user {user_id}")
+        # 5. Generate completion (Resilient)
         try:
-            completion = await groq_client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=messages,
-                temperature=0.3,
-                max_tokens=2048
-            )
-        except Exception as model_err:
-            logger.warning(f"Primary model {MODEL_NAME} failed: {model_err}. Trying fallback...")
-            completion = await groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=messages,
-                temperature=0.3,
-                max_tokens=2048
-            )
-        
-        logger.info(f"Completion received for user {user_id}")
-        answer = completion.choices[0].message.content
-        
-        # Check if the AI (or proxy) returned an HTML error page instead of a research answer
-        if answer and ("<!DOCTYPE" in answer[:20] or "<html>" in answer.lower()[:20]):
-            logger.error(f"Upstream AI returned HTML instead of research content for user {user_id}")
-            answer = "❌ <b>Maverick System Error</b>: Upstream AI interface returned an invalid response (502/504 gateway error). Please try again in 30 seconds."
-        else:
+            answer = await get_resilient_completion(messages, user_id)
             if "💠" not in answer[:15]:
                 answer = "💠 " + answer
+        except Exception as e:
+            logger.error(f"Critical failure: {e}")
+            answer = "❌ <b>Maverick System Error</b>: All AI synthesis engines are currently saturated (504 Gateway). Please try again in 1 minute."
             
         # Save AI response
         save_message(user_id, "assistant", answer)
