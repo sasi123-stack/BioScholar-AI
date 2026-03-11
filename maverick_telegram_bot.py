@@ -149,6 +149,40 @@ async def perform_search(query: str, max_results=3):
         logger.error(f"Search failed: {e}")
         return []
 
+def sanitize_for_telegram(text: str) -> str:
+    """Sanitize and map unsupported HTML tags to Telegram-safe equivalents."""
+    if not text:
+        return ""
+    
+    import re
+    # 1. Map Headers to Bold
+    text = re.sub(r'<(h1|h2|h3|h4|h5|h6)[^>]*>', '<b>', text, flags=re.IGNORECASE)
+    text = re.sub(r'</(h1|h2|h3|h4|h5|h6)>', '</b>\n', text, flags=re.IGNORECASE)
+    
+    # 2. Map Paragraphs and Divs to line breaks
+    text = re.sub(r'<(p|div)[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'</(p|div)>', '\n', text, flags=re.IGNORECASE)
+    
+    # 3. Handle line breaks
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    
+    # 4. Remove unsupported tags entirely but keep content
+    # Standard tags: b, i, u, s, strike, del, code, pre, a
+    supported_tags = ['b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del', 'code', 'pre', 'a']
+    
+    # Use regex to find all tags
+    all_tags = re.findall(r'<(/?)([a-z0-9]+)(\s*[^>]*)>', text, flags=re.IGNORECASE)
+    for is_closing, tag_name, attrs in all_tags:
+        if tag_name.lower() not in supported_tags:
+            # Construct exact tag to replace
+            full_tag = f"<{is_closing}{tag_name}{attrs}>"
+            text = text.replace(full_tag, "")
+            
+    # Clean up double line breaks
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    return text.strip()
+
 # Command Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -302,6 +336,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
             
         # Save AI response
         save_message(user_id, "assistant", answer)
+        
+        # 6. Sanitize for Telegram Parsing
+        answer = sanitize_for_telegram(answer)
         
         # Edit/Split message if too long
         if len(answer) > 4000:
