@@ -289,7 +289,7 @@ async def maverick_chat(request: ChatRequest):
         if not request.question:
             raise HTTPException(status_code=400, detail="No question provided")
         
-        from groq import Groq
+        from groq import AsyncGroq
         
         system_content = (
             "You are Maverick, the official BioMedScholar AI Research Engine. "
@@ -315,8 +315,8 @@ async def maverick_chat(request: ChatRequest):
         else:
             messages.append({"role": "user", "content": request.question})
         
-        client = Groq(api_key=GROQ_API_KEY)
-        response = client.chat.completions.create(
+        client = AsyncGroq(api_key=GROQ_API_KEY)
+        response = await client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
             temperature=0.3,
