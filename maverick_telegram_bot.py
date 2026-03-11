@@ -291,8 +291,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
         
         logger.info(f"Completion received for user {user_id}")
         answer = completion.choices[0].message.content
-        if "💠" not in answer[:15]:
-            answer = "💠 " + answer
+        
+        # Check if the AI (or proxy) returned an HTML error page instead of a research answer
+        if answer and ("<!DOCTYPE" in answer[:20] or "<html>" in answer.lower()[:20]):
+            logger.error(f"Upstream AI returned HTML instead of research content for user {user_id}")
+            answer = "❌ <b>Maverick System Error</b>: Upstream AI interface returned an invalid response (502/504 gateway error). Please try again in 30 seconds."
+        else:
+            if "💠" not in answer[:15]:
+                answer = "💠 " + answer
             
         # Save AI response
         save_message(user_id, "assistant", answer)
