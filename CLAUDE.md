@@ -88,6 +88,7 @@ Required for backend (see `.env.example`):
 | `/help` | Show all commands |
 | `/search <topic>` | AI biomedical literature search |
 | `/clear` | Clear conversation memory |
+| `/claude <task>` | Execute Claude Code command |
 | `/history` | View recent conversation |
 | `/about` | About Maverick AI |
 
