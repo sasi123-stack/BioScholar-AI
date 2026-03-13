@@ -19,6 +19,9 @@ RUN apt-get update && apt-get install -y \
     curl \
     chromium \
     chromium-driver \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g @anthropic-ai/claude-code@latest \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install
