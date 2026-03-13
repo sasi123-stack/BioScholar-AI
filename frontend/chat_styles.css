@@ -1395,6 +1395,56 @@
     border: 1px dashed #3c4043;
 }
 
-.chat-message.ai.incognito .message-bubble {
     border-color: #9aa0a6;
+}
+
+/* Maverick AI Chat Markdown Formatting Styles */
+.chat-answer-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.chat-answer-content th, .chat-answer-content td {
+    border: 1px solid var(--border-color);
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.chat-answer-content th {
+    background: var(--primary-blue);
+    color: white;
+    font-weight: 600;
+}
+
+.chat-answer-content tr:nth-child(even) {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.chat-answer-content ul, .chat-answer-content ol {
+    margin: 10px 0;
+    padding-left: 24px;
+}
+
+.chat-answer-content li {
+    margin-bottom: 6px;
+    line-height: 1.5;
+}
+
+.chat-answer-content h1, .chat-answer-content h2, .chat-answer-content h3 {
+    margin-top: 20px;
+    margin-bottom: 12px;
+    color: var(--primary-blue);
+    font-weight: 700;
+}
+
+.chat-answer-content hr {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 20px 0;
 }

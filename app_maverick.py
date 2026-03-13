@@ -163,7 +163,7 @@ if __name__ == '__main__':
     def health():
         return jsonify({
             "status": "synced", 
-            "engine": "GPT OSS 120B", 
+            "engine": "gpt-oss:120b-cloud & Claude Code", 
             "bot": "online",
             "elasticsearch": "connected" # simplified health check
         })
@@ -320,7 +320,7 @@ if __name__ == '__main__':
             return jsonify({
                 "status": "success",
                 "answer": answer,
-                "reasoning": "Maverick AI synthesis via GPT OSS 120B on Groq",
+                "reasoning": "Maverick AI synthesis via gpt-oss:120b-cloud & Claude Code on Groq",
                 "sources": []
             })
         except Exception as e:
