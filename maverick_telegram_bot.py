@@ -6,7 +6,7 @@ import logging
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
-from groq import AsyncGroq
+from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import sys
 
@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "openai/gpt-oss-120b"
+MODEL_NAME = "gpt-oss:120b-cloud"
 DB_FILE = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "local_memory.db"
 
 # Search Config (Bonsai/OpenSearch)
@@ -74,13 +74,14 @@ ES_HOST = os.getenv("ELASTICSEARCH_HOST", "assertive-mahogany-1m2hcasg.us-east-1
 ES_USER = os.getenv("ELASTICSEARCH_USER", "0204784e62")
 ES_PASS = os.getenv("ELASTICSEARCH_PASSWORD", "38aa998d6c5c2891232c")
 
-# Initialize Groq Client
+# Initialize AI Client for Ollama
 try:
-    groq_client = AsyncGroq(api_key=GROQ_API_KEY)
-    logger.info("AsyncGroq client initialized")
+    # Use Ollama endpoint pointing to localhost
+    ai_client = AsyncOpenAI(base_url="http://127.0.0.1:11434/v1", api_key="ollama")
+    logger.info("AsyncOpenAI client initialized for Ollama")
 except Exception as e:
-    logger.error(f"Failed to initialize Groq client: {e}")
-    groq_client = None
+    logger.error(f"Failed to initialize OpenAI client: {e}")
+    ai_client = None
 
 # Initialize Database
 def init_db():
@@ -225,7 +226,7 @@ async def get_resilient_completion(messages: list, user_id: int):
     for model in models_to_try:
         try:
             logger.info(f"Trying model {model} for user {user_id}")
-            completion = await groq_client.chat.completions.create(
+            completion = await ai_client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=0.3,
@@ -257,6 +258,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"I can help you navigate 35M+ biomedical articles and clinical trials.\n\n"
         f"🚀 <b>Available Commands:</b>\n"
         f"/search &lt;topic&gt; - AI biomedical literature search\n"
+        f"/claude &lt;task&gt; - Execute Claude Code command\n"
         f"/help - Show all commands\n"
         f"/history - View recent conversations\n"
         f"/clear - Wipe memory\n"
@@ -278,9 +280,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🤖 <b>Maverick Bot Commands</b>\n\n"
         "• /start - Welcome message\n"
         "• /search &lt;topic&gt; - AI literature search & synthesis\n"
+        "• /claude &lt;task&gt; - Evaluate Claude Code in backend\n"
         "• /history - Recall your last 5 interactions\n"
         "• /clear - Reset conversation memory\n"
-        "• /about - Learn about the GPT OSS 120B engine\n"
+        "• /about - Learn about the gpt-oss:120b-cloud (Claude Code) engine\n"
         "• /test - Launch the full Research Desk"
     )
     await update.message.reply_html(help_text)
@@ -289,7 +292,7 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     about_text = (
         "💠 <b>About Maverick AI</b>\n\n"
         "Maverick is a high-performance biomedical synthesis engine powered by Groq's low-latency "
-        "<b>GPT OSS 120B</b> platform. Optimized for clinical research, oncology, and pharmacology "
+        "<b>gpt-oss:120b-cloud (Claude Code)</b> platform. Optimized for clinical research, oncology, and pharmacology "
         "data extraction."
     )
     await update.message.reply_html(about_text)
@@ -329,6 +332,57 @@ async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     if update.effective_message:
         await update.effective_message.reply_text("Click below to open the full Research Intelligence Platform:", reply_markup=reply_markup)
+
+async def claude_code_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        if update.effective_message:
+            await update.effective_message.reply_html("Please provide a task. Example: <code>/claude Write a quick react component</code>")
+        return
+        
+    task = " ".join(context.args)
+    processing_msg = await update.effective_message.reply_html("👨‍💻 <i>Launching Claude Code Router...</i>")
+    
+    try:
+        # Run Claude Code via CCR locally
+        env = os.environ.copy()
+        env["ANTHROPIC_AUTH_TOKEN"] = "test"
+        env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:3456"
+        env["NO_PROXY"] = "127.0.0.1"
+        env["DISABLE_TELEMETRY"] = "true"
+        
+        proc = await asyncio.create_subprocess_exec(
+            "claude", "-p", task,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+        output = stdout.decode('utf-8', errors='replace')
+        
+        if not output.strip() and stderr:
+            output = stderr.decode('utf-8', errors='replace')
+        elif not output.strip():
+            output = "Command finished with no output."
+             
+        # Format response
+        clean_out = html.escape(output)
+        if len(clean_out) > 3900:
+             clean_out = clean_out[:3900] + "\n...(truncated)"
+             
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=processing_msg.message_id,
+            text=f"<b>Claude Code Result:</b>\n<pre>{clean_out}</pre>",
+            parse_mode='HTML'
+        )
+    except Exception as e:
+        safe_error = html.escape(str(e))
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=processing_msg.message_id,
+            text=f"❌ <b>Claude Code Error</b>: {safe_error}",
+            parse_mode='HTML'
+        )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, override_msg=None, force_search=False):
     user_id = update.effective_user.id
@@ -424,14 +478,15 @@ async def post_init(application: Application):
         BotCommand("start", "Welcome message"),
         BotCommand("help", "Show all commands"),
         BotCommand("search", "Search literature"),
+        BotCommand("claude", "Evaluate Claude Code"),
         BotCommand("history", "Recent conversations"),
         BotCommand("clear", "Reset memory"),
         BotCommand("about", "About Maverick"),
         BotCommand("test", "Open Web App")
     ])
     try:
-        await application.bot.set_my_description("Maverick AI 🦞: Your advanced clinical research synthesis engine. Powered by GPT OSS 120B.")
-        await application.bot.set_my_short_description("Maverick AI Research Bot (GPT OSS 120B)")
+        await application.bot.set_my_description("Maverick AI 🦞: Your advanced clinical research synthesis engine. Powered by gpt-oss:120b-cloud & Claude Code.")
+        await application.bot.set_my_short_description("Maverick AI Research Bot (gpt-oss:120b-cloud & Claude Code)")
         logger.info("Bot commands and description updated successfully")
     except Exception as e:
         logger.warning(f"Failed to set bot description: {e}")
@@ -461,6 +516,7 @@ def main():
     app.add_handler(CommandHandler("clear", clear))
     app.add_handler(CommandHandler("history", history_command))
     app.add_handler(CommandHandler("search", search_command))
+    app.add_handler(CommandHandler("claude", claude_code_command))
     app.add_handler(CommandHandler("test", test_command))
     
     # Regular text messages

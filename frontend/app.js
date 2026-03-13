@@ -1,4 +1,4 @@
-// BioMedScholar AI v1.4.0 - GPT OSS 120B Integration
+// BioMedScholar AI v1.4.0 - gpt-oss:120b-cloud (Claude Code) Integration
 // Force browser update - unique id: 20260311-1010
 
 // Use 'var' (which can be redeclared) or check if it exists first
@@ -32,27 +32,6 @@ function ensureAuthorsArray(authors) {
         return clean.length > 0 ? [clean] : [];
     }
     return [String(authors)];
-}
-
-/**
- * Formats Maverick AI response with HTML tags and clean styling
- */
-function formatMaverickResponse(text) {
-    if (!text) return '';
-
-    let formatted = text;
-
-    // Remove the 💠 prefix if present for internal processing
-    formatted = formatted.replace(/^💠\s*/, '');
-
-    // Convert markdown bold/italic to HTML
-    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-    formatted = formatted.replace(/\*(.*?)\*/g, '<i>$1</i>');
-
-    // Handle line breaks
-    formatted = formatted.replace(/\n/g, '<br>');
-
-    return formatted;
 }
 
 /**
@@ -1250,7 +1229,7 @@ function renderChatWelcome() {
             </div>
             <h2 style="font-size: 28px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #1a73e8, #0d47a1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 12px 0;">Research AI Chat</h2>
             <p style="color: var(--text-secondary); max-width: 440px; margin: 0 auto 4px; font-size: 16px; line-height: 1.6; opacity: 0.9;">Search & synthesise from 24,000+ biomedical articles.</p>
-            <p style="color: var(--text-muted); max-width: 440px; margin: 0 auto 32px; font-size: 13px; line-height: 1.5; opacity: 0.8;">Powered by <strong>GPT OSS 120B via Groq</strong></p>
+            <p style="color: var(--text-muted); max-width: 440px; margin: 0 auto 32px; font-size: 13px; line-height: 1.5; opacity: 0.8;">Powered by <strong>gpt-oss:120b-cloud (Claude Code) via Groq</strong></p>
             
             <div style="width: 100%; max-width: 480px;">
                 <div style="display: flex; flex-direction: column; gap: 12px;">
@@ -3228,9 +3207,10 @@ function normalizeScore(score) {
 function formatMaverickResponse(text) {
     if (!text) return "";
 
+    let html = text.replace(/^💠\s*/, ''); // Remove the 💠 prefix if present
+
     // Escape HTML but selectively revive safe tags
-    let html = text
-        .replace(/&/g, "&amp;")
+    html = html.replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
@@ -3239,8 +3219,11 @@ function formatMaverickResponse(text) {
 
     safeTags.forEach(tag => {
         // Revive opening tags (including any attributes)
-        const openRegex = new RegExp(`&lt;${tag}\\b(.*?)&gt;`, 'gi');
-        html = html.replace(openRegex, `<${tag}$1>`);
+        const openRegex = new RegExp(`&lt;${tag}(&gt;|\\s+.*?&gt;)`, 'gi');
+        html = html.replace(openRegex, (match, p1) => {
+            const attrs = p1.substring(0, p1.length - 4); // strip '&gt;'
+            return `<${tag}${attrs}>`;
+        });
         // Revive closing tags
         const closeRegex = new RegExp(`&lt;\\/${tag}&gt;`, 'gi');
         html = html.replace(closeRegex, `</${tag}>`);
