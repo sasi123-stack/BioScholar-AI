@@ -1,34 +1,34 @@
-FROM python:3.11
+FROM python:3.11-slim
 
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=7860 \
-    HOME=/home/user
+    HOME=/home/user \
+    OLLAMA_HOST=127.0.0.1:11434
 
 # Create user
 RUN useradd -m -u 1000 user
 WORKDIR $HOME/app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies (minimal - no chromium, no nodejs)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     libpq-dev \
     git \
     curl \
-    chromium \
-    chromium-driver \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g @anthropic-ai/claude-code@latest \
-    && curl -fsSL https://ollama.com/install.sh | sh \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install
-COPY --chown=user requirements.txt .
+# Install Ollama binary directly (no systemd service registration)
+RUN curl -L https://ollama.com/download/ollama-linux-amd64 -o /usr/local/bin/ollama \
+    && chmod +x /usr/local/bin/ollama
+
+# Copy slim requirements and install
+COPY --chown=user requirements_bot.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements_bot.txt
 
 # Copy the rest of the application
 COPY --chown=user . .
@@ -38,7 +38,7 @@ RUN chmod +x entrypoint.sh
 
 # Change to user
 USER user
-ENV PATH="/home/user/.local/bin:$PATH"
+ENV PATH="/home/user/.local/bin:/usr/local/bin:$PATH"
 
 # Expose port (HF looks for 7860)
 EXPOSE 7860

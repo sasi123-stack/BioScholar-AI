@@ -1,0 +1,21 @@
+# Slim requirements for maverick-ai-bot Space
+# Only what the Telegram bot + minimal FastAPI health endpoint need
+
+# API Framework (minimal)
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+
+# AI / Telegram
+openai>=1.3.0
+python-telegram-bot>=20.0
+python-dotenv>=1.0.0
+
+# Search
+opensearch-py>=2.4.0
+
+# Utilities
+requests>=2.31.0
+aiohttp>=3.9.0
+dnspython
+tenacity>=8.2.0
