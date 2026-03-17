@@ -4,14 +4,13 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=7860 \
-    HOME=/home/user \
-    OLLAMA_HOST=127.0.0.1:11434
+    HOME=/home/user
 
 # Create user
 RUN useradd -m -u 1000 user
 WORKDIR $HOME/app
 
-# Install system dependencies (minimal - no chromium, no nodejs)
+# Install system dependencies (minimal)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
@@ -20,10 +19,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Ollama binary directly (no systemd service registration)
-RUN curl -L https://ollama.com/download/ollama-linux-amd64 -o /usr/local/bin/ollama \
-    && chmod +x /usr/local/bin/ollama
 
 # Copy slim requirements and install
 COPY --chown=user requirements_bot.txt .
@@ -38,7 +33,7 @@ RUN chmod +x entrypoint.sh
 
 # Change to user
 USER user
-ENV PATH="/home/user/.local/bin:/usr/local/bin:$PATH"
+ENV PATH="/home/user/.local/bin:$PATH"
 
 # Expose port (HF looks for 7860)
 EXPOSE 7860

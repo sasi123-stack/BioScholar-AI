@@ -6,7 +6,7 @@ import logging
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
-from openai import AsyncOpenAI
+from groq import AsyncGroq
 from dotenv import load_dotenv
 import sys
 
@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "gpt-oss:120b-cloud"
+MODEL_NAME = "llama-3.3-70b-versatile"   # Primary Groq model
 DB_FILE = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "local_memory.db"
 
 # Search Config (Bonsai/OpenSearch)
@@ -74,13 +74,12 @@ ES_HOST = os.getenv("ELASTICSEARCH_HOST", "assertive-mahogany-1m2hcasg.us-east-1
 ES_USER = os.getenv("ELASTICSEARCH_USER", "0204784e62")
 ES_PASS = os.getenv("ELASTICSEARCH_PASSWORD", "38aa998d6c5c2891232c")
 
-# Initialize AI Client for Ollama
+# Initialize Groq AI Client
 try:
-    # Use Ollama endpoint pointing to localhost
-    ai_client = AsyncOpenAI(base_url="http://127.0.0.1:11434/v1", api_key="ollama")
-    logger.info("AsyncOpenAI client initialized for Ollama")
+    ai_client = AsyncGroq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    logger.info("Groq AsyncGroq client initialized")
 except Exception as e:
-    logger.error(f"Failed to initialize OpenAI client: {e}")
+    logger.error(f"Failed to initialize Groq client: {e}")
     ai_client = None
 
 # Initialize Database
@@ -215,17 +214,21 @@ def sanitize_for_telegram(text: str) -> str:
     return text.strip()
 
 async def get_resilient_completion(messages: list, user_id: int):
-    """Try multiple models and check for HTML/Error responses."""
+    """Try multiple Groq models with fallback chain."""
+    if not ai_client:
+        raise Exception("Groq client not initialized. Check GROQ_API_KEY environment variable.")
+
     models_to_try = [
-        MODEL_NAME,                         # Primary: GPT OSS 120B
-        "llama-3.3-70b-versatile",         # Fallback 1: Latest Llama
-        "llama-3.1-8b-instant"             # Fallback 2: Stable Instant
+        MODEL_NAME,                # Primary: llama-3.3-70b-versatile
+        "llama-3.1-70b-versatile", # Fallback 1
+        "llama-3.1-8b-instant",    # Fallback 2: Fast/light
+        "gemma2-9b-it",            # Fallback 3: Google Gemma
     ]
     
     last_err = None
     for model in models_to_try:
         try:
-            logger.info(f"Trying model {model} for user {user_id}")
+            logger.info(f"Trying Groq model '{model}' for user {user_id}")
             completion = await ai_client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -234,20 +237,19 @@ async def get_resilient_completion(messages: list, user_id: int):
             )
             answer = completion.choices[0].message.content
             
-            # Check for HTML responses (Gateways/Proxies)
+            # Guard against HTML gateway error pages
             if answer and ("<!DOCTYPE" in answer[:20] or "<html>" in answer.lower()[:20]):
-                logger.warning(f"Model {model} returned HTML instead of text. Switching...")
+                logger.warning(f"Model {model} returned HTML. Trying next model...")
                 continue
                 
             return answer
             
         except Exception as e:
-            logger.warning(f"Model {model} failed: {e}")
+            logger.warning(f"Groq model '{model}' failed: {e}")
             last_err = e
             continue
             
-    # If all fail
-    raise Exception(f"All models failed or returned invalid responses. Final error: {last_err}")
+    raise Exception(f"All Groq models failed. Final error: {last_err}")
 
 # Command Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
