@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "openclaw"
+MODEL_NAME = "gpt-oss:120b-cloud"
 DB_FILE = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "local_memory.db"
 
 # Search Config (Bonsai/OpenSearch)
@@ -217,7 +217,9 @@ def sanitize_for_telegram(text: str) -> str:
 async def get_resilient_completion(messages: list, user_id: int):
     """Try multiple models and check for HTML/Error responses."""
     models_to_try = [
-        MODEL_NAME,                         # Primary: Local Ollama
+        MODEL_NAME,                         # Primary: GPT OSS 120B
+        "llama-3.3-70b-versatile",         # Fallback 1: Latest Llama
+        "llama-3.1-8b-instant"             # Fallback 2: Stable Instant
     ]
     
     last_err = None

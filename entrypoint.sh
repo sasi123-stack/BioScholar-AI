@@ -13,9 +13,6 @@ OLLAMA_HOST="127.0.0.1:11434" ollama serve > /tmp/logs/ollama.log 2>&1 &
 echo "⏳ Waiting for Ollama to start..."
 sleep 5
 
-echo "📥 Pulling openclaw model (this may take a while)..."
-ollama pull openclaw
-
 # Start Maverick Telegram Bot in background
 echo "🤖 Starting Maverick Telegram Bot..."
 python maverick_telegram_bot.py &
