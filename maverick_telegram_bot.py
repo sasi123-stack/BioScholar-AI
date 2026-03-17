@@ -285,7 +285,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /claude &lt;task&gt; - Evaluate Claude Code in backend\n"
         "• /history - Recall your last 5 interactions\n"
         "• /clear - Reset conversation memory\n"
-        "• /about - Learn about the gpt-oss:120b-cloud (Claude Code) engine\n"
+        "• /about - Learn about the Maverick AI engine\n"
         "• /test - Launch the full Research Desk"
     )
     await update.message.reply_html(help_text)
@@ -293,9 +293,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     about_text = (
         "💠 <b>About Maverick AI</b>\n\n"
-        "Maverick is a high-performance biomedical synthesis engine powered by Groq's low-latency "
-        "<b>gpt-oss:120b-cloud (Claude Code)</b> platform. Optimized for clinical research, oncology, and pharmacology "
-        "data extraction."
+        "Maverick is a high-performance biomedical synthesis engine powered by "
+        "<b>Groq's low-latency inference API</b> (llama-3.3-70b-versatile). "
+        "Optimized for clinical research, oncology, and pharmacology data extraction."
     )
     await update.message.reply_html(about_text)
 
@@ -472,8 +472,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
             if "💠" not in answer[:15]:
                 answer = "💠 " + answer
         except Exception as e:
-            logger.error(f"Critical failure: {e}")
-            answer = "❌ <b>Maverick System Error</b>: All AI synthesis engines are currently saturated (504 Gateway). Please try again in 1 minute."
+            logger.error(f"Critical failure in get_resilient_completion: {e}")
+            answer = f"❌ <b>Maverick System Error</b>: {html.escape(str(e)[:200])}"
             
         # Save AI response
         save_message(user_id, "assistant", answer)
@@ -525,8 +525,8 @@ async def post_init(application: Application):
         BotCommand("test", "Open Web App")
     ])
     try:
-        await application.bot.set_my_description("Maverick AI 🦞: Your advanced clinical research synthesis engine. Powered by gpt-oss:120b-cloud & Claude Code.")
-        await application.bot.set_my_short_description("Maverick AI Research Bot (gpt-oss:120b-cloud & Claude Code)")
+        await application.bot.set_my_description("Maverick AI 🦞: Your advanced clinical research synthesis engine. Powered by Groq (llama-3.3-70b-versatile) with biomedical search.")
+        await application.bot.set_my_short_description("Maverick AI Research Bot — Powered by Groq")
         logger.info("Bot commands and description updated successfully")
     except Exception as e:
         logger.warning(f"Failed to set bot description: {e}")
