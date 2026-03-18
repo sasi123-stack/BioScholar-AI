@@ -20,3 +20,4 @@ requests>=2.31.0
 aiohttp>=3.9.0
 dnspython
 tenacity>=8.2.0
+pymupdf>=1.22.0

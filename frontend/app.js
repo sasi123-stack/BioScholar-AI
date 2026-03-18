@@ -3457,229 +3457,87 @@ function handleChatSubmit() {
     const suggestedContainer = document.getElementById('suggested-questions-container');
     if (suggestedContainer) suggestedContainer.classList.add('hidden');
 
-    // Use the /search endpoint (always works, powers Research Desk too)
-    // Build a synthesized AI response from top search results
-    updateSyncStatus('synced');
-    fetch(`${API_BASE_URL}/search`, {
+    // 🚀 NEW: Call the dedicated Maverick Unified Research endpoint (/maverick/chat)
+    // This handles long-term memory, reasoning, and multi-modal attachments on the backend.
+    updateSyncStatus('calculating');
+    
+    fetch(`${API_BASE_URL}/maverick/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        headers: { 
+            'Content-Type': 'application/json', 
+            'ngrok-skip-browser-warning': 'true' 
+        },
         signal: currentChatController.signal,
         body: JSON.stringify({
-            query: message,
-            // Plugin: Clinical Trial Finder → search clinical_trials index too
-            index: activePlugins.has('trials') ? 'clinical_trials'
-                : isWebSearchEnabled ? 'both'
-                    : 'pubmed',
-            max_results: activePlugins.has('summarize') ? 8 : 8,   // Always fetch 8 for good synthesis depth
-            alpha: activePlugins.has('molecule') ? 0.7 : 0.5,
-            use_reranking: activePlugins.has('summarize') || activePlugins.has('gene'),
-            sort_by: 'relevance'
+            question: message,
+            context: getHistoryForAPI(),
+            attachments: currentAttachments,
+            user_id: 123, // Fallback for guest mode; logic handles UID if logged in
+            index: activePlugins.has('trials') ? 'clinical_trials' : 'pubmed'
         })
     })
-        .then(res => {
-            if (!res.ok) throw new Error(`Search API returned ${res.status}`);
-            return res.json();
-        })
-        .then(data => {
-            updateSyncStatus('synced');
-            const results = data.results || [];
+    .then(res => {
+        if (!res.ok) throw new Error(`Maverick API returned ${res.status}`);
+        return res.json();
+    })
+    .then(data => {
+        updateSyncStatus('synced');
+        
+        if (data.status === 'error') {
+            throw new Error(data.message || 'Maverick core engine error');
+        }
 
-            if (results.length === 0) {
-                addChatMessage('ai',
-                    `I searched the biomedical index for **"${message}"** but found no matching articles.\n\n` +
-                    `**Try:**\n` +
-                    `• Using different keywords or scientific terms\n` +
-                    `• Switching to the **Research Desk** tab for advanced filters\n` +
-                    `• Access deep biomedical insights through our Research AI Chat`);
-                return;
-            }
+        const aiText = data.answer;
+        const reasoning = data.reasoning;
+        const sources = data.sources || [];
 
-            const top = results.slice(0, activePlugins.has('summarize') ? 5 : 3);
+        // Map sources to standard format for UI
+        const mappedSources = sources.map(s => ({
+            title: s.source_title || 'Research Source',
+            url: getExternalUrl({
+                source: s.source_type,
+                id: s.source_id,
+                pmid: s.source_type === 'pubmed' ? s.source_id : null,
+                nct_id: s.source_type !== 'pubmed' ? s.source_id : null
+            }),
+            score: s.confidence,
+            type: s.source_type,
+            snippet: s.context || '',
+            id: s.source_id
+        }));
 
-            // ── Plugin: Summarize Mode ──────────────────────────────────────────────
-            let aiText;
-            if (activePlugins.has('summarize')) {
-                const summaries = top.map((r, i) => {
-                    const abs = (r.abstract || r.content || '').slice(0, 400).trim();
-                    const journal = r.journal || r.source || 'Unknown Journal';
-                    const year = r.year || r.publication_date?.split('-')[0] || 'n.d.';
-                    return `**[${i + 1}] ${r.title || 'Untitled'}** *(${journal}, ${year})*\n> ${abs}${abs.length >= 400 ? '...' : ''}`;
-                }).join('\n\n');
-                aiText = `📊 **Structured Summary** — *"${message}"* (${results.length} articles found)\n\n${summaries}\n\n**Key Takeaway:** These studies represent the top indexed evidence on this topic. Review the full abstracts in the **Research Desk** tab.`;
-
-                // ── Plugin: Gene / Drug Lookup ─────────────────────────────────────────
-            } else if (activePlugins.has('gene')) {
-                const drugGeneTerms = message.match(/\b[A-Z]{2,}[0-9]*\b/g) || [];
-                const termNote = drugGeneTerms.length > 0
-                    ? `\n\n🧬 **Detected Identifiers:** ${drugGeneTerms.slice(0, 5).join(', ')} — cross-referenced with indexed literature.`
-                    : '';
-                const geneFindings = top.map((r, i) => {
-                    const abs = (r.abstract || r.content || '').slice(0, 280).trim();
-                    const year = r.year || r.publication_date?.split('-')[0] || 'n.d.';
-                    return `**${i + 1}. ${r.title || 'Untitled'}** *(${year})*\n${abs}${abs.length >= 280 ? '...' : ''}`;
-                }).join('\n\n');
-                aiText = `🧬 **Gene/Drug Intelligence** — *"${message}"*${termNote}\n\n${geneFindings}\n\n*For full pharmacological data, see [PubChem](https://pubchem.ncbi.nlm.nih.gov) or [DrugBank](https://go.drugbank.com).*`;
-
-                // ── Plugin: Citation Generator ──────────────────────────────────────────
-            } else if (activePlugins.has('citation')) {
-                const citations = top.map((r, i) => {
-                    const authors = ensureAuthorsArray(r.metadata?.authors || r.authors);
-                    const authorStr = authors.length > 0
-                        ? (authors.length > 3 ? authors.slice(0, 3).join(', ') + ' et al.' : authors.join(', '))
-                        : 'Unknown Author(s)';
-                    const year = r.year || r.publication_date?.split('-')[0] || 'n.d.';
-                    const journal = r.journal || r.metadata?.journal || 'Biomedical Journal';
-                    const title = r.title || 'Untitled';
-                    const pmid = r.doc_id || r.id;
-                    const url = pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pmid}/` : '';
-                    // APA 7th edition format
-                    return `**[${i + 1}]** ${authorStr} (${year}). *${title}*. *${journal}*. ${url ? `[Link](${url})` : ''}`;
-                }).join('\n\n');
-                aiText = `📋 **APA Citations** — for *"${message}"*\n\n${citations}\n\n*Tip: Use the 📝 Cite button on any article card in Research Desk for APA/MLA/BibTeX formats.*`;
-
-                // ── Plugin: Molecule Solver ─────────────────────────────────────────────
-            } else if (activePlugins.has('molecule')) {
-                const molFindings = top.map((r, i) => {
-                    const abs = (r.abstract || r.content || '').slice(0, 300).trim();
-                    const year = r.year || r.publication_date?.split('-')[0] || 'n.d.';
-                    return `**${i + 1}. ${r.title || 'Untitled'}** *(${year})*\n${abs}${abs.length >= 300 ? '...' : ''}`;
-                }).join('\n\n');
-                aiText = `🧪 **Chemical/Molecular Context** — *"${message}"*\n\n${molFindings}\n\n*For 3D structure visualization, see [PubChem](https://pubchem.ncbi.nlm.nih.gov/?query=${encodeURIComponent(message)}) or [ChemSpider](https://www.chemspider.com).*`;
-
-                // ── Plugin: Clinical Trial Finder ───────────────────────────────────────
-            } else if (activePlugins.has('trials')) {
-                const trialFindings = top.map((r, i) => {
-                    const abs = (r.abstract || r.content || '').slice(0, 260).trim();
-                    const nct = r.doc_id || r.id || '';
-                    const nctLink = nct ? ` — [View on ClinicalTrials.gov](https://clinicaltrials.gov/study/${nct})` : '';
-                    return `**${i + 1}. ${r.title || 'Clinical Trial'}** ${nctLink}\n${abs}${abs.length >= 260 ? '...' : ''}`;
-                }).join('\n\n');
-                aiText = `🔬 **Clinical Trials** matching *"${message}"* (${results.length} found in index):\n\n${trialFindings}\n\n*Updated trial data: [ClinicalTrials.gov](https://clinicaltrials.gov/search?term=${encodeURIComponent(message)})*`;
-
-                // ── Default: Detailed Research Synthesis ───────────────────────────────
-            } else {
-                const top5 = results.slice(0, 5);
-
-                // ── Overview paragraph ──
-                // Collect unique journals and years to frame the synthesis
-                const years = top5
-                    .map(r => r.year || r.publication_date?.split('-')[0])
-                    .filter(Boolean)
-                    .sort();
-                const yearRange = years.length > 1
-                    ? `${years[0]}–${years[years.length - 1]}`
-                    : years[0] || 'recent years';
-                const journals = [...new Set(
-                    top5.map(r => r.journal || r.metadata?.journal).filter(Boolean)
-                )].slice(0, 3);
-                const journalNote = journals.length > 0
-                    ? ` Published sources include *${journals.join(', ')}*.`
-                    : '';
-
-                const overviewPara =
-                    `A search of the BioMedScholar index for **"${message}"** returned **${results.length} indexed articles** ` +
-                    `spanning ${yearRange}.${journalNote} ` +
-                    `Below is a synthesized review of the top ${top5.length} most relevant findings:`;
-
-                // ── Per-article detailed findings ──
-                const detailedFindings = top5.map((r, i) => {
-                    const rawAbstract = (r.abstract || r.content || '').trim();
-                    // Use up to 600 chars — enough for genuine detail
-                    const abstract = rawAbstract.slice(0, 600);
-                    const isTruncated = rawAbstract.length > 600;
-
-                    const authors = ensureAuthorsArray(r.metadata?.authors || r.authors);
-                    const authorStr = authors.length > 0
-                        ? (authors.length > 3
-                            ? `${authors.slice(0, 3).join(', ')} *et al.*`
-                            : authors.join(', '))
-                        : null;
-
-                    const journal = r.journal || r.metadata?.journal || null;
-                    const year = r.year || r.publication_date?.split('-')[0] || null;
-                    const pmid = r.doc_id || r.id;
-                    const pubLink = pmid ? ` [[View →]](https://pubmed.ncbi.nlm.nih.gov/${pmid}/)` : '';
-
-                    const metaParts = [authorStr, journal, year].filter(Boolean);
-                    const metaLine = metaParts.length > 0
-                        ? `\n*${metaParts.join(' · ')}*${pubLink}` : pubLink;
-
-                    return (
-                        `**${i + 1}. ${r.title || 'Untitled'}**${metaLine}\n\n` +
-                        `${abstract}${isTruncated ? '...' : ''}`
-                    );
-                }).join('\n\n---\n\n');
-
-                // ── Clinical implications footer ──
-                const implications =
-                    `\n\n**Clinical / Research Implications:**\n` +
-                    `• These findings are drawn from ${results.length} peer-reviewed or registered sources.\n` +
-                    `• For full article access, open the **Research Desk** tab and apply date/source filters.\n` +
-                    `• Further reading: [PubMed](https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(message)}) · ` +
-                    `[Google Scholar](https://scholar.google.com/scholar?q=${encodeURIComponent(message)}) · ` +
-                    `[ClinicalTrials.gov](https://clinicaltrials.gov/search?term=${encodeURIComponent(message)})`;
-
-                aiText = `${overviewPara}\n\n${detailedFindings}${implications}`;
-            }
-
-            // Use top5 for default mode, top for plugin modes (already sliced above)
-            const sourcesArray = (activePlugins.size === 0 && !isWebSearchEnabled)
-                ? results.slice(0, 5)
-                : top;
-
-            const sources = sourcesArray.map(r => ({
-                title: r.title || 'Research Source',
-                url: getExternalUrl({
-                    source: r.source_type || r.source || 'pubmed',
-                    id: r.doc_id || r.id,
-                    pmid: (r.source_type || r.source) === 'pubmed' ? (r.doc_id || r.id) : null,
-                    nct_id: (r.source_type || r.source) !== 'pubmed' ? (r.doc_id || r.id) : null
-                }),
-                score: r.score || r.relevance_score,
-                type: r.source_type || r.source || 'pubmed',
-                snippet: r.abstract || r.content || '',
-                id: r.doc_id || r.id
-            }));
-
-            // Build active plugins label for the reasoning panel
-            const pluginLabels = [
-                isWebSearchEnabled ? '🌐 Web Search' : '',
-                activePlugins.has('trials') ? '🔬 Clinical Trials' : '',
-                activePlugins.has('molecule') ? '🧪 Molecule Solver' : '',
-                activePlugins.has('summarize') ? '📊 Summarize Mode' : '',
-                activePlugins.has('gene') ? '🧬 Gene/Drug Lookup' : '',
-                activePlugins.has('citation') ? '📋 Citation Generator' : ''
-            ].filter(Boolean);
-
-            const pluginReasoning = pluginLabels.length > 0
-                ? `**Active Research Tools:** ${pluginLabels.join('  ')}\n\n`
-                : '';
-
-            const reasoningSteps = `${pluginReasoning}Searched ${results.length} biomedical articles specializing in medical research context...`;
-
-            addChatMessage('ai', aiText, sources, reasoningSteps);
-            showSuggestedQuestions(message);
-        })
-        .catch(err => {
-            if (err.name === 'AbortError') {
-                console.log('Chat stopped by user');
-                return;
-            }
-            updateSyncStatus('synced');
-            console.warn('Chat search error:', err.message);
-            addChatMessage('ai',
-                `🔍 I couldn't reach the search index right now (backend may still be warming up).\n\n` +
-                `**Try these options:**\n` +
-                `• 🔄 **Retry** — tap send again in a few seconds\n` +
-                `• 📋 Use the **Research Desk** tab to search directly\n` +
-                `• 🤖 For instant AI answers: Use the Research AI tab`);
-        })
-        .finally(() => {
-            currentChatController = null;
-            removeChatLoading();
-            document.getElementById('chat-stop-btn')?.classList.add('hidden');
-            document.getElementById('chat-send-btn')?.classList.remove('hidden');
-        });
+        addChatMessage('ai', aiText, mappedSources, reasoning);
+        showSuggestedQuestions(message);
+        
+        // Clear attachments after successful send
+        currentAttachments = [];
+        const preview = document.getElementById('chat-attachment-preview');
+        if (preview) {
+            preview.innerHTML = '';
+            preview.classList.add('hidden');
+        }
+    })
+    .catch(err => {
+        if (err.name === 'AbortError') {
+            console.log('Chat stopped by user');
+            return;
+        }
+        updateSyncStatus('synced');
+        console.error('Maverick Chat Error:', err);
+        addChatMessage('ai',
+            `🔍 **Maverick Engine Connectivity Issue**\n\n` +
+            `I encountered an error while processing your research request: *${err.message}*\n\n` +
+            `**Try these options:**\n` +
+            `• 🔄 **Retry** — tap send again in a few seconds\n` +
+            `• 📋 Use the **Research Desk** tab to search the static index\n` +
+            `• 🤖 Check your local network or API key configuration`);
+    })
+    .finally(() => {
+        currentChatController = null;
+        removeChatLoading();
+        document.getElementById('chat-stop-btn')?.classList.add('hidden');
+        document.getElementById('chat-send-btn')?.classList.remove('hidden');
+    });
 }
 
 function sendChatMessage(message) {
@@ -3735,46 +3593,104 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
     // Process text for formatting (Rich Markdown)
     const formattedText = formatMaverickResponse(text);
 
-    msgDiv.innerHTML = `
-        ${avatar}
-        <div class="message-bubble">
-            ${reasoning ? `
-                <div class="thinking-process">
-                    <button class="thinking-toggle" onclick="toggleThinking(this)">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-                        Thinking Process
-                    </button>
-                    <div class="thinking-content hidden">${reasoning}</div>
+    if (role === 'ai' && !isHistoryLoad) {
+        // Typing Effect for AI responses to simulate streaming
+        msgDiv.innerHTML = `
+            ${avatar}
+            <div class="message-bubble">
+                ${reasoning ? `
+                    <div class="thinking-process">
+                        <button class="thinking-toggle" onclick="toggleThinking(this)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                            Thinking Process
+                        </button>
+                        <div class="thinking-content hidden">${reasoning}</div>
+                    </div>
+                ` : ''}
+                <div class="chat-answer-content">
+                    ${isGroupChat ? getRandomParticipantTag() : ''}
+                    <span class="typing-text"></span>
                 </div>
-            ` : ''}
-            <div class="chat-answer-content">
-                ${isGroupChat && role === 'ai' ? getRandomParticipantTag() : ''}
-                ${formattedText}
+                ${isIncognito ? '<div class="incognito-disclaimer">Private Search: History not logged</div>' : ''}
+                <div class="chat-sources hidden">${sourcesHtml}</div>
+                <div class="message-actions hidden">
+                    <button class="msg-action-btn" onclick="copyMessage(this)" title="Copy message">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </button>
+                    <button class="msg-action-btn speak-btn" onclick="speakMessage(this)" title="Listen to response">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    </button>
+                    <button class="msg-action-btn" onclick="sendFeedback(this, 'up')" title="Helpful">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                    </button>
+                    <button class="msg-action-btn" onclick="sendFeedback(this, 'down')" title="Not helpful">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>
+                    </button>
+                </div>
             </div>
-            ${isIncognito && role === 'ai' ? '<div class="incognito-disclaimer">Private Search: History not logged</div>' : ''}
-            ${sourcesHtml}
-            <div class="message-actions">
-                <button class="msg-action-btn" onclick="copyMessage(this)" title="Copy message">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                </button>
-                ${role === 'user' ? `
-                <button class="msg-action-btn" onclick="editUserMessage(this)" title="Edit message">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                </button>
-                ` : `
-                <button class="msg-action-btn speak-btn" onclick="speakMessage(this)" title="Listen to response">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                </button>
-                <button class="msg-action-btn" onclick="sendFeedback(this, 'up')" title="Helpful">
-                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
-                </button>
-                <button class="msg-action-btn" onclick="sendFeedback(this, 'down')" title="Not helpful">
-                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>
-                </button>
-                `}
+        `;
+        history.appendChild(msgDiv);
+        
+        const typingSpan = msgDiv.querySelector('.typing-text');
+        // We set innerHTML immediately but hide it if we wanted real streaming.
+        // For a beautiful "teaser" feel, we'll use a fast typing simulation.
+        let i = 0;
+        const typeSpeed = formattedText.length > 500 ? 5 : 15;
+        
+        // Use a more robust typing that handles HTML tags
+        typingSpan.innerHTML = formattedText;
+        msgDiv.querySelector('.message-bubble').classList.add('typing-active');
+        
+        setTimeout(() => {
+            msgDiv.querySelector('.message-bubble').classList.remove('typing-active');
+            msgDiv.querySelector('.chat-sources')?.classList.remove('hidden');
+            msgDiv.querySelector('.message-actions')?.classList.remove('hidden');
+            if (shouldScroll) history.scrollTop = history.scrollHeight;
+        }, formattedText.length * 2); // Fast enough to not be annoying
+
+    } else {
+        msgDiv.innerHTML = `
+            ${avatar}
+            <div class="message-bubble">
+                ${reasoning ? `
+                    <div class="thinking-process">
+                        <button class="thinking-toggle" onclick="toggleThinking(this)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                            Thinking Process
+                        </button>
+                        <div class="thinking-content hidden">${reasoning}</div>
+                    </div>
+                ` : ''}
+                <div class="chat-answer-content">
+                    ${isGroupChat && role === 'ai' ? getRandomParticipantTag() : ''}
+                    ${formattedText}
+                </div>
+                ${isIncognito && role === 'ai' ? '<div class="incognito-disclaimer">Private Search: History not logged</div>' : ''}
+                ${sourcesHtml}
+                <div class="message-actions">
+                    <button class="msg-action-btn" onclick="copyMessage(this)" title="Copy message">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </button>
+                    ${role === 'user' ? `
+                    <button class="msg-action-btn" onclick="editUserMessage(this)" title="Edit message">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121(0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    ` : `
+                    <button class="msg-action-btn speak-btn" onclick="speakMessage(this)" title="Listen to response">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    </button>
+                    <button class="msg-action-btn" onclick="sendFeedback(this, 'up')" title="Helpful">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                    </button>
+                    <button class="msg-action-btn" onclick="sendFeedback(this, 'down')" title="Not helpful">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>
+                    </button>
+                    `}
+                </div>
             </div>
-        </div>
-    `;
+        `;
+        history.appendChild(msgDiv);
+    }
 
     history.appendChild(msgDiv);
     // Smooth scroll to bottom
@@ -4212,19 +4128,31 @@ function handleChatFileUpload(input) {
     files.forEach(file => {
         if (currentAttachments.some(a => a.name === file.name)) return;
 
-        currentAttachments.push(file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const base64Data = e.target.result;
+            currentAttachments.push({
+                name: file.name,
+                type: file.type,
+                data: base64Data
+            });
 
-        const chip = document.createElement('div');
-        chip.className = 'attachment-chip';
-        chip.innerHTML = `
-    < svg width = "12" height = "12" viewBox = "0 0 24 24" fill = "none" stroke = "currentColor" stroke - width="2" ><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg >
-        ${truncate(file.name, 15)}
-<span class="attachment-remove" onclick="removeAttachment('${file.name}', this)">×</span>
-`;
-        preview.appendChild(chip);
+            const chip = document.createElement('div');
+            chip.className = 'attachment-chip';
+            chip.innerHTML = `
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                    <polyline points="13 2 13 9 20 9"/>
+                </svg>
+                ${truncate(file.name, 15)}
+                <span class="attachment-remove" onclick="removeAttachment('${file.name}', this)">×</span>
+            `;
+            preview.appendChild(chip);
+            preview.classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
     });
 
-    preview.classList.remove('hidden');
     input.value = ""; // Reset input
 }
 

@@ -1,9 +1,13 @@
 import os
 import socket
-import html
 import sqlite3
 import logging
 import asyncio
+import html
+import re
+import fitz # PyMuPDF
+import io
+import base64
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
 from groq import AsyncGroq
@@ -391,22 +395,74 @@ async def claude_code_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             parse_mode='HTML'
         )
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, override_msg=None, force_search=False):
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle PDF uploads."""
+    user_id = update.effective_user.id
+    doc = update.message.document
+    
+    if not doc.file_name.lower().endswith(".pdf") and "pdf" not in doc.mime_type.lower():
+        await update.message.reply_html("💠 <i>Maverick currently only supports PDF analysis. Try uploading a research paper.</i>")
+        return
+
+    thinking = await update.message.reply_html(f"📑 <i>Analyzing PDF: {html.escape(doc.file_name)}...</i>")
+    
+    try:
+        new_file = await context.bot.get_file(doc.file_id)
+        # Download to memory
+        file_bytes = await new_file.download_as_bytearray()
+        
+        # Extract text
+        with fitz.open(stream=file_bytes, filetype="pdf") as pdf:
+            pdf_text = ""
+            for page in pdf:
+                pdf_text += page.get_text()
+        
+        extracted_context = pdf_text[:4000] # Limit to avoid prompt overflow
+        
+        # Forward to handle_message with extra context
+        caption = update.message.caption or f"What are the key findings in {doc.file_name}?"
+        rich_query = f"{caption}\n\n[CONTEXT FROM ATTACHED PDF: {doc.file_name}]\n{extracted_context}"
+        
+        await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=thinking.message_id)
+        await handle_message(update, context, override_msg=rich_query, original_caption=caption)
+        
+    except Exception as e:
+        logger.error(f"PDF Analysis Error: {e}")
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=thinking.message_id,
+            text=f"❌ <b>PDF Extraction Error</b>: {html.escape(str(e)[:200])}",
+            parse_mode='HTML'
+        )
+
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle image uploads (Research Figures/Posters)."""
+    user_id = update.effective_user.id
+    caption = update.message.caption or "What can you tell me about this biomedical figure?"
+    
+    # For now, we notify Maverick about the visual context
+    # Vision models can be integrated here later if needed
+    rich_query = f"{caption}\n\n[USER ATTACHED A RESEARCH IMAGE/POSTER/FIGURE]"
+    await handle_message(update, context, override_msg=rich_query, original_caption=caption)
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, override_msg=None, force_search=False, original_caption=None):
     user_id = update.effective_user.id
     incoming_text = override_msg if override_msg else update.message.text
+    display_text = original_caption if original_caption else incoming_text
     
-    logger.info(f"Processing message from {user_id}: {incoming_text[:50]}...")
+    logger.info(f"Processing message from {user_id}: {display_text[:50]}...")
     
     # Send thinking placeholder
     thinking_msg = await update.effective_message.reply_html("💠 <i>Maverick is synthesizing...</i>")
     
     try:
-        # Save user message
-        save_message(user_id, "user", incoming_text)
+        # Save user message (use display_text for history unless it's a doc)
+        save_message(user_id, "user", display_text)
         
-        # 1. Search Literature
+        # 1. Search Literature (trigger on text or forced)
         search_results = []
-        if force_search or any(word in incoming_text.lower() for word in ["search", "find", "studies", "trials", "papers"]):
+        should_search = force_search or any(word in incoming_text.lower() for word in ["search", "find", "studies", "trials", "papers"])
+        if should_search:
             search_results = await perform_search(incoming_text)
             
         # 2. Get history
@@ -528,6 +584,8 @@ def main():
     
     # Regular text messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.Document.PDF, handle_document))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
     print("-" * 30)
     print("MAVERICK TELEGRAM BOT ONLINE")

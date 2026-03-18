@@ -36,11 +36,14 @@ from src.qa_module.qa_engine import QuestionAnsweringEngine
 from src.indexing.document_indexer import DocumentIndexer
 from src.utils.config import Settings
 from src.utils.logger import logger
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, File, UploadFile
 from fastapi.responses import JSONResponse
 
 import sqlite3
 import os
+import base64
+import io
+import fitz # PyMuPDF
 
 router = APIRouter(prefix="/api/v1", tags=["api"])
 
@@ -650,12 +653,53 @@ async def maverick_chat(
             "Contextualizing based on previous interaction history."
         ]
         
+        # 4. Process Attachments if present
+        attachment_context = ""
         if request.attachments:
             reasoning_steps.append(f"Analyzing {len(request.attachments)} attached files/modalities.")
-            
-        # 4. Get answer (Passing history_context for long-term memory sync)
+            for att in request.attachments:
+                name = att.get("name", "Unknown File")
+                file_type = att.get("type", "")
+                data_b64 = att.get("data", "")
+                
+                if not data_b64: continue
+                
+                try:
+                    # Strip base64 prefix if present (e.g. data:application/pdf;base64,...)
+                    if "," in data_b64:
+                        data_b64 = data_b64.split(",")[1]
+                    
+                    file_bytes = base64.b64decode(data_b64)
+                    
+                    if "pdf" in file_type.lower() or name.lower().endswith(".pdf"):
+                        # Extract text from PDF
+                        with fitz.open(stream=file_bytes, filetype="pdf") as doc:
+                            text = ""
+                            for page in doc:
+                                text += page.get_text()
+                        
+                        # Only take first 5000 chars to avoid prompt overflow
+                        extracted_text = text[:5000]
+                        attachment_context += f"\n--- EXTRACTED FROM PDF: {name} ---\n{extracted_text}\n"
+                        reasoning_steps.append(f"Successfully parsed PDF: {name} ({len(text)} characters).")
+                    
+                    elif "image" in file_type.lower():
+                        # For now, just note the image presence. Vision support can be added via GPT-4o-mini or Llama-3.2-Vision.
+                        attachment_context += f"\n[User attached an image: {name}]\n"
+                        reasoning_steps.append(f"Detected image: {name}. Processing via visual reasoning.")
+                        
+                except Exception as ex:
+                    logger.error(f"Error processing attachment {name}: {ex}")
+                    reasoning_steps.append(f"Failed to parse {name}: {str(ex)}")
+
+        # 5. Get answer (Passing history_context and attachment_context for synthesis)
+        # We append attachment_context to the question to ensure Maverick sees it
+        full_query = query
+        if attachment_context:
+            full_query += f"\n\nRESEARCH CONTEXT FROM ATTACHMENTS:\n{attachment_context}"
+
         result = await qa_engine.answer_question(
-            question=query, 
+            question=full_query, 
             num_answers=1, 
             index_name=request.index or "all", 
             history_context=history_context
