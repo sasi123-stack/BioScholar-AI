@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "llama-3.3-70b-versatile"   # Primary Groq model
+MODEL_NAME = "gpt-oss:120b-cloud"         # Primary model: gpt-oss:120b-cloud (Claude Code) via Groq
 DB_FILE = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "local_memory.db"
 
 # Search Config (Bonsai/OpenSearch)
@@ -219,10 +219,11 @@ async def get_resilient_completion(messages: list, user_id: int):
         raise Exception("Groq client not initialized. Check GROQ_API_KEY environment variable.")
 
     models_to_try = [
-        MODEL_NAME,                # Primary: llama-3.3-70b-versatile
-        "llama-3.1-70b-versatile", # Fallback 1
-        "llama-3.1-8b-instant",    # Fallback 2: Fast/light
-        "gemma2-9b-it",            # Fallback 3: Google Gemma
+        MODEL_NAME,                    # Primary: gpt-oss:120b-cloud (Claude Code) via Groq
+        "llama-3.3-70b-versatile",     # Fallback 1
+        "llama-3.1-70b-versatile",     # Fallback 2
+        "llama-3.1-8b-instant",        # Fallback 3: Fast/light
+        "gemma2-9b-it",                # Fallback 4: Google Gemma
     ]
     
     last_err = None
@@ -294,7 +295,7 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     about_text = (
         "💠 <b>About Maverick AI</b>\n\n"
         "Maverick is a high-performance biomedical synthesis engine powered by "
-        "<b>Groq's low-latency inference API</b> (llama-3.3-70b-versatile). "
+        "<b>gpt-oss:120b-cloud (Claude Code) via Groq</b>. "
         "Optimized for clinical research, oncology, and pharmacology data extraction."
     )
     await update.message.reply_html(about_text)
@@ -491,8 +492,8 @@ async def post_init(application: Application):
         BotCommand("test", "Open Web App")
     ])
     try:
-        await application.bot.set_my_description("Maverick AI 🦞: Your advanced clinical research synthesis engine. Powered by Groq (llama-3.3-70b-versatile) with biomedical search.")
-        await application.bot.set_my_short_description("Maverick AI Research Bot — Powered by Groq")
+        await application.bot.set_my_description("Maverick AI 💠: Your advanced clinical research synthesis engine. Powered by gpt-oss:120b-cloud (Claude Code) via Groq with biomedical search.")
+        await application.bot.set_my_short_description("Maverick AI — Powered by gpt-oss:120b-cloud (Claude Code) via Groq")
         logger.info("Bot commands and description updated successfully")
     except Exception as e:
         logger.warning(f"Failed to set bot description: {e}")
