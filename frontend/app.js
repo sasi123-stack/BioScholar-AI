@@ -6636,7 +6636,7 @@ function initVoiceSearch() {
 }
 
 /**
- * Scheduled Actions Module (v1.4.0 - PRO)
+ * Scheduled Actions Module (v1.5.0 - PRO)
  */
 let scheduledActions = JSON.parse(localStorage.getItem('maverick_scheduled_actions') || '[]');
 
