@@ -336,91 +336,57 @@ async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_text("Click below to open the full Research Intelligence Platform:", reply_markup=reply_markup)
 
 async def claude_code_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Execute a task via the Claude Code CLI tool."""
+    """Answer code, analysis, and research tasks using Groq AI (Claude-style agent)."""
     if not context.args:
         if update.effective_message:
             await update.effective_message.reply_html(
-                "<b>🛠️ Claude Code Executor</b>\n\n"
-                "Please provide a task or question for Claude Code.\n"
-                "Example: <code>/claude analyze the current project structure</code>\n"
-                "Example: <code>/claude write a unit test for the search module</code>"
+                "<b>🛠️ Maverick Code Agent</b>\n\n"
+                "Ask me to analyze code, explain concepts, or help with research tasks.\n"
+                "Example: <code>/claude analyze the search module architecture</code>\n"
+                "Example: <code>/claude write a unit test for the API endpoint</code>\n"
+                "Example: <code>/claude explain how BioBERT embeddings work</code>"
             )
         return
-        
+
     task = " ".join(context.args)
-    processing_msg = await update.effective_message.reply_html("👨‍💻 <i>Launching Claude Code Agent...</i>")
-    
+    user_id = update.effective_user.id
+    processing_msg = await update.effective_message.reply_html("👨‍💻 <i>Maverick Code Agent thinking...</i>")
+
     try:
-        # Check if claude is available
-        import shutil
-        claude_path = shutil.which("claude")
-        if not claude_path:
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=processing_msg.message_id,
-                text="❌ <b>Claude Code Error</b>: The <code>claude</code> CLI is not installed or not in the system PATH.",
-                parse_mode='HTML'
-            )
-            return
-
-        # Prepare environment for Claude Code
-        env = os.environ.copy()
-        # Ensure we don't accidentally leak tokens if not intended, but provide necessary ones
-        if "ANTHROPIC_API_KEY" not in env and os.getenv("GROQ_API_KEY"):
-            # If no Anthropic key, we might be using a router or local setup
-            env["ANTHROPIC_AUTH_TOKEN"] = "test" 
-            env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:3456"
-        
-        env["NO_PROXY"] = "127.0.0.1"
-        env["DISABLE_TELEMETRY"] = "true"
-        
-        # Execute claude command
-        # -p (prompt mode) is used for one-off tasks
-        proc = await asyncio.create_subprocess_exec(
-            "claude", "-p", task,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env
+        system_prompt = (
+            "You are Maverick Code Agent — an expert AI assistant specialized in biomedical software, "
+            "Python, FastAPI, machine learning, and research architecture. "
+            "You help developers analyze code, write tests, debug issues, and explain complex systems. "
+            "Be precise, concise, and technically accurate. "
+            "Use plain text with minimal formatting (no markdown symbols like **, ##). "
+            "Use <b>bold</b> for key terms and <code>code</code> for snippets (Telegram HTML mode)."
         )
-        
-        # Wait for completion with timeout (30s for responsiveness, adjust if needed)
-        try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=45)
-            output = stdout.decode('utf-8', errors='replace')
-            err_output = stderr.decode('utf-8', errors='replace')
-            
-            if not output.strip() and err_output:
-                output = f"Error Output:\n{err_output}"
-            elif not output.strip():
-                output = "Command finished with no output."
-                 
-            # Format and sanitize response
-            clean_out = html.escape(output)
-            if len(clean_out) > 3800:
-                 clean_out = clean_out[:3800] + "\n...(results truncated for Telegram overhead)"
-                 
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=processing_msg.message_id,
-                text=f"<b>Claude Code Result:</b>\n<pre>{clean_out}</pre>",
-                parse_mode='HTML'
-            )
-        except asyncio.TimeoutError:
-            proc.kill()
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=processing_msg.message_id,
-                text="⏳ <b>Timeout</b>: Claude Code task is taking too long. Try a simpler request.",
-                parse_mode='HTML'
-            )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": task}
+        ]
 
-    except Exception as e:
-        logger.error(f"Claude Code Execution Error: {e}")
-        safe_error = html.escape(str(e))
+        answer = await get_resilient_completion(messages, user_id)
+
+        # Sanitize for Telegram
+        answer = sanitize_for_telegram(answer)
+        if len(answer) > 3900:
+            answer = answer[:3900] + "\n\n<i>...(response truncated)</i>"
+
         await context.bot.edit_message_text(
             chat_id=update.effective_chat.id,
             message_id=processing_msg.message_id,
-            text=f"❌ <b>Claude Code System Error</b>: {safe_error}",
+            text=f"🛠️ <b>Maverick Code Agent:</b>\n\n{answer}",
+            parse_mode='HTML'
+        )
+
+    except Exception as e:
+        logger.error(f"Claude Code Command Error: {e}")
+        safe_error = html.escape(str(e)[:200])
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=processing_msg.message_id,
+            text=f"❌ <b>Agent Error</b>: {safe_error}",
             parse_mode='HTML'
         )
 
