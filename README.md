@@ -44,7 +44,10 @@ Powered by Groq's low-latency GPT OSS 120B platform, Maverick acts as a dedicate
 - **Context-Aware Follow-Ups**: Dynamically maps 12 unique biomedical domains (Oncology, Cardiology, CRISPR, etc.) to generate intelligent, specialized click-to-ask follow-up questions.
 - **Voice Dictation & Transcription**: Native Web Speech API integration allows for seamless dictation without auto-submitting unreviewed text.
 - **Collaboration & Privacy Modes**: Toggle **Group Session** mode for multi-persona analysis or **Incognito Mode** to prevent the session from saving to cloud history.
-- **Scheduled Actions (NEW v0.9.0)**: Proactive automation tools for setting research reminders, automated reports, and personalized triggers (e.g., anniversary wishes or periodic synthesis).
+- **Scheduled Actions (v0.9.0)**: Proactive automation tools for setting research reminders and triggers.
+- **Multi-Modal Research (NEW v1.5.0)**: Upload **PDF research papers** or **Medical Images** directly to Maverick. It extracts text using PyMuPDF and incorporates clinical findings into the AI reasoning loop.
+- **Knowledge Graph Visualization (NEW v1.5.0)**: Powered by **D3.js**, Maverick now generates a visual ecosystem of research connections, mapping associations between disparate papers, authors, and medical topics.
+- **Premium Reasoning UI**: Real-time "Thinking Process" display and streaming token intelligence for a true digital counterpart experience.
 
 ### 🔬 Research Desk (Analytical Engine)
 A high-density workspace for literature review and data extraction:
@@ -63,6 +66,8 @@ A high-density workspace for literature review and data extraction:
 | `/history` | View recent conversation |
 | `/about` | About Maverick AI |
 | `/test` | Open BioMedScholar AI with buttons |
+| `[PDF Upload]` | Send a research paper for instant AI synthesis |
+| `[Photo Upload]` | Send medical figures/posters for visual context |
 
 ### ⚡ Backend API
 - **FastAPI** with BioBERT semantic search
@@ -129,6 +134,8 @@ A high-density workspace for literature review and data extraction:
 | **Auth** | Firebase Authentication |
 | **Bot** | python-telegram-bot, Flask |
 | **Deployment** | Hugging Face Spaces (Docker) |
+| **Visualization** | D3.js v7 |
+| **PDF Processing** | PyMuPDF (fitz) |
 | **Version Control** | GitHub |
 
 ---
@@ -141,7 +148,7 @@ A high-density workspace for literature review and data extraction:
 
 ---
 
-## ✅ System Status Verification (March 11, 2026)
+## ✅ System Status Verification (March 18, 2026)
 
 ### 🎂 Birthday Reminder System ✅ **WORKING**
 
@@ -272,7 +279,7 @@ A high-density workspace for literature review and data extraction:
 
 **Built with ❤️ for the Biomedical Research Community**
 
-*Last updated: March 11, 2026 (v1.4.0 - GPT OSS 120B Integration)*
+*Last updated: March 18, 2026 (v1.5.0 - Multi-Modal & Knowledge Graph Update)*
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
