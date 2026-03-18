@@ -614,8 +614,7 @@ async def get_maverick_history(user_id: int = Query(default=123, description="Te
 @router.post("/maverick/chat", response_model=MaverickChatResponse)
 async def maverick_chat(
     request: MaverickChatRequest,
-    qa_engine: QuestionAnsweringEngine = Depends(get_qa_engine),
-    settings: Settings = Depends(get_settings)
+    qa_engine: QuestionAnsweringEngine = Depends(get_qa_engine)
 ):
     """
     Conversational endpoint that syncs with Maverick's long-term memory and returns advanced reasoning.
@@ -624,6 +623,42 @@ async def maverick_chat(
     user_id = request.user_id or 123
     query = request.question
     
+    # 0. Helper to Build Research Graph
+    def build_research_graph(sources):
+        nodes = []
+        links = []
+        seen_nodes = set()
+        
+        # Colors/Groups: 1: Paper, 2: Shared Topic/Entity
+        for i, s in enumerate(sources):
+            paper_id = f"paper_{s.get('doc_id', i)}"
+            if paper_id not in seen_nodes:
+                nodes.append(GraphNode(
+                    id=paper_id,
+                    label=s.get('title', 'Research Paper')[:45] + "...",
+                    group="paper",
+                    val=15 + (s.get('confidence', 0.5) * 10)
+                ))
+                seen_nodes.add(paper_id)
+            
+            # Extract Potential Topics (from title/context)
+            title_words = [w for w in s.get("title", "").split() if len(w) > 5]
+            for word in title_words[:2]: # Take 2 unique long words as "topics"
+                topic_id = f"topic_{word.lower()}"
+                if topic_id not in seen_nodes:
+                    nodes.append(GraphNode(
+                        id=topic_id,
+                        label=word,
+                        group="topic",
+                        val=8
+                    ))
+                    seen_nodes.add(topic_id)
+                
+                # Link Paper to Topic
+                links.append(GraphLink(source=paper_id, target=topic_id, value=1.0))
+
+        return KnowledgeGraph(nodes=nodes, links=links)
+
     init_maverick_db()
     
     try:
@@ -700,7 +735,7 @@ async def maverick_chat(
 
         result = await qa_engine.answer_question(
             question=full_query, 
-            num_answers=1, 
+            num_answers=10, # Requesting more for graph building
             index_name=request.index or "all", 
             history_context=history_context
         )
@@ -719,23 +754,28 @@ async def maverick_chat(
         conn.commit()
         conn.close()
         
+        sources_list = [
+            AnswerResult(
+                answer=ans["answer"],
+                confidence=ans["confidence"],
+                confidence_level=ans["confidence_level"],
+                source_title=ans["title"],
+                source_id=ans["doc_id"],
+                source_type=ans["source_type"],
+                context=ans.get("context"),
+                journal=ans.get("journal", "PubMed Central"),
+                publication_date=ans.get("date")
+            )
+            for ans in result.get("answers", [])
+        ]
+
         return MaverickChatResponse(
             answer=answer,
             reasoning="\n".join([f"• {step}" for step in reasoning_steps]),
             status="success",
-            sources=[
-                AnswerResult(
-                    answer=ans["answer"],
-                    confidence=ans["confidence"],
-                    confidence_level=ans["confidence_level"],
-                    source_title=ans["title"],
-                    source_id=ans["doc_id"],
-                    source_type=ans["source_type"],
-                    context=ans.get("context")
-                )
-                for ans in result.get("answers", [])
-            ],
-            qa_time_ms=round((time.time() - start_time) * 1000, 2)
+            sources=sources_list,
+            qa_time_ms=round((time.time() - start_time) * 1000, 2),
+            graph_data=build_research_graph(result.get("answers", []))
         )
         
     except Exception as e:

@@ -148,6 +148,24 @@ class IngestResponse(BaseModel):
     count: Optional[int] = Field(None, description="Number of documents processed")
 
 
+class GraphNode(BaseModel):
+    """A node in the research knowledge graph."""
+    id: str
+    label: str
+    group: str # 'paper', 'author', 'topic'
+    val: float # node size/importance
+
+class GraphLink(BaseModel):
+    """A connection between research entities."""
+    source: str
+    target: str
+    value: float # link strength
+
+class KnowledgeGraph(BaseModel):
+    """The complete visual representation of search results connections."""
+    nodes: List[GraphNode] = Field(default_factory=list)
+    links: List[GraphLink] = Field(default_factory=list)
+
 class MaverickChatRequest(BaseModel):
     """Enhanced request model for Maverick Chat with memory and metadata."""
     
@@ -166,3 +184,4 @@ class MaverickChatResponse(BaseModel):
     status: str = Field("success", description="Status of the request")
     sources: List[AnswerResult] = Field(default_factory=list, description="Supporting evidence sources")
     qa_time_ms: float = Field(0.0, description="Processing time")
+    graph_data: KnowledgeGraph = Field(default_factory=KnowledgeGraph, description="Data for D3.js Knowledge Graph")

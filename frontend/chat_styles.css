@@ -1448,3 +1448,150 @@
     border-top: 1px solid var(--border-color);
     margin: 20px 0;
 }
+
+/* ==========================================
+   KNOWLEDGE GRAPH STYLES (D3.js)
+   ========================================== */
+.modal-xl {
+    max-width: 95vw;
+    width: 1400px;
+    height: 90vh;
+}
+
+.graph-body-container {
+    display: flex;
+    height: calc(90vh - 120px);
+    overflow: hidden;
+    padding: 0;
+}
+
+#knowledge-graph-container {
+    flex: 1;
+    background: #f8faff;
+    position: relative;
+    cursor: grab;
+    overflow: hidden;
+}
+
+#knowledge-graph-container:active {
+    cursor: grabbing;
+}
+
+.graph-sidebar {
+    width: 320px;
+    background: var(--bg-primary);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.graph-legend-box {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.graph-legend-box h4 {
+    font-size: 14px;
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.node-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.node-dot.paper { background: #1a73e8; }
+.node-dot.topic { background: #34a853; }
+
+.graph-details-panel {
+    flex: 1;
+}
+
+.graph-details-panel h3 {
+    font-size: 18px;
+    color: var(--primary-blue);
+    margin-bottom: 12px;
+}
+
+.graph-details-panel p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.graph-details-panel .meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    display: block;
+}
+
+/* D3 Specific */
+.node circle {
+    stroke: #fff;
+    stroke-width: 2px;
+    transition: filter 0.2s;
+}
+
+.node:hover circle {
+    filter: brightness(1.1) drop-shadow(0 0 5px rgba(0,0,0,0.2));
+}
+
+.link {
+    stroke: #cad5ef;
+    stroke-opacity: 0.6;
+}
+
+.node text {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    pointer-events: none;
+    text-shadow: 0 1px 0 #fff, 0 -1px 0 #fff, 1px 0 0 #fff, -1px 0 0 #fff;
+}
+
+.graph-action-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--primary-blue);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* Toggle Button in Chat */
+.view-graph-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 8px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--primary-blue);
+    color: var(--primary-blue);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.view-graph-btn:hover {
+    background: var(--primary-blue);
+    color: white;
+    box-shadow: 0 4px 12px rgba(26, 115, 232, 0.2);
+}
