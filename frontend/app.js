@@ -1,4 +1,4 @@
-// BioMedScholar AI v1.4.0 - gpt-oss:120b-cloud (Claude Code) Integration
+// BioMedScholar AI v1.4.0 - gpt-oss:120b (Claude Code) Integration
 // Force browser update - unique id: 20260311-1010
 
 // Use 'var' (which can be redeclared) or check if it exists first
