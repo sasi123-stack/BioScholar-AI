@@ -1118,6 +1118,32 @@
         </div>
     </div>
 
+    <!-- Research Knowledge Graph Modal -->
+    <div id="graph-modal" class="modal">
+        <div class="modal-content modal-xl">
+            <div class="modal-header">
+                <h2>🕸️ Research Knowledge Graph</h2>
+                <div class="modal-header-actions">
+                    <button class="modal-btn secondary" onclick="resetGraph()">Reset View</button>
+                    <button class="modal-close" onclick="closeGraphModal()">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body graph-body-container">
+                <div id="knowledge-graph-container"></div>
+                <div class="graph-sidebar">
+                    <div class="graph-legend-box">
+                        <h4>Legend</h4>
+                        <div class="legend-item"><span class="node-dot paper"></span> Research Paper</div>
+                        <div class="legend-item"><span class="node-dot topic"></span> Shared Topic</div>
+                    </div>
+                    <div id="graph-details" class="graph-details-panel">
+                        <p class="placeholder-text">Click a node to view details</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Citation Modal -->
     <div id="citation-modal" class="modal">
         <div class="modal-content">

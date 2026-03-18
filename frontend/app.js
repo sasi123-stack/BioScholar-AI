@@ -3506,7 +3506,7 @@ function handleChatSubmit() {
             id: s.source_id
         }));
 
-        addChatMessage('ai', aiText, mappedSources, reasoning);
+        addChatMessage('ai', aiText, mappedSources, reasoning, true, false, data.graph_data);
         showSuggestedQuestions(message);
         
         // Clear attachments after successful send
@@ -3548,7 +3548,7 @@ function sendChatMessage(message) {
     }
 }
 
-function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll = true, isHistoryLoad = false) {
+function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll = true, isHistoryLoad = false, graphData = null) {
     const history = document.getElementById('chat-history');
     if (!history) return;
 
@@ -3611,6 +3611,16 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
                     ${isGroupChat ? getRandomParticipantTag() : ''}
                     <span class="typing-text"></span>
                 </div>
+                ${graphData ? `
+                    <button class="view-graph-btn" style="margin-top: 10px;" onclick="openGraphModalById('${(() => {
+                        const id = 'graph-' + Date.now() + '-typing';
+                        graphDataMap.set(id, graphData);
+                        return id;
+                    })()}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        View Knowledge Map
+                    </button>
+                ` : ''}
                 ${isIncognito ? '<div class="incognito-disclaimer">Private Search: History not logged</div>' : ''}
                 <div class="chat-sources hidden">${sourcesHtml}</div>
                 <div class="message-actions hidden">
@@ -3665,6 +3675,16 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
                     ${isGroupChat && role === 'ai' ? getRandomParticipantTag() : ''}
                     ${formattedText}
                 </div>
+                ${graphData ? `
+                    <button class="view-graph-btn" style="margin-top: 10px;" onclick="openGraphModalById('${(() => {
+                        const id = 'graph-' + Date.now() + '-static';
+                        graphDataMap.set(id, graphData);
+                        return id;
+                    })()}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        View Knowledge Map
+                    </button>
+                ` : ''}
                 ${isIncognito && role === 'ai' ? '<div class="incognito-disclaimer">Private Search: History not logged</div>' : ''}
                 ${sourcesHtml}
                 <div class="message-actions">
@@ -6749,9 +6769,172 @@ function triggerAction(action) {
     }
 }
 
-// Add Scheduled Actions to main initialization
-document.addEventListener('DOMContentLoaded', () => {
-    // Other initializers...
-    setTimeout(initScheduledActions, 1000);
-});
+/**
+ * RESEARCH KNOWLEDGE GRAPH (D3.js Implementation)
+ * Visualizing connections between papers and topics
+ */
+
+let activeGraphData = null;
+let graphSimulation = null;
+const graphDataMap = new Map();
+
+function openGraphModalById(graphId) {
+    const data = graphDataMap.get(graphId);
+    if (data) openGraphModal(data);
+}
+
+function openGraphModal(data) {
+    if (!data || !data.nodes || data.nodes.length === 0) {
+        showToast('No graph data available for this research', 'info');
+        return;
+    }
+    
+    activeGraphData = data;
+    const modal = document.getElementById('graph-modal');
+    if (modal) modal.classList.add('open');
+    
+    // Allow animation/layout to settle before rendering
+    setTimeout(() => renderResearchGraph(data), 100);
+}
+
+function closeGraphModal() {
+    const modal = document.getElementById('graph-modal');
+    if (modal) modal.classList.remove('open');
+    if (graphSimulation) graphSimulation.stop();
+}
+
+function resetGraph() {
+    if (activeGraphData) renderResearchGraph(activeGraphData);
+}
+
+function renderResearchGraph(data) {
+    const container = document.getElementById('knowledge-graph-container');
+    if (!container) return;
+    
+    // Clear previous
+    container.innerHTML = '';
+    
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    
+    const svg = d3.select("#knowledge-graph-container")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", "100%")
+        .attr("viewBox", [0, 0, width, height]);
+        
+    const g = svg.append("g");
+    
+    // Zoom behavior
+    svg.call(d3.zoom()
+        .extent([[0, 0], [width, height]])
+        .scaleExtent([0.2, 5])
+        .on("zoom", (event) => g.attr("transform", event.transform)));
+
+    const simulation = d3.forceSimulation(data.nodes)
+        .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
+        .force("charge", d3.forceManyBody().strength(-300))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .force("collision", d3.forceCollide().radius(40));
+
+    graphSimulation = simulation;
+
+    // Links
+    const link = g.append("g")
+        .attr("class", "links")
+        .selectAll("line")
+        .data(data.links)
+        .join("line")
+        .attr("class", "link")
+        .attr("stroke-width", d => Math.sqrt(d.value) * 2);
+
+    // Nodes
+    const node = g.append("g")
+        .attr("class", "nodes")
+        .selectAll(".node")
+        .data(data.nodes)
+        .join("g")
+        .attr("class", "node")
+        .call(drag(simulation))
+        .on("click", (event, d) => showNodeDetails(d));
+
+    node.append("circle")
+        .attr("r", d => d.val || 10)
+        .attr("fill", d => d.group === "paper" ? "#1a73e8" : "#34a853");
+
+    node.append("text")
+        .attr("dy", d => (d.val || 10) + 12)
+        .attr("text-anchor", "middle")
+        .text(d => truncate(d.label, 20));
+
+    simulation.on("tick", () => {
+        link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+
+        node
+            .attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+
+    function drag(simulation) {
+        function dragstarted(event) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            event.subject.fx = event.subject.x;
+            event.subject.fy = event.subject.y;
+        }
+        
+        function dragged(event) {
+            event.subject.fx = event.x;
+            event.subject.fy = event.y;
+        }
+        
+        function dragended(event) {
+            if (!event.active) simulation.alphaTarget(0);
+            event.subject.fx = null;
+            event.subject.fy = null;
+        }
+        
+        return d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended);
+    }
+}
+
+function showNodeDetails(node) {
+    const details = document.getElementById('graph-details');
+    if (!details) return;
+    
+    const isPaper = node.group === "paper";
+    const title = isPaper ? "Research Paper" : "Scientific Topic";
+    const icon = isPaper ? "📄" : "🧬";
+    
+    details.innerHTML = `
+        <div class="node-details">
+            <span class="meta">${icon} ${title}</span>
+            <h3>${node.label}</h3>
+            <p>${isPaper ? "Selected for high relevance and citation impact." : "Extracted as a core thematic cluster matching your research query."}</p>
+            ${isPaper ? `
+                <a href="#" class="graph-action-link" onclick="openArticleModal('${node.id.replace('paper_', '')}')">
+                    View Full Article →
+                </a>
+            ` : ""}
+        </div>
+    `;
+    
+    // Highlight node circles in SVG
+    d3.selectAll(".node circle")
+        .transition().duration(200)
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 2);
+        
+    d3.selectAll(".node")
+        .filter(d => d.id === node.id)
+        .select("circle")
+        .transition().duration(200)
+        .attr("stroke", "#000")
+        .attr("stroke-width", 3);
+}
 
