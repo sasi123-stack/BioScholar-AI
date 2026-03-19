@@ -100,6 +100,9 @@ class Settings(BaseSettings):
     # Serper (Google Search)
     serper_api_key: str = Field(default="", alias="SERPER_API_KEY")
 
+    # Tavily (Web Search - alternative to Serper)
+    tavily_api_key: str = Field(default="", alias="TAVILY_API_KEY")
+
     # OpenClaw / Generic OpenAI-compatible
     openclaw_api_key: str = Field(default="sk-openclaw-placeholder", alias="OPENCLAW_API_KEY")
     openclaw_api_base: str = Field(default="http://localhost:8000/v1", alias="OPENCLAW_API_BASE")

@@ -129,51 +129,83 @@ async def search_documents(
         document_results = []
         
         if request.index == "google":
-            # Perform Google Search via Serper
-            if not settings.serper_api_key or settings.serper_api_key == "YOUR_SERPER_API_KEY_HERE":
-                logger.warning("Serper API key not configured on backend")
-                # Don't throw 500, return empty results with a message
+            has_serper = settings.serper_api_key and settings.serper_api_key != "YOUR_SERPER_API_KEY_HERE"
+            has_tavily = bool(settings.tavily_api_key)
+            use_tavily = has_tavily and not has_serper
+
+            if use_tavily:
+                # Perform web search via Tavily
+                logger.info(f"Performing web search via Tavily for: '{request.query}'")
+                try:
+                    from tavily import AsyncTavilyClient
+                    tavily_client = AsyncTavilyClient(api_key=settings.tavily_api_key)
+                    tavily_response = await tavily_client.search(
+                        query=request.query,
+                        max_results=request.max_results,
+                        search_depth="basic",
+                    )
+                    for i, item in enumerate(tavily_response.get("results", [])):
+                        url = item.get("url", "")
+                        document_results.append(DocumentResult(
+                            id=f"tavily-{i}",
+                            title=item.get("title") or "No Title",
+                            abstract=item.get("content") or "No snippet available.",
+                            score=item.get("score", 1.0 - (i * 0.01)),
+                            source="google",
+                            metadata={
+                                "authors": ["Web Content"],
+                                "publication_date": "N/A",
+                                "journal": httpx.URL(url).host if url else "N/A",
+                                "url": url
+                            }
+                        ))
+                except Exception as e:
+                    logger.error(f"Tavily search failed: {e}")
+                    raise HTTPException(status_code=500, detail=f"Tavily search failed: {str(e)}")
+            elif has_serper:
+                # Perform Google Search via Serper
+                logger.info(f"Performing Google Search via Serper for: '{request.query}'")
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        "https://google.serper.dev/search",
+                        headers={
+                            "X-API-KEY": settings.serper_api_key,
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "q": request.query,
+                            "num": request.max_results
+                        },
+                        timeout=10.0
+                    )
+
+                    if response.status_code != 200:
+                        logger.error(f"Serper API failed: {response.text}")
+                        raise HTTPException(status_code=response.status_code, detail=f"Serper API failed: {response.text}")
+
+                    serper_data = response.json()
+                    for i, item in enumerate(serper_data.get("organic", [])):
+                        document_results.append(DocumentResult(
+                            id=f"google-{i}",
+                            title=item.get("title") or "No Title",
+                            abstract=item.get("snippet") or "No snippet available.",
+                            score=1.0 - (i * 0.01),
+                            source="google",
+                            metadata={
+                                "authors": ["Web Content"],
+                                "publication_date": item.get("date") or "N/A",
+                                "journal": httpx.URL(item.get("link")).host if item.get("link") else "N/A",
+                                "url": item.get("link")
+                            }
+                        ))
+            else:
+                logger.warning("No web search API key configured (Serper or Tavily)")
                 return SearchResponse(
                     query=request.query,
                     total_results=0,
                     results=[],
                     search_time_ms=round((time.time() - start_time) * 1000, 2)
                 )
-
-            logger.info(f"Performing Google Search via Serper for: '{request.query}'")
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://google.serper.dev/search",
-                    headers={
-                        "X-API-KEY": settings.serper_api_key,
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "q": request.query,
-                        "num": request.max_results
-                    },
-                    timeout=10.0
-                )
-                
-                if response.status_code != 200:
-                    logger.error(f"Serper API failed: {response.text}")
-                    raise HTTPException(status_code=response.status_code, detail=f"Serper API failed: {response.text}")
-                
-                serper_data = response.json()
-                for i, item in enumerate(serper_data.get("organic", [])):
-                    document_results.append(DocumentResult(
-                        id=f"google-{i}",
-                        title=item.get("title") or "No Title",
-                        abstract=item.get("snippet") or "No snippet available.",
-                        score=1.0 - (i * 0.01),
-                        source="google",
-                        metadata={
-                            "authors": ["Web Content"],
-                            "publication_date": item.get("date") or "N/A",
-                            "journal": httpx.URL(item.get("link")).host if item.get("link") else "N/A",
-                            "url": item.get("link")
-                        }
-                    ))
         else:
             # Existing Elasticsearch logic
             # Determine index to search
