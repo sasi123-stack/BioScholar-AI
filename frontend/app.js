@@ -3365,30 +3365,30 @@ function toggleWebSearch() {
 }
 
 let isGeminiLiveEnabled = false;
-let recognition = null;
-let currentUtterance = null;
+let liveRecognition = null;
+let liveUtterance = null;
 
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
+    liveRecognition = new SpeechRecognition();
+    liveRecognition.continuous = true;
+    liveRecognition.interimResults = false;
+    liveRecognition.lang = 'en-US';
 
-    recognition.onresult = (event) => {
+    liveRecognition.onresult = (event) => {
         const transcript = event.results[event.results.length - 1][0].transcript.trim();
         if (transcript && isGeminiLiveEnabled) {
             handleLiveVoiceInput(transcript);
         }
     };
 
-    recognition.onerror = (event) => {
+    liveRecognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
-        if (isGeminiLiveEnabled) recognition.start(); // Restart if it fails
+        if (isGeminiLiveEnabled) liveRecognition.start(); // Restart if it fails
     };
 
-    recognition.onend = () => {
-        if (isGeminiLiveEnabled) recognition.start(); // Keep listening in live mode
+    liveRecognition.onend = () => {
+        if (isGeminiLiveEnabled) liveRecognition.start(); // Keep listening in live mode
     };
 }
 
@@ -3413,17 +3413,17 @@ function speakMaverickResponse(text) {
     const statusText = document.querySelector('.live-status-text');
     if (statusText) statusText.innerText = "Maverick is Speaking...";
 
-    currentUtterance = new SpeechSynthesisUtterance(text);
-    currentUtterance.rate = 1.0;
-    currentUtterance.pitch = 1.0;
+    liveUtterance = new SpeechSynthesisUtterance(text);
+    liveUtterance.rate = 1.0;
+    liveUtterance.pitch = 1.0;
     
-    currentUtterance.onend = () => {
+    liveUtterance.onend = () => {
         if (isGeminiLiveEnabled && statusText) {
             statusText.innerText = "Maverick is Listening...";
         }
     };
 
-    window.speechSynthesis.speak(currentUtterance);
+    window.speechSynthesis.speak(liveUtterance);
 }
 
 function toggleGeminiLive() {
@@ -3438,8 +3438,8 @@ function toggleGeminiLive() {
         container?.classList.add('active-live-session');
         showToast('Gemini Live Voice Session Started', 'info');
         
-        if (recognition) {
-            try { recognition.start(); } catch(e) {}
+        if (liveRecognition) {
+            try { liveRecognition.start(); } catch(e) {}
         }
         
         setTimeout(() => {
@@ -3452,8 +3452,8 @@ function toggleGeminiLive() {
         visualizer?.classList.add('hidden');
         container?.classList.remove('active-live-session');
         window.speechSynthesis.cancel();
-        if (recognition) {
-            try { recognition.stop(); } catch(e) {}
+        if (liveRecognition) {
+            try { liveRecognition.stop(); } catch(e) {}
         }
         showToast('Gemini Live Voice Session Ended', 'info');
     }
