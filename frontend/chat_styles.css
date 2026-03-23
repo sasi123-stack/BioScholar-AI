@@ -658,12 +658,52 @@
     z-index: 5;
 }
 
+.live-status-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
 .live-status-text {
     font-size: 16px;
     font-weight: 700;
     color: #fff;
     letter-spacing: 0.5px;
     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.live-beta-tag {
+    font-size: 9px;
+    font-weight: 900;
+    color: var(--primary-blue);
+    background: rgba(66, 133, 244, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+    border: 1px solid rgba(66, 133, 244, 0.2);
+}
+
+.live-end-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 59, 48, 0.1);
+    color: #ff453a;
+    border: 1px solid rgba(255, 59, 48, 0.3);
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.live-end-btn:hover {
+    background: #ff453a;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 59, 48, 0.3);
 }
 
 .live-wave-container {
