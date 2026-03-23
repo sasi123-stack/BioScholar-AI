@@ -3364,9 +3364,11 @@ let isGeminiLiveEnabled = false;
 function toggleGeminiLive() {
     isGeminiLiveEnabled = !isGeminiLiveEnabled;
     const btn = document.getElementById('gemini-live-toggle');
+    const visualizer = document.getElementById('gemini-live-visualizer');
     
     if (isGeminiLiveEnabled) {
         btn?.classList.add('active');
+        visualizer?.classList.remove('hidden');
         showToast('Gemini Live Voice Connection Initializing...', 'info');
         
         setTimeout(() => {
@@ -3375,6 +3377,7 @@ function toggleGeminiLive() {
         }, 1200);
     } else {
         btn?.classList.remove('active');
+        visualizer?.classList.add('hidden');
         showToast('Gemini Live Voice Session Ended', 'info');
     }
 }
