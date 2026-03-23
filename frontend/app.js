@@ -3360,6 +3360,66 @@ function toggleWebSearch() {
 }
 
 let isGeminiLiveEnabled = false;
+let recognition = null;
+let currentUtterance = null;
+
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim();
+        if (transcript && isGeminiLiveEnabled) {
+            handleLiveVoiceInput(transcript);
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        if (isGeminiLiveEnabled) recognition.start(); // Restart if it fails
+    };
+
+    recognition.onend = () => {
+        if (isGeminiLiveEnabled) recognition.start(); // Keep listening in live mode
+    };
+}
+
+function handleLiveVoiceInput(text) {
+    const statusText = document.querySelector('.live-status-text');
+    if (statusText) statusText.innerText = "Maverick is Thinking...";
+    
+    // Inject into chat
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = text;
+        handleChatSubmit();
+    }
+}
+
+function speakMaverickResponse(text) {
+    if (!window.speechSynthesis) return;
+    
+    // Cancel previous speech
+    window.speechSynthesis.cancel();
+    
+    const statusText = document.querySelector('.live-status-text');
+    if (statusText) statusText.innerText = "Maverick is Speaking...";
+
+    currentUtterance = new SpeechSynthesisUtterance(text);
+    currentUtterance.rate = 1.0;
+    currentUtterance.pitch = 1.0;
+    
+    currentUtterance.onend = () => {
+        if (isGeminiLiveEnabled && statusText) {
+            statusText.innerText = "Maverick is Listening...";
+        }
+    };
+
+    window.speechSynthesis.speak(currentUtterance);
+}
 
 function toggleGeminiLive() {
     isGeminiLiveEnabled = !isGeminiLiveEnabled;
@@ -3371,16 +3431,25 @@ function toggleGeminiLive() {
         btn?.classList.add('active');
         visualizer?.classList.remove('hidden');
         container?.classList.add('active-live-session');
-        showToast('Gemini Live Voice Connection Initializing...', 'info');
+        showToast('Gemini Live Voice Session Started', 'info');
+        
+        if (recognition) {
+            try { recognition.start(); } catch(e) {}
+        }
         
         setTimeout(() => {
-            showToast('Live Mode Active: Speaking is listening...', 'success');
-            addChatMessage('ai', "💠 **Gemini Live Connection Established.** I'm listening. How can I help you dynamically with your research today?");
-        }, 1200);
+            const welcomeMsg = "💠 Gemini Live Connection Established. I'm listening. How can I help you dynamically with your research today?";
+            addChatMessage('ai', welcomeMsg);
+            speakMaverickResponse(welcomeMsg);
+        }, 800);
     } else {
         btn?.classList.remove('active');
         visualizer?.classList.add('hidden');
         container?.classList.remove('active-live-session');
+        window.speechSynthesis.cancel();
+        if (recognition) {
+            try { recognition.stop(); } catch(e) {}
+        }
         showToast('Gemini Live Voice Session Ended', 'info');
     }
 }
@@ -3749,6 +3818,12 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
     }
 
     history.appendChild(msgDiv);
+    
+    // 🔊 Gemini Live: Auto-speak AI response if live mode is active
+    if (isGeminiLiveEnabled && role === 'ai') {
+        speakMaverickResponse(text);
+    }
+    
     // Smooth scroll to bottom
     if (shouldScroll) {
         history.scrollTop = history.scrollHeight;
