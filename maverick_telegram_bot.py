@@ -395,6 +395,58 @@ async def claude_code_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             parse_mode='HTML'
         )
 
+async def code_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Answer coding, programming, and software engineering tasks."""
+    if not context.args:
+        if update.effective_message:
+            await update.effective_message.reply_html(
+                "<b>💻 Maverick Coding Skill</b>\n\n"
+                "Ask me to write code, debug scripts, or explain algorithms.\n"
+                "Example: <code>/code write a Python script to fetch NCBI data</code>\n"
+                "Example: <code>/code explain React hooks</code>"
+            )
+        return
+
+    task = " ".join(context.args)
+    user_id = update.effective_user.id
+    processing_msg = await update.effective_message.reply_html("👨‍💻 <i>Maverick Code Agent thinking...</i>")
+
+    try:
+        system_prompt = (
+            "You are Maverick Code Agent — an expert AI assistant specialized in software engineering, "
+            "web development, ML, and computational biology. "
+            "You help developers write code, debug issues, and explain programming concepts. "
+            "Be precise and technically accurate. "
+            "For formatting in Telegram: Use <b>bold</b> and for code blocks use <code>your code here</code>."
+        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": task}
+        ]
+
+        answer = await get_resilient_completion(messages, user_id)
+        answer = sanitize_for_telegram(answer)
+
+        if len(answer) > 3900:
+            answer = answer[:3900] + "\n\n<i>...(response truncated)</i>"
+
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=processing_msg.message_id,
+            text=f"💻 <b>Maverick Code:</b>\n\n{answer}",
+            parse_mode='HTML'
+        )
+
+    except Exception as e:
+        logger.error(f"Code Command Error: {e}")
+        safe_error = html.escape(str(e)[:200])
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=processing_msg.message_id,
+            text=f"❌ <b>Code Error</b>: {safe_error}",
+            parse_mode='HTML'
+        )
+
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle PDF uploads."""
     user_id = update.effective_user.id
@@ -472,8 +524,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
         system_content = (
             "You are Maverick, the official BioMedScholar AI Research Engine. "
             "You are a specialized analytical assistant for medicine, oncology, and pharmacology. "
+            "You also possess expert coding skills—you can write, debug, and explain code (Python, JS, etc.) when asked. "
             "Respond as a world-class scientist. "
-            "FORMATTING: Use HTML tags — <b>bold</b> for medical terms, <i>italic</i> for Latin, <u>underline</u> for takeaways."
+            "FORMATTING: Use HTML tags — <b>bold</b> for medical terms, <i>italic</i> for Latin, <u>underline</u> for takeaways. "
+            "For code snippets, wrap them in <code>code</code> tags."
         )
         
         if search_results:
@@ -542,6 +596,7 @@ async def post_init(application: Application):
         BotCommand("help", "Show all commands"),
         BotCommand("search", "Search literature"),
         BotCommand("claude", "Execute Claude Code task"),
+        BotCommand("code", "AI Coding Assistant"),
         BotCommand("history", "Recent conversations"),
         BotCommand("clear", "Reset memory"),
         BotCommand("about", "About Maverick"),
@@ -580,6 +635,7 @@ def main():
     app.add_handler(CommandHandler("history", history_command))
     app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler("claude", claude_code_command))
+    app.add_handler(CommandHandler("code", code_command))
     app.add_handler(CommandHandler("test", test_command))
     
     # Regular text messages

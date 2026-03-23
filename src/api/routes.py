@@ -728,10 +728,16 @@ async def maverick_chat(
                     reasoning_steps.append(f"Failed to parse {name}: {str(ex)}")
 
         # 5. Get answer (Passing history_context and attachment_context for synthesis)
-        # We append attachment_context to the question to ensure Maverick sees it
+        # Check for multiple PDFs to enable "Cross-Reference Mode"
+        pdf_count = len([a for a in request.attachments or [] if "pdf" in a.get("type", "").lower() or a.get("name", "").lower().endswith(".pdf")])
+        
         full_query = query
         if attachment_context:
-            full_query += f"\n\nRESEARCH CONTEXT FROM ATTACHMENTS:\n{attachment_context}"
+            if pdf_count > 1:
+                reasoning_steps.append(f"Activating PDF Cross-Reference Agent: comparing {pdf_count} files.")
+                full_query = f"[CROSS-REFERENCE RESEARCH AGENT MODE]\n\nYou are analyzing {pdf_count} attached papers simultaneously. Compare and contrast their findings. Identify if they disagree on results or methodologies. \n\n{attachment_context}\n\nUSER QUESTION: {query}"
+            else:
+                full_query += f"\n\nRESEARCH CONTEXT FROM ATTACHMENTS:\n{attachment_context}"
 
         result = await qa_engine.answer_question(
             question=full_query, 
