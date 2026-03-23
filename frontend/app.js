@@ -3365,10 +3365,12 @@ function toggleGeminiLive() {
     isGeminiLiveEnabled = !isGeminiLiveEnabled;
     const btn = document.getElementById('gemini-live-toggle');
     const visualizer = document.getElementById('gemini-live-visualizer');
+    const container = document.querySelector('.chat-container');
     
     if (isGeminiLiveEnabled) {
         btn?.classList.add('active');
         visualizer?.classList.remove('hidden');
+        container?.classList.add('active-live-session');
         showToast('Gemini Live Voice Connection Initializing...', 'info');
         
         setTimeout(() => {
@@ -3378,6 +3380,7 @@ function toggleGeminiLive() {
     } else {
         btn?.classList.remove('active');
         visualizer?.classList.add('hidden');
+        container?.classList.remove('active-live-session');
         showToast('Gemini Live Voice Session Ended', 'info');
     }
 }
