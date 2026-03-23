@@ -782,7 +782,14 @@
                         <div class="chat-input-area">
                             <div id="chat-attachment-preview"></div>
                             <div id="suggested-questions-container" class="suggested-questions-chips hidden"></div>
-                            <div class="chat-input-wrapper">
+                                <div class="chat-input-wrapper">
+                                <button class="chat-web-toggle" id="grok-search-toggle" onclick="toggleWebSearch()" title="Search Web">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                    </svg>
+                                </button>
                                 <button class="chat-upload-btn"
                                     onclick="document.getElementById('chat-file-input').click()" title="Upload Context">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"

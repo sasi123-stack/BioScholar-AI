@@ -3213,7 +3213,7 @@ function formatMaverickResponse(text) {
 
     // 1. EXTRACT CODE BLOCKS to protect them from regular formatting routines
     const codeBlocks = [];
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    html = html.replace(/```(\w*)\s*([\s\S]*?)```/g, (match, lang, code) => {
         const index = codeBlocks.length;
         const language = lang || 'Code';
         
@@ -3221,7 +3221,8 @@ function formatMaverickResponse(text) {
         const escapedCode = code
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
+            .replace(/>/g, "&gt;")
+            .trim();
             
         codeBlocks.push(`
             <div class="grok-code-block">
@@ -3343,15 +3344,18 @@ function toggleWebSearch() {
     isWebSearchEnabled = !isWebSearchEnabled;
     const item = document.getElementById('plugin-web-search');
     const mainBtn = document.getElementById('chat-plugins-btn');
+    const grokBtn = document.getElementById('grok-search-toggle');
 
     if (isWebSearchEnabled) {
         item?.classList.add('active');
+        grokBtn?.classList.add('active');
         mainBtn?.classList.add('active-plugin');
-        showToast('Web Search Plugin Activated', 'success');
+        showToast('Web Search Activated', 'success');
     } else {
         item?.classList.remove('active');
+        grokBtn?.classList.remove('active');
         if (!activePlugins.size) mainBtn?.classList.remove('active-plugin');
-        showToast('Web Search Plugin Deactivated', 'info');
+        showToast('Web Search Deactivated', 'info');
     }
 }
 
@@ -3615,7 +3619,7 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
                 ` : ''}
                 <div class="chat-answer-content">
                     ${isGroupChat ? getRandomParticipantTag() : ''}
-                    <span class="typing-text"></span>
+                    <div class="typing-text"></div>
                 </div>
                 ${graphData ? `
                     <button class="view-graph-btn" style="margin-top: 10px;" onclick="openGraphModalById('${(() => {
