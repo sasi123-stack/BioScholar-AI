@@ -538,9 +538,36 @@
     border: none;
 }
 
-.chat-web-toggle:hover {
+.chat-web-toggle:hover, .chat-live-btn:hover {
     background: var(--bg-hover);
     color: var(--primary-blue);
+}
+
+.chat-live-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 50%;
+    transition: all 0.2s;
+    background: transparent;
+    border: none;
+}
+
+.chat-live-btn.active {
+    color: #fff;
+    background: linear-gradient(135deg, #8ab4f8, #c58af9);
+    box-shadow: 0 0 12px rgba(197, 138, 249, 0.4);
+    animation: livePulse 2s infinite;
+}
+
+@keyframes livePulse {
+    0% { box-shadow: 0 0 0 0 rgba(197, 138, 249, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(197, 138, 249, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(197, 138, 249, 0); }
 }
 
 .chat-web-toggle.active {
