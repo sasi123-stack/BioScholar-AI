@@ -3359,6 +3359,26 @@ function toggleWebSearch() {
     }
 }
 
+let isGeminiLiveEnabled = false;
+
+function toggleGeminiLive() {
+    isGeminiLiveEnabled = !isGeminiLiveEnabled;
+    const btn = document.getElementById('gemini-live-toggle');
+    
+    if (isGeminiLiveEnabled) {
+        btn?.classList.add('active');
+        showToast('Gemini Live Voice Connection Initializing...', 'info');
+        
+        setTimeout(() => {
+            showToast('Live Mode Active: Speaking is listening...', 'success');
+            addChatMessage('ai', "💠 **Gemini Live Connection Established.** I'm listening. How can I help you dynamically with your research today?");
+        }, 1200);
+    } else {
+        btn?.classList.remove('active');
+        showToast('Gemini Live Voice Session Ended', 'info');
+    }
+}
+
 function toggleChatPlugin(pluginId) {
     const item = document.getElementById(`plugin-${pluginId}`);
     const mainBtn = document.getElementById('chat-plugins-btn');

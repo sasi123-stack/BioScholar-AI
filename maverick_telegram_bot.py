@@ -127,18 +127,18 @@ def clear_history(user_id: int):
         conn.commit()
         conn.close()
         return True
-    except:
+    except:bbbbbb
         return False
 
-# Search Logic
+# Search Logicbbbbbb
 async def perform_search(query: str, max_results=3):
-    try:
+    try:bbbbbbbb
         from opensearchpy import OpenSearch
         client = OpenSearch(
             hosts=[f"https://{ES_USER}:{ES_PASS}@{ES_HOST}:443"],
             use_ssl=True, verify_certs=True
         )
-        
+        bbbbbbbbbbbbbbbbbbbbbbbbbb
         es_query = {
             "size": max_results,
             "query": {
