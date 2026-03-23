@@ -1158,6 +1158,11 @@ function switchTab(tabName) {
     tabName = (tabName || '').trim().toLowerCase();
     if (!validTabs.includes(tabName)) tabName = 'articles';
 
+    // 🛑 If switching away from Chat, stop Gemini Live if active
+    if (tabName !== 'chat' && isGeminiLiveEnabled) {
+        toggleGeminiLive();
+    }
+
     // Update hash for deep linking (replaceState avoids back-button bloat)
     const newHash = '#' + tabName;
     if (window.location.hash !== newHash) {
