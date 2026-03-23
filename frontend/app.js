@@ -3202,108 +3202,114 @@ function normalizeScore(score) {
 
 /**
  * Robust markdown parser for Maverick responses
- * Supports bold, italic, lists, code, and basic underline
+ * Features Grok AI frontend capabilities: Code Blocks with syntax coloring, Copy Buttons, Headers, Lists, formatting
  */
 function formatMaverickResponse(text) {
     if (!text) return "";
 
-    let html = text.replace(/^💠\s*/, ''); // Remove the 💠 prefix if present
+    let html = text;
+    // Remove the 💠 prefix if present
+    html = html.replace(/^💠\s*/, '');
 
-    // Escape HTML but selectively revive safe tags
-    html = html.replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-
-    // Whitelist of safe structural and styling tags sent by the Maverick bot
-    const safeTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'hr', 'ul', 'ol', 'li', 'sup', 'sub', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'b', 'strong', 'i', 'em', 'u', 'span', 'div'];
-
-    safeTags.forEach(tag => {
-        // Revive opening tags (including any attributes)
-        const openRegex = new RegExp(`&lt;${tag}(&gt;|\\s+.*?&gt;)`, 'gi');
-        html = html.replace(openRegex, (match, p1) => {
-            const attrs = p1.substring(0, p1.length - 4); // strip '&gt;'
-            return `<${tag}${attrs}>`;
-        });
-        // Revive closing tags
-        const closeRegex = new RegExp(`&lt;\\/${tag}&gt;`, 'gi');
-        html = html.replace(closeRegex, `</${tag}>`);
+    // 1. EXTRACT CODE BLOCKS to protect them from regular formatting routines
+    const codeBlocks = [];
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        const index = codeBlocks.length;
+        const language = lang || 'Code';
+        
+        // Safely escape the code content
+        const escapedCode = code
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+            
+        codeBlocks.push(`
+            <div class="grok-code-block">
+                <div class="grok-code-header">
+                    <span class="grok-code-lang">${language}</span>
+                    <button class="grok-copy-btn" onclick="copyToClipboard(this.nextElementSibling.innerText, this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        Copy
+                    </button>
+                    <div class="hidden-code-content" style="display:none;">${escapedCode}</div>
+                </div>
+                <pre><code class="language-${lang}">${escapedCode}</code></pre>
+            </div>
+        `);
+        return `___CODE_BLOCK_${index}___`;
     });
 
-    // Revive safe formatting tags if they were in the original response
-    html = html.replace(/&lt;b&gt;(.*?)&lt;\/b&gt;/gi, "<strong>$1</strong>");
-    html = html.replace(/&lt;i&gt;(.*?)&lt;\/i&gt;/gi, "<em>$1</em>");
-    html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/gi, "<u>$1</u>");
+    // 2. EXTRACT INLINE CODE
+    const inlineCodes = [];
+    html = html.replace(/`([^`\n]+)`/g, (match, code) => {
+        const index = inlineCodes.length;
+        const escapedCode = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        inlineCodes.push(`<code class="grok-inline-code">${escapedCode}</code>`);
+        return `___INLINE_CODE_${index}___`;
+    });
 
-    // Revive links but ensure they open in new tab and are safe
-    html = html.replace(/&lt;a href=(?:'|")([^'"]+)(?:'|")&gt;(.*?)&lt;\/a&gt;/gi,
-        '<a href="$1" target="_blank" rel="noopener noreferrer" class="maverick-link">$2</a>');
+    // 3. Escape general HTML (except natively whitelisted tags if backend sent them)
+    html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const safeTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'hr', 'ul', 'ol', 'li', 'sup', 'sub', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'b', 'strong', 'i', 'em', 'u', 'span', 'div'];
+    safeTags.forEach(tag => {
+        html = html.replace(new RegExp(`&lt;${tag}(&gt;|\\s+.*?&gt;)`, 'gi'), (match, p1) => `<${tag}${p1.substring(0, p1.length - 4)}>`);
+        html = html.replace(new RegExp(`&lt;\\/${tag}&gt;`, 'gi'), `</${tag}>`);
+    });
 
+    // 4. Headers (Markdown #)
+    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
 
-    // Standard Markdown formatting
+    // 5. Basic Markdown Formatting
     html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
     html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/__(.*?)__/g, "<strong>$1</strong>");
-    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
-    html = html.replace(/_(.*?)_/g, "<em>$1</em>");
-    html = html.replace(/`(.*?)`/g, "<code class='inline-code'>$1</code>");
+    html = html.replace(/\*([^\*]+)\*/g, "<em>$1</em>");
+    html = html.replace(/_([^_]+)_/g, "<em>$1</em>");
 
-    // 🔗 ENHANCED LINK FORMATTING - Detect and convert URLs to clickable links
-    // Match standard URLs (http, https, ftp)
-    html = html.replace(/https?:\/\/[^\s<>"\)]+/g, (url) => {
-        const cleanUrl = url.replace(/[.,;:!?]*$/, ''); // Remove trailing punctuation
-        return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="maverick-link">🔗 ${cleanUrl}</a>`;
+    // 6. Links (Markdown and Auto-detect)
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="maverick-link">$1</a>');
+    
+    html = html.replace(/(^|\s)(https?:\/\/[^\s<>"\)]+)/g, (match, space, url) => {
+        const cleanUrl = url.replace(/[.,;:!?]*$/, '');
+        return `${space}<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="maverick-link">🔗 ${cleanUrl}</a>`;
     });
 
-    // PubMed links (PMID format: pmid/12345678)
-    html = html.replace(/pmid[:\s\/]+(\d+)/gi, (match, pmid) => {
-        return `<a href="https://pubmed.ncbi.nlm.nih.gov/${pmid}/" target="_blank" rel="noopener noreferrer" class="maverick-link">📚 PubMed ${pmid}</a>`;
-    });
-
-    // DOI links (doi:10.xxxx/xxxxx or https://doi.org/...)
-    html = html.replace(/(?:doi[:\s\/]+)?(10\.\S+\/\S+)/gi, (match, doi) => {
-        return `<a href="https://doi.org/${doi}" target="_blank" rel="noopener noreferrer" class="maverick-link">📄 DOI: ${doi}</a>`;
-    });
-
-    // Markdown-style links [text](url)
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="maverick-link">🔗 $1</a>');
-
-    // Scientific Header Formatting: 
-    // Convert strong tags at the beginning of a block to Section Headers
-    html = html.replace(/^(?:<br>)*<strong>(Introduction|Synthesis|Conclusion|Methodology|Analysis|Results|Discussion|References)<\/strong>/gim,
-        '<span class="maverick-section-header">$1</span>');
-
-    // Reference Citation Styling: [1], [2], etc.
+    // Scientific specifics
+    html = html.replace(/pmid[:\s\/]+(\d+)/gi, '<a href="https://pubmed.ncbi.nlm.nih.gov/$1/" target="_blank" rel="noopener noreferrer" class="maverick-link">📚 PubMed $1</a>');
+    html = html.replace(/(?:doi[:\s\/]+)?(10\.\S+\/\S+)/gi, '<a href="https://doi.org/$1" target="_blank" rel="noopener noreferrer" class="maverick-link">📄 DOI: $1</a>');
     html = html.replace(/\[(\d+)\]/g, '<span class="maverick-cite">[$1]</span>');
-
-    // Handle LaTeX-style \boxed{...}
     html = html.replace(/\$+\s*\\boxed\{([\s\S]*?)\}\s*\$+/g, '<span class="maverick-boxed">$1</span>');
     html = html.replace(/\\boxed\{([\s\S]*?)\}/g, '<span class="maverick-boxed">$1</span>');
 
-    // Line blocks and basic lists
+    // 7. Lists
     html = html.replace(/^\s*[-*+]\s+(.*)$/gm, "<li>$1</li>");
-
     if (html.includes("<li>")) {
-        html = html.replace(/(?:<li>.*<\/li>\s*)+/g, (match) => `<ul>${match}</ul>`);
+        html = html.replace(/(?:<li>.*<\/li>\n*)+/g, (match) => `<ul>${match}</ul>`);
     }
 
-    // Convert newlines to breaks
-    html = html.replace(/\n/g, "<br>");
+    html = html.replace(/^\s*\d+\.\s+(.*)$/gm, "<li class='ordered-item'>$1</li>");
+    if (html.includes("<li class='ordered-item'>")) {
+        html = html.replace(/(?:<li class='ordered-item'>.*<\/li>\n*)+/g, (match) => `<ol>${match.replace(/ class='ordered-item'/g, '')}</ol>`);
+    }
 
-    // Wrap parts in paragraphs if they are not already structured
-    // This is simple but helps with spacing
-    const parts = html.split('<br><br>');
-    html = parts.map(p => {
-        if (p.startsWith('<span class="maverick-section-header">') || p.startsWith('<ul>') || p.startsWith('<span class="maverick-boxed">')) {
-            return p;
-        }
-        return `<p>${p}</p>`;
-    }).join('');
+    // 8. Line breaks
+    html = html.replace(/\n\n/g, "<br><br>");
+    html = html.replace(/\n(?!<br>)(?!<ul>)(?!<ol>)(?!<li>)(?!<h)/g, "<br>");
 
-    // Cleanup double breaks or empty paragraphs
-    html = html.replace(/<p><\/p>/g, "");
-    html = html.replace(/<\/ul><br>/g, "</ul>");
-    html = html.replace(/<br><ul>/g, "<ul>");
+    // 9. RE-INJECT PROTECTED BLOCKS
+    inlineCodes.forEach((code, index) => {
+        html = html.replace(`___INLINE_CODE_${index}___`, code);
+    });
+
+    codeBlocks.forEach((block, index) => {
+        html = html.replace(`___CODE_BLOCK_${index}___`, block);
+    });
+
+    // Cleanup double breaks or empty paragraphs around blocks
+    html = html.replace(/<br><br><div class="grok-code-block">/g, '<div class="grok-code-block">');
+    html = html.replace(/<\/div><br><br>/g, "</div><br>");
 
     return html;
 }
