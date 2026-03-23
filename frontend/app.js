@@ -1,5 +1,5 @@
-// BioMedScholar AI v1.4.0 - gpt-oss:120b (Claude Code) Integration
-// Force browser update - unique id: 20260311-1010
+// BioMedScholar AI v1.5.PRO - gpt-oss:120b (Claude Code) Integration & Coding Skills
+// Force browser update - unique id: 20260323...
 
 // Use 'var' (which can be redeclared) or check if it exists first
 if (typeof isLocal === 'undefined') {
