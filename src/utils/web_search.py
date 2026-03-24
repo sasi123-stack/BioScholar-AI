@@ -12,17 +12,52 @@ logger = logging.getLogger(__name__)
 
 class WebSearchTool:
     """Utility to perform web searches and fetch website content."""
-    
+
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or settings.serper_api_key
+        self.tavily_api_key = settings.tavily_api_key
         self.base_url = "https://google.serper.dev/search"
-    
+
+    def _use_tavily(self) -> bool:
+        """Determine whether to use Tavily instead of Serper."""
+        has_serper = self.api_key and self.api_key != "YOUR_SERPER_API_KEY_HERE"
+        has_tavily = bool(self.tavily_api_key)
+        # Use Tavily when its key is set and Serper key is absent
+        return has_tavily and not has_serper
+
+    async def _search_tavily(self, query: str, num_results: int = 5) -> List[Dict]:
+        """Perform a web search via Tavily API."""
+        try:
+            from tavily import AsyncTavilyClient
+            client = AsyncTavilyClient(api_key=self.tavily_api_key)
+            response = await client.search(
+                query=query,
+                max_results=num_results,
+                search_depth="basic",
+            )
+            results = []
+            for item in response.get("results", []):
+                results.append({
+                    "title": item.get("title"),
+                    "link": item.get("url"),
+                    "snippet": item.get("content"),
+                    "source": "tavily_search"
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Tavily search error: {e}")
+            return []
+
     async def search(self, query: str, num_results: int = 5) -> List[Dict]:
-        """Perform a Google search via Serper API."""
+        """Perform a web search via Tavily (preferred) or Serper API."""
+        if self._use_tavily():
+            logger.info(f"Searching the internet via Tavily for: '{query}'")
+            return await self._search_tavily(query, num_results)
+
         if not self.api_key or self.api_key == "YOUR_SERPER_API_KEY_HERE":
             logger.warning("Serper API key not configured")
             return []
-            
+
         logger.info(f"Searching the internet for: '{query}'")
         try:
             async with httpx.AsyncClient() as client:
@@ -38,11 +73,11 @@ class WebSearchTool:
                     },
                     timeout=10.0
                 )
-                
+
                 if response.status_code != 200:
                     logger.error(f"Serper API failed: {response.status_code}")
                     return []
-                
+
                 data = response.json()
                 results = []
                 for item in data.get("organic", []):
