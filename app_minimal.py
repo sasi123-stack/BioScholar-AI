@@ -185,7 +185,7 @@ def fallback_search_entrez(query: str, max_results: int = 20) -> List[Dict]:
 app = FastAPI(
     title="BioMed Scholar API",
     description="AI-powered biomedical research engine with Maverick AI",
-    version="2.1.0"
+    version="2.1.4"
 )
 
 app.add_middleware(
@@ -213,7 +213,7 @@ async def root():
     """Root endpoint with API information."""
     return {
         "message": "💠 BioMed Scholar AI Research Engine",
-        "version": "2.1.3",
+        "version": "2.1.4",
         "docs": "/docs",
         "features": {
             "search": "/api/v1/search",
