@@ -3400,7 +3400,12 @@ function handleLiveVoiceInput(text) {
     const input = document.getElementById('chat-input');
     if (input) {
         input.value = text;
-        handleChatSubmit();
+        // Check for attachments
+        if (currentAttachments.length > 0) {
+            handleChatSubmit(true); // Pass a flag to indicate it's a vision call
+        } else {
+            handleChatSubmit();
+        }
     }
 }
 
@@ -3431,6 +3436,7 @@ function toggleGeminiLive() {
     const btn = document.getElementById('gemini-live-toggle');
     const visualizer = document.getElementById('gemini-live-visualizer');
     const container = document.querySelector('.chat-container');
+    let uploadBtn = document.getElementById('chat-upload-btn-live');
     
     if (isGeminiLiveEnabled) {
         btn?.classList.add('active');
@@ -3442,6 +3448,18 @@ function toggleGeminiLive() {
             try { liveRecognition.start(); } catch(e) {}
         }
         
+        // Add upload button
+        if (!uploadBtn) {
+            uploadBtn = document.createElement('button');
+            uploadBtn.id = 'chat-upload-btn-live';
+            uploadBtn.className = 'chat-control-btn';
+            uploadBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+            uploadBtn.onclick = () => document.getElementById('chat-file-input').click();
+            btn.insertAdjacentElement('afterend', uploadBtn);
+        }
+        uploadBtn.classList.remove('hidden');
+
+
         setTimeout(() => {
             const welcomeMsg = "💠 Gemini Live Connection Established. I'm listening. How can I help you dynamically with your research today?";
             addChatMessage('ai', welcomeMsg);
@@ -3451,6 +3469,7 @@ function toggleGeminiLive() {
         btn?.classList.remove('active');
         visualizer?.classList.add('hidden');
         container?.classList.remove('active-live-session');
+        if (uploadBtn) uploadBtn.classList.add('hidden');
         window.speechSynthesis.cancel();
         if (liveRecognition) {
             try { liveRecognition.stop(); } catch(e) {}
@@ -3540,7 +3559,7 @@ function getRandomParticipantTag() {
 
 let currentChatController = null;
 
-function handleChatSubmit() {
+function handleChatSubmit(isVision = false) {
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
     if (!message) return;
@@ -3567,24 +3586,26 @@ function handleChatSubmit() {
     const suggestedContainer = document.getElementById('suggested-questions-container');
     if (suggestedContainer) suggestedContainer.classList.add('hidden');
 
-    // 🚀 NEW: Call the dedicated Maverick Unified Research endpoint (/maverick/chat)
-    // This handles long-term memory, reasoning, and multi-modal attachments on the backend.
     updateSyncStatus('calculating');
+
+    const endpoint = isVision ? `${API_BASE_URL}/maverick/chat_with_image` : `${API_BASE_URL}/maverick/chat`;
     
-    fetch(`${API_BASE_URL}/maverick/chat`, {
+    const body = {
+        question: message,
+        context: getHistoryForAPI(),
+        attachments: currentAttachments,
+        user_id: 123, // Fallback for guest mode; logic handles UID if logged in
+        index: activePlugins.has('trials') ? 'clinical_trials' : 'pubmed'
+    };
+
+    fetch(endpoint, {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json', 
             'ngrok-skip-browser-warning': 'true' 
         },
         signal: currentChatController.signal,
-        body: JSON.stringify({
-            question: message,
-            context: getHistoryForAPI(),
-            attachments: currentAttachments,
-            user_id: 123, // Fallback for guest mode; logic handles UID if logged in
-            index: activePlugins.has('trials') ? 'clinical_trials' : 'pubmed'
-        })
+        body: JSON.stringify(body)
     })
     .then(res => {
         if (!res.ok) throw new Error(`Maverick API returned ${res.status}`);
@@ -5854,6 +5875,17 @@ function updateNotificationUI() {
     updateNotificationBadge();
     updateNotificationList();
     syncSettingsUI();
+}
+
+/**
+ * Save notifications and preferences to local storage
+ */
+function saveNotifications() {
+    localStorage.setItem('notifications', JSON.stringify(notifications));
+}
+
+function saveNotificationPreferences() {
+    localStorage.setItem('notificationPreferences', JSON.stringify(notificationPreferences));
 }
 
 /**

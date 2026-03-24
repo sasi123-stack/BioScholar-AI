@@ -9,6 +9,8 @@ import sys
 import sqlite3
 import time
 import logging
+import httpx
+import base64
 from typing import List, Dict, Any, Optional
 
 from fastapi import FastAPI, HTTPException
@@ -16,10 +18,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- DNS PATCH FOR HUGGING FACE SPACES ---
 _original_getaddrinfo = socket.getaddrinfo
-DNS_PRIORITY_HOSTS = ["api.groq.com", "google.com", "huggingface.co"]
+DNS_PRIORITY_HOSTS = ["api.groq.com", "google.com", "huggingface.co", "openrouter.ai"]
 
 def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
     host_str = host.decode('utf-8') if isinstance(host, bytes) else str(host)
@@ -58,11 +63,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "openai/gpt-oss-120b"
-DB_FILE = "/tmp/conversation_history.db"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", os.getenv("OPENCLAW_API_KEY"))
+MODEL_NAME = "gpt-oss:120b"
+VISION_MODEL = "meta-llama/llama-3.2–11b-vision-instruct:free"
+DB_FILE = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "local_memory.db"
 ES_HOST = os.getenv("ELASTICSEARCH_HOST", "assertive-mahogany-1m2hcasg.us-east-1.bonsaisearch.net")
 ES_USER = os.getenv("ELASTICSEARCH_USER", "0204784e62")
 ES_PASS = os.getenv("ELASTICSEARCH_PASSWORD", "38aa998d6c5c2891232c")
+
+OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
 
 # --- PYDANTIC MODELS ---
 class SearchRequest(BaseModel):
@@ -72,6 +81,16 @@ class SearchRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
+    context: List[Dict[str, str]] = []
+
+class Attachment(BaseModel):
+    name: str
+    type: str
+    data: str
+
+class ChatWithImageRequest(BaseModel):
+    question: str
+    attachments: List[Attachment] = []
     context: List[Dict[str, str]] = []
 
 # --- DATABASE ---
@@ -349,6 +368,86 @@ async def maverick_chat(request: ChatRequest):
             "sources": []
         }
         
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def get_vision_completion(prompt: str, image_base64: str):
+    """Get completion from a vision model via OpenRouter."""
+    if not OPENROUTER_API_KEY:
+        raise Exception("OPENROUTER_API_KEY is not configured.")
+
+    # The data URL is already base64 encoded, so we just need to extract the raw base64 data
+    try:
+        header, encoded = image_base64.split(",", 1)
+    except ValueError:
+        raise Exception("Invalid base64 image data")
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        try:
+            logger.info(f"Querying vision model '{VISION_MODEL}'")
+            response = await client.post(
+                f"{OPENROUTER_API_BASE}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": VISION_MODEL,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/jpeg;base64,{encoded}"},
+                                },
+                            ],
+                        }
+                    ],
+                    "max_tokens": 1500,
+                    "temperature": 0.2,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data['choices'][0]['message']['content']
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"OpenRouter vision API error: {e.response.status_code} {e.response.text}")
+            raise Exception(f"Vision API request failed: {e.response.status_code}")
+        except Exception as e:
+            logger.error(f"Vision completion error: {e}")
+            raise
+
+@app.post("/api/v1/maverick/chat_with_image")
+async def maverick_chat_with_image(request: ChatWithImageRequest):
+    """Chat with Maverick AI using a vision model."""
+    try:
+        if not OPENROUTER_API_KEY:
+            raise HTTPException(status_code=503, detail="OpenRouter API not configured")
+
+        if not request.question:
+            raise HTTPException(status_code=400, detail="No question provided")
+
+        if not request.attachments:
+            raise HTTPException(status_code=400, detail="No image provided")
+
+        # For now, we only support one image
+        image_attachment = request.attachments[0]
+
+        answer = await get_vision_completion(request.question, image_attachment.data)
+
+        if "💠" not in answer[:15]:
+            answer = "💠 " + answer
+
+        return {
+            "status": "success",
+            "answer": answer,
+            "reasoning": "Maverick AI vision analysis via OpenRouter",
+            "sources": []
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -249,8 +249,15 @@ async def search_documents(
         )
         
     except Exception as e:
-        logger.error(f"Search failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        error_msg = str(e)
+        logger.error(f"Search failed: {error_msg}")
+        
+        # Specific handling for Bonsai cluster issues
+        if "Cluster has been disabled" in error_msg or "403" in error_msg:
+            detail_msg = "The primary search service (Bonsai Elasticsearch) is currently disabled. Please contact support@bonsai.io or switch to 'Web Search' mode in the sidebar."
+            raise HTTPException(status_code=503, detail=detail_msg)
+            
+        raise HTTPException(status_code=500, detail=f"Search failed: {error_msg}")
 
 
 @router.post("/question", response_model=QuestionResponse)

@@ -8,6 +8,7 @@ import re
 import fitz # PyMuPDF
 import io
 import base64
+import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
 from groq import AsyncGroq
@@ -26,7 +27,7 @@ if sys.platform == 'win32':
 # --- DNS GLOBAL MONKEYPATCH ---
 # Hugging Face Spaces often have flaky DNS resolution for external APIs.
 _original_getaddrinfo = socket.getaddrinfo
-DNS_PRIORITY_HOSTS = ["api.groq.com", "google.com", "huggingface.co", "api.telegram.org"]
+DNS_PRIORITY_HOSTS = ["api.groq.com", "google.com", "huggingface.co", "api.telegram.org", "openrouter.ai"]
 
 def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
     host_str = host.decode('utf-8') if isinstance(host, bytes) else str(host)
@@ -70,8 +71,13 @@ logger = logging.getLogger(__name__)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "gpt-oss:120b"               # Primary model: gpt-oss:120b (Claude Code) via Groq
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", os.getenv("OPENCLAW_API_KEY")) # Fallback for legacy
+MODEL_NAME = "gpt-oss:120b"
+VISION_MODEL = "meta-llama/llama-3.2–11b-vision-instruct:free" 
 DB_FILE = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "local_memory.db"
+
+# API Endpoints
+OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
 
 # Search Config (Bonsai/OpenSearch)
 ES_HOST = os.getenv("ELASTICSEARCH_HOST", "assertive-mahogany-1m2hcasg.us-east-1.bonsaisearch.net")
@@ -215,6 +221,49 @@ def sanitize_for_telegram(text: str) -> str:
     text = text.replace('&nbsp;', ' ')
     
     return text.strip()
+
+async def get_vision_completion(prompt: str, image_base64: str, user_id: int):
+    """Get completion from a vision model via OpenRouter."""
+    if not OPENROUTER_API_KEY:
+        raise Exception("OPENROUTER_API_KEY is not configured.")
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        try:
+            logger.info(f"Querying vision model '{VISION_MODEL}' for user {user_id}")
+            response = await client.post(
+                f"{OPENROUTER_API_BASE}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": VISION_MODEL,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
+                                },
+                            ],
+                        }
+                    ],
+                    "max_tokens": 1500,
+                    "temperature": 0.2,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data['choices'][0]['message']['content']
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"OpenRouter vision API error: {e.response.status_code} {e.response.text}")
+            raise Exception(f"Vision API request failed: {e.response.status_code}")
+        except Exception as e:
+            logger.error(f"Vision completion error: {e}")
+            raise
 
 async def get_resilient_completion(messages: list, user_id: int):
     """Try multiple Groq models with fallback chain."""
@@ -489,14 +538,54 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle image uploads (Research Figures/Posters)."""
+    """Handle image uploads and analyze them with a vision model."""
     user_id = update.effective_user.id
-    caption = update.message.caption or "What can you tell me about this biomedical figure?"
-    
-    # For now, we notify Maverick about the visual context
-    # Vision models can be integrated here later if needed
-    rich_query = f"{caption}\n\n[USER ATTACHED A RESEARCH IMAGE/POSTER/FIGURE]"
-    await handle_message(update, context, override_msg=rich_query, original_caption=caption)
+    caption = update.message.caption or "Analyze this biomedical image and provide a detailed description."
+
+    # Notify the user that the image is being processed
+    thinking_msg = await update.message.reply_html("🔬 <i>Analyzing image with Maverick Vision...</i>")
+
+    try:
+        # Get the largest photo size
+        photo = update.message.photo[-1]
+        photo_file = await context.bot.get_file(photo.file_id)
+        
+        # Download the photo into memory
+        file_bytes_io = io.BytesIO()
+        await photo_file.download_to_memory(file_bytes_io)
+        file_bytes_io.seek(0)
+        
+        # Encode the image in base64
+        image_base64 = base64.b64encode(file_bytes_io.read()).decode('utf-8')
+        
+        # Get the analysis from the vision model
+        analysis = await get_vision_completion(caption, image_base64, user_id)
+        
+        # Save messages to history
+        save_message(user_id, "user", f"[Image] {caption}")
+        save_message(user_id, "assistant", analysis)
+        
+        # Sanitize the response and send it
+        sanitized_analysis = sanitize_for_telegram(analysis)
+        if len(sanitized_analysis) > 4000:
+            sanitized_analysis = sanitized_analysis[:3990] + "..."
+
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=thinking_msg.message_id,
+            text=f"👁️‍🗨️ <b>Maverick Vision Analysis:</b>\n\n{sanitized_analysis}",
+            parse_mode='HTML'
+        )
+
+    except Exception as e:
+        logger.error(f"Photo analysis error: {e}")
+        safe_error = html.escape(str(e))[:200]
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=thinking_msg.message_id,
+            text=f"❌ <b>Vision Error</b>: {safe_error}",
+            parse_mode='HTML'
+        )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, override_msg=None, force_search=False, original_caption=None):
     user_id = update.effective_user.id
