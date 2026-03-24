@@ -1937,6 +1937,11 @@ async function performSearch() {
 
         const data = await response.json();
         currentResults = data.results || [];
+        
+        if (data.warning) {
+            showToast(data.warning, 'info');
+        }
+        
         displayCurrentResults();
         showRelatedSearches(query);
 
