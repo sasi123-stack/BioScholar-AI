@@ -213,7 +213,7 @@ async def root():
     """Root endpoint with API information."""
     return {
         "message": "💠 BioMed Scholar AI Research Engine",
-        "version": "2.1.0",
+        "version": "2.1.3",
         "docs": "/docs",
         "features": {
             "search": "/api/v1/search",
@@ -271,16 +271,19 @@ async def statistics():
 async def diagnostic():
     """Diagnostic endpoint for checking system health and fallbacks."""
     entrez_test = False
+    error = None
     try:
+        from app_minimal import fallback_search_entrez
         results = fallback_search_entrez("cancer", max_results=1)
         entrez_test = len(results) > 0
-    except:
-        pass
+    except Exception as e:
+        error = str(e)
         
     return {
-        "bonsai": False, # We know it's down
+        "bonsai": False,
         "entrez": entrez_test,
-        "version": "2.1.1",
+        "entrez_error": error,
+        "version": "2.1.3",
         "env": "production"
     }
 
