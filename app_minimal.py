@@ -27,7 +27,7 @@ load_dotenv()
 
 # --- DNS PATCH FOR HUGGING FACE SPACES ---
 _original_getaddrinfo = socket.getaddrinfo
-DNS_PRIORITY_HOSTS = ["api.groq.com", "google.com", "huggingface.co", "openrouter.ai"]
+DNS_PRIORITY_HOSTS = ["api.groq.com", "google.com", "huggingface.co", "openrouter.ai", "ncbi.nlm.nih.gov"]
 
 def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
     host_str = host.decode('utf-8') if isinstance(host, bytes) else str(host)
