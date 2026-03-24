@@ -77,7 +77,13 @@ OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
 class SearchRequest(BaseModel):
     query: str
     index: str = "both"
-    max_results: int = 20
+    max_results: int = 50
+    date_from: Optional[int] = None
+    date_to: Optional[int] = None
+    article_types: Optional[List[str]] = None
+    subject: Optional[str] = None
+    availability: Optional[str] = None
+    sort_by: Optional[str] = "relevance"
 
 class ChatRequest(BaseModel):
     question: str
@@ -145,11 +151,38 @@ def get_elasticsearch_stats() -> Dict[str, Any]:
         logger.warning(f"ES connection failed: {e}")
         return {}
 
+# --- FALLBACK SEARCH (ENTREZ) ---
+def fallback_search_entrez(query: str, max_results: int = 20) -> List[Dict]:
+    """Fallback search using NCBI Entrez API."""
+    try:
+        from src.data_pipeline.pubmed_fetcher import PubMedFetcher
+        fetcher = PubMedFetcher(email="biomed-scholar-user@example.com")
+        
+        # Simple search usingEntrez
+        detailed_articles = fetcher.search_and_fetch(query, max_results=max_results)
+        
+        results = []
+        for doc in detailed_articles:
+            results.append({
+                "id": doc.get("pmid", "unknown"),
+                "title": doc.get("title", "No Title"),
+                "authors": doc.get("authors", []),
+                "journal": doc.get("journal", "PubMed"),
+                "year": doc.get("publication_year", ""),
+                "abstract": doc.get("abstract", ""),
+                "score": 1.0, # Flat score for fallback
+                "source": "pubmed (live)"
+            })
+        return results
+    except Exception as e:
+        logger.error(f"Fallback search failed: {e}")
+        return []
+
 # --- FASTAPI APP ---
 app = FastAPI(
     title="BioMed Scholar API",
     description="AI-powered biomedical research engine with Maverick AI",
-    version="2.0.2"
+    version="2.1.0"
 )
 
 app.add_middleware(
@@ -177,7 +210,7 @@ async def root():
     """Root endpoint with API information."""
     return {
         "message": "💠 BioMed Scholar AI Research Engine",
-        "version": "2.0.2",
+        "version": "2.1.0",
         "docs": "/docs",
         "features": {
             "search": "/api/v1/search",
@@ -204,7 +237,7 @@ async def health():
     
     return {
         "status": "synced",
-        "version": "2.0.2",
+        "version": "2.1.0",
         "engine": "Maverick AI",
         "services": {
             "elasticsearch": es_healthy,
@@ -233,79 +266,99 @@ async def statistics():
 
 @app.post("/api/v1/search")
 async def search(request: SearchRequest):
-    """Search biomedical literature and clinical trials."""
+    """Search biomedical literature and clinical trials with live fallback."""
     try:
         from opensearchpy import OpenSearch
         
         if not request.query:
             raise HTTPException(status_code=400, detail="No query provided")
         
-        client = OpenSearch(
-            hosts=[f"https://{ES_USER}:{ES_PASS}@{ES_HOST}:443"],
-            use_ssl=True, verify_certs=True
-        )
-        
-        # Determine index
-        if request.index == 'pubmed':
-            index_name = 'pubmed_articles'
-        elif request.index == 'clinical_trials':
-            index_name = 'clinical_trials'
-        else:
-            index_name = 'pubmed_articles,clinical_trials'
-        
-        # Perform search
-        es_query = {
-            "size": request.max_results,
-            "query": {
-                "multi_match": {
-                    "query": request.query,
-                    "fields": ["title^3", "abstract", "authors"]
+        # Primary: Try OpenSearch (Bonsai)
+        try:
+            client = OpenSearch(
+                hosts=[f"https://{ES_USER}:{ES_PASS}@{ES_HOST}:443"],
+                use_ssl=True, verify_certs=True,
+                timeout=5 # Short timeout for failover
+            )
+            
+            # Determine index
+            if request.index == 'pubmed':
+                index_name = 'pubmed_articles'
+            elif request.index == 'clinical_trials':
+                index_name = 'clinical_trials'
+            else:
+                index_name = 'pubmed_articles,clinical_trials'
+            
+            # Perform search
+            es_query = {
+                "size": request.max_results,
+                "query": {
+                    "multi_match": {
+                        "query": request.query,
+                        "fields": ["title^3", "abstract", "authors"]
+                    }
                 }
             }
-        }
-        
-        res = client.search(index=index_name, body=es_query)
-        
-        results = []
-        for hit in res['hits']['hits']:
-            source = hit['_source']
-            year = ""
-            if "publication_date" in source:
-                year = str(source["publication_date"])[:4]
-            elif "publication_year" in source:
-                year = str(source["publication_year"])[:4]
-            elif "year" in source:
-                year = str(source["year"])[:4]
             
-            results.append({
-                "id": hit['_id'],
-                "title": source.get("title", "No Title"),
-                "authors": source.get("authors", source.get("author", "Unknown")),
-                "journal": source.get("journal", source.get("source_name", "Biomedical Literature")),
-                "year": year,
-                "abstract": source.get("abstract", ""),
-                "score": hit['_score'],
-                "source": source.get("source", "pubmed")
-            })
-        
-        return {
-            "query": request.query,
-            "total_results": res['hits']['total']['value'] if isinstance(res['hits']['total'], dict) else res['hits']['total'],
-            "results": results,
-            "search_time_ms": res['took']
-        }
-        
+            res = client.search(index=index_name, body=es_query)
+            
+            results = []
+            for hit in res['hits']['hits']:
+                source = hit['_source']
+                year = ""
+                if "publication_date" in source:
+                    year = str(source["publication_date"])[:4]
+                elif "publication_year" in source:
+                    year = str(source["publication_year"])[:4]
+                elif "year" in source:
+                    year = str(source["year"])[:4]
+                
+                results.append({
+                    "id": hit['_id'],
+                    "title": source.get("title", "No Title"),
+                    "authors": source.get("authors", source.get("author", "Unknown")),
+                    "journal": source.get("journal", source.get("source_name", "Biomedical Literature")),
+                    "year": year,
+                    "abstract": source.get("abstract", ""),
+                    "score": hit['_score'],
+                    "source": source.get("source", "pubmed")
+                })
+            
+            return {
+                "query": request.query,
+                "total_results": res['hits']['total']['value'] if isinstance(res['hits']['total'], dict) else res['hits']['total'],
+                "results": results,
+                "search_time_ms": res['took']
+            }
+            
+        except Exception as es_err:
+            logger.warning(f"Primary index (Bonsai) failed: {es_err}. Attempting Entrez fallback...")
+            
+            # Fallback: Live NCBI Entrez search
+            fallback_results = fallback_search_entrez(request.query, max_results=request.max_results)
+            
+            if fallback_results:
+                return {
+                    "query": request.query,
+                    "total_results": len(fallback_results),
+                    "results": fallback_results,
+                    "search_time_ms": 0,
+                    "warning": "Primary search index is offline. Results fetched live from PubMed Entrez API."
+                }
+            else:
+                raise es_err # Re-raise original error if fallback also fails
+
     except Exception as e:
         error_msg = str(e)
         logger.warning(f"Search endpoint degradation: {error_msg}")
         
-        # Return 200 OK with empty results instead of 503/500
+        # Ultimate fallback: return 200 with empty results
         return {
             "query": request.query,
             "total_results": 0,
             "results": [],
             "search_time_ms": 0,
-            "warning": "The primary search index is currently unavailable. Displaying empty results."
+            "warning": f"Search failed: {error_msg}. Please try again."
         }
 
 @app.post("/api/v1/maverick/chat")
