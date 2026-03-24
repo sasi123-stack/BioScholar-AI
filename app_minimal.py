@@ -149,7 +149,7 @@ def get_elasticsearch_stats() -> Dict[str, Any]:
 app = FastAPI(
     title="BioMed Scholar API",
     description="AI-powered biomedical research engine with Maverick AI",
-    version="2.0.1"
+    version="2.0.2"
 )
 
 app.add_middleware(
@@ -177,7 +177,7 @@ async def root():
     """Root endpoint with API information."""
     return {
         "message": "💠 BioMed Scholar AI Research Engine",
-        "version": "2.0.1",
+        "version": "2.0.2",
         "docs": "/docs",
         "features": {
             "search": "/api/v1/search",
@@ -204,7 +204,7 @@ async def health():
     
     return {
         "status": "synced",
-        "version": "2.0.1",
+        "version": "2.0.2",
         "engine": "Maverick AI",
         "services": {
             "elasticsearch": es_healthy,
@@ -297,12 +297,16 @@ async def search(request: SearchRequest):
         
     except Exception as e:
         error_msg = str(e)
-        # Specific handling for Bonsai cluster issues
-        if "Cluster has been disabled" in error_msg or "403" in error_msg:
-            detail_msg = "The primary search service (Bonsai Elasticsearch) is currently disabled. Please contact support@bonsai.io or switch to 'Web Search' mode in the sidebar."
-            raise HTTPException(status_code=503, detail=detail_msg)
-            
-        raise HTTPException(status_code=500, detail=error_msg)
+        logger.warning(f"Search endpoint degradation: {error_msg}")
+        
+        # Return 200 OK with empty results instead of 503/500
+        return {
+            "query": request.query,
+            "total_results": 0,
+            "results": [],
+            "search_time_ms": 0,
+            "warning": "The primary search index is currently unavailable. Displaying empty results."
+        }
 
 @app.post("/api/v1/maverick/chat")
 async def maverick_chat(request: ChatRequest):
