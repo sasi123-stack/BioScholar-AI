@@ -1158,10 +1158,6 @@ function switchTab(tabName) {
     tabName = (tabName || '').trim().toLowerCase();
     if (!validTabs.includes(tabName)) tabName = 'articles';
 
-    // 🛑 If switching away from Chat, stop Gemini Live if active
-    if (tabName !== 'chat' && isGeminiLiveEnabled) {
-        toggleGeminiLive();
-    }
 
     // Update hash for deep linking (replaceState avoids back-button bloat)
     const newHash = '#' + tabName;
@@ -3369,125 +3365,6 @@ function toggleWebSearch() {
     }
 }
 
-let isGeminiLiveEnabled = false;
-let liveRecognition = null;
-let liveUtterance = null;
-
-if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    liveRecognition = new SpeechRecognition();
-    liveRecognition.continuous = true;
-    liveRecognition.interimResults = false;
-    liveRecognition.lang = 'en-US';
-
-    liveRecognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript.trim();
-        if (transcript && isGeminiLiveEnabled) {
-            handleLiveVoiceInput(transcript);
-        }
-    };
-
-    liveRecognition.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        if (isGeminiLiveEnabled) liveRecognition.start(); // Restart if it fails
-    };
-
-    liveRecognition.onend = () => {
-        if (isGeminiLiveEnabled) liveRecognition.start(); // Keep listening in live mode
-    };
-}
-
-function handleLiveVoiceInput(text) {
-    const statusText = document.querySelector('.live-status-text');
-    if (statusText) statusText.innerText = "Maverick is Thinking...";
-    
-    // Inject into chat
-    const input = document.getElementById('chat-input');
-    if (input) {
-        input.value = text;
-        // Check for attachments
-        if (currentAttachments.length > 0) {
-            handleChatSubmit(true); // Pass a flag to indicate it's a vision call
-        } else {
-            handleChatSubmit();
-        }
-    }
-}
-
-function speakMaverickResponse(text) {
-    if (!window.speechSynthesis) return;
-    
-    // Cancel previous speech
-    window.speechSynthesis.cancel();
-    
-    const statusText = document.querySelector('.live-status-text');
-    if (statusText) statusText.innerText = "Maverick is Speaking...";
-
-    liveUtterance = new SpeechSynthesisUtterance(text);
-    liveUtterance.rate = 1.0;
-    liveUtterance.pitch = 1.0;
-    
-    liveUtterance.onend = () => {
-        if (isGeminiLiveEnabled && statusText) {
-            statusText.innerText = "Maverick is Listening...";
-        }
-    };
-
-    window.speechSynthesis.speak(liveUtterance);
-}
-
-function toggleGeminiLive() {
-    isGeminiLiveEnabled = !isGeminiLiveEnabled;
-    const btn = document.getElementById('gemini-live-toggle');
-    const visualizer = document.getElementById('gemini-live-visualizer');
-    const container = document.querySelector('.chat-container');
-    let uploadBtn = document.getElementById('chat-upload-btn-live');
-    
-    if (isGeminiLiveEnabled) {
-        if (!liveRecognition) {
-            isGeminiLiveEnabled = false;
-            showToast('Gemini Live Requires Chrome, Safari, or Edge Browser', 'error');
-            return;
-        }
-        btn?.classList.add('active');
-        visualizer?.classList.remove('hidden');
-        container?.classList.add('active-live-session');
-        showToast('Gemini Live Voice Session Started', 'info');
-        
-        try { liveRecognition.start(); } catch(e) {
-            console.error('Failed to start Live Recognition:', e);
-            showToast('Microphone access denied or already in use', 'error');
-        }
-        
-        // Add upload button
-        if (!uploadBtn) {
-            uploadBtn = document.createElement('button');
-            uploadBtn.id = 'chat-upload-btn-live';
-            uploadBtn.className = 'chat-control-btn';
-            uploadBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
-            uploadBtn.onclick = () => document.getElementById('chat-file-input').click();
-            btn.insertAdjacentElement('afterend', uploadBtn);
-        }
-        uploadBtn.classList.remove('hidden');
-
-
-        setTimeout(() => {
-            const welcomeMsg = "💠 Gemini Live Connection Established. I'm listening. How can I help you dynamically with your research today?";
-            addChatMessage('ai', welcomeMsg);
-            speakMaverickResponse(welcomeMsg);
-        }, 800);
-    } else {
-        btn?.classList.remove('active');
-        visualizer?.classList.add('hidden');
-        container?.classList.remove('active-live-session');
-        if (uploadBtn) uploadBtn.classList.add('hidden');
-        window.speechSynthesis.cancel();
-        if (liveRecognition) {
-            try { liveRecognition.stop(); } catch(e) {}
-        }
-        showToast('Gemini Live Voice Session Ended', 'info');
-    }
-}
 
 function toggleChatPlugin(pluginId) {
     const item = document.getElementById(`plugin-${pluginId}`);
@@ -3856,11 +3733,7 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
 
     history.appendChild(msgDiv);
     
-    // 🔊 Gemini Live: Auto-speak AI response if live mode is active
-    if (isGeminiLiveEnabled && role === 'ai') {
-        speakMaverickResponse(text);
-    }
-    
+
     // Smooth scroll to bottom
     if (shouldScroll) {
         history.scrollTop = history.scrollHeight;
