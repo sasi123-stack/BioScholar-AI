@@ -3444,13 +3444,19 @@ function toggleGeminiLive() {
     let uploadBtn = document.getElementById('chat-upload-btn-live');
     
     if (isGeminiLiveEnabled) {
+        if (!liveRecognition) {
+            isGeminiLiveEnabled = false;
+            showToast('Gemini Live Requires Chrome, Safari, or Edge Browser', 'error');
+            return;
+        }
         btn?.classList.add('active');
         visualizer?.classList.remove('hidden');
         container?.classList.add('active-live-session');
         showToast('Gemini Live Voice Session Started', 'info');
         
-        if (liveRecognition) {
-            try { liveRecognition.start(); } catch(e) {}
+        try { liveRecognition.start(); } catch(e) {
+            console.error('Failed to start Live Recognition:', e);
+            showToast('Microphone access denied or already in use', 'error');
         }
         
         // Add upload button
@@ -3829,7 +3835,7 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
                     </button>
                     ${role === 'user' ? `
                     <button class="msg-action-btn" onclick="editUserMessage(this)" title="Edit message">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121(0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
                     ` : `
                     <button class="msg-action-btn speak-btn" onclick="speakMessage(this)" title="Listen to response">

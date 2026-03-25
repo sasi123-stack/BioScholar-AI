@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", os.getenv("OPENCLAW_API_KEY"))
 MODEL_NAME = "gpt-oss:120b"
-VISION_MODEL = "meta-llama/llama-3.2–11b-vision-instruct:free"
+VISION_MODEL = "meta-llama/llama-3.2-11b-vision-instruct:free"
 DB_FILE = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "local_memory.db"
 ES_HOST = os.getenv("ELASTICSEARCH_HOST", "assertive-mahogany-1m2hcasg.us-east-1.bonsaisearch.net")
 ES_USER = os.getenv("ELASTICSEARCH_USER", "0204784e62")
@@ -240,7 +240,7 @@ async def health():
     
     return {
         "status": "synced",
-        "version": "2.1.0",
+        "version": "2.1.6",
         "engine": "Maverick AI",
         "services": {
             "elasticsearch": es_healthy,
@@ -283,7 +283,7 @@ async def diagnostic():
         "bonsai": False,
         "entrez": entrez_test,
         "entrez_error": error,
-        "version": "2.1.3",
+        "version": "2.1.6",
         "env": "production"
     }
 
