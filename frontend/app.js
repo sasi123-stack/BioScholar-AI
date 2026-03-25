@@ -77,12 +77,13 @@ var firebaseConfig = {
     measurementId: "G-CGJ5B74CEQ"
 };
 
-// Initialize Firebase (Auth only)
-var auth;
+// Initialize Firebase (Auth & Firestore)
+var auth, db;
 if (typeof firebase !== 'undefined') {
     try {
         firebase.initializeApp(firebaseConfig);
         auth = firebase.auth();
+        db = firebase.firestore();
     } catch (e) {
         console.error("Firebase initialization failed:", e);
     }
@@ -1205,16 +1206,7 @@ function switchTab(tabName) {
     }
 }
 
-async function loadMaverickHistory() {
-    const historyContainer = document.getElementById('chat-history');
-    if (!historyContainer) return;
-
-    // Maverick HF Space history endpoint is offline (free tier sleeping).
-    // Skip the fetch and render the welcome screen directly.
-    if (historyContainer.children.length <= 1) {
-        renderChatWelcome();
-    }
-}
+// loadMaverickHistory is defined later in the file with Firebase support.
 
 function renderChatWelcome() {
     const history = document.getElementById('chat-history');
@@ -4252,7 +4244,7 @@ async function deleteChatHistory() {
 }
 
 async function saveChatToFirestore(role, text) {
-    if (!currentUser || !db) return;
+    if (!currentUser || typeof db === 'undefined' || !db) return;
     try {
         await db.collection("users").doc(currentUser.uid).collection("chat_history").add({
             role: role,
@@ -4265,7 +4257,10 @@ async function saveChatToFirestore(role, text) {
 }
 
 async function loadMaverickHistory() {
-    if (!currentUser || !db) return;
+    if (!currentUser || typeof db === 'undefined' || !db) {
+        renderChatWelcome();
+        return;
+    }
     try {
         const snapshot = await db.collection("users").doc(currentUser.uid).collection("chat_history").orderBy("timestamp", "asc").get();
         if (snapshot.empty) return;
