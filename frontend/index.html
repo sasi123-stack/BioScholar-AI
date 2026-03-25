@@ -47,9 +47,9 @@
                 <img src="assets/images/logo.png" alt="BioMedScholar AI Logo" class="logo-img" width="40" height="40"
                     style="border-radius: 50%; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);">
                 <span class="logo-text">BioMedScholar <span class="logo-scholar">AI</span></span>
-                <span class="beta-badge indicator-badge" id="maverick-sync-indicator" title="System Status">
-                    <div class="sync-dot synced"></div>
-                    <span class="sync-text">LIVE</span>
+                <span class="beta-badge indicator-badge beta-indicator" id="maverick-sync-indicator" title="BETA Version (Early Access)">
+                    <div class="sync-dot beta"></div>
+                    <span class="sync-text">BETA</span>
                 </span>
             </a>
         </div>
@@ -132,6 +132,12 @@
         </div>
 
         <div class="header-right">
+            <!-- Global Engine Status (BETA) -->
+            <div class="header-engine-status" id="header-engine-status" title="BioMedScholar AI Core: Operational">
+                <div class="status-dot pulsed"></div>
+                <span class="status-text">Insight Engine: Active</span>
+            </div>
+
             <!-- Tools Menu Button -->
             <div class="header-action-menu">
                 <button class="header-icon-btn menu-trigger" onclick="toggleHeaderMenu(event)" title="More Options">
@@ -254,6 +260,16 @@
 
         </div>
     </header>
+    
+    <!-- Live Search Ticker (BETA Feature) -->
+    <div class="live-ticker-bar glass-panel" id="live-ticker">
+        <div class="ticker-content">
+            <span class="ticker-item"><span class="ticker-label">LATEST SEARCH:</span> SARS-CoV-2 Variant Sequencing</span>
+            <span class="ticker-item"><span class="ticker-label">TRENDING:</span> GLP-1 Metabolic Pathways</span>
+            <span class="ticker-item"><span class="ticker-label">NEW DATA:</span> 12.4K PubMed Papers Indexed (Today)</span>
+            <span class="ticker-item"><span class="ticker-label">BETA:</span> Multi-Modal Vision Enabled</span>
+        </div>
+    </div>
 
     <!-- Navigation Tabs -->
     <nav class="scholar-nav">
@@ -502,6 +518,15 @@
                                     <line x1="3" y1="18" x2="21" y2="18" />
                                 </svg>
                             </button>
+                            <button class="view-btn visualization-btn" onclick="toggleKnowledgeGraph()" id="view-graph-btn"
+                                title="Knowledge Graph (BETA)">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="2" x2="12" y2="22"></line>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path d="M18 18l-4-4M6 6l4 4"></path>
+                                    <path d="M2 12h20"></path>
+                                </svg>
+                            </button>
                         </div>
                     </div>
 
@@ -514,6 +539,7 @@
                                 <line x1="9" y1="3" x2="9" y2="21" />
                             </svg>
                         </button>
+                        <!-- Quick Filters Sidebar (Left Side) -->
                         <!-- Quick Filters Sidebar (Left Side) -->
                         <div class="quick-filters" id="quick-filters">
                             <div class="filters-header">
@@ -563,6 +589,8 @@
                                 </div>
                             </div>
 
+                            <div class="quick-filter-divider"></div>
+
                             <div class="quick-filter-section">
                                 <span class="quick-filter-sublabel">⏳ Time Horizon</span>
                                 <div class="quick-filter-group">
@@ -600,6 +628,44 @@
                                     <input type="range" id="quick-alpha-slider" min="0" max="100" value="50" step="10"
                                         onchange="handleQuickAlpha(this.value)">
                                     <span class="quick-alpha-text">Sem</span>
+                                </div>
+                            </div>
+
+                            <div class="quick-filter-divider"></div>
+
+                            <!-- Research Achievements (BETA) -->
+                            <div class="quick-filter-section">
+                                <span class="quick-filter-sublabel">🏆 Research Milestones</span>
+                                <div class="achievement-container" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                                    <div class="achievement-item locked" id="achievement-pioneer" title="Search all sources in one session">
+                                        <span class="achievement-icon">🛡️</span>
+                                        <div class="achievement-text">
+                                            <strong>Evidence Pioneer</strong>
+                                            <div class="achievement-progress" style="width: 100%; height: 4px; background: var(--bg-tertiary); margin-top: 4px; border-radius: 2px;">
+                                                <div id="progress-pioneer" style="width: 0%; height: 100%; background: var(--primary-blue); border-radius: 2px; transition: width 1s;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="achievement-item locked" id="achievement-thinker" title="Use 100% semantic weight">
+                                        <span class="achievement-icon">🧠</span>
+                                        <div class="achievement-text">
+                                            <strong>Deep Semantic Thinker</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="quick-filter-divider"></div>
+
+                            <div class="quick-filter-section" style="margin-bottom: 20px;">
+                                <span class="quick-filter-sublabel">🔥 Scientists of the Day</span>
+                                <div class="leaderboard-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg-tertiary); border-radius: 12px; border-left: 4px solid var(--primary-blue); margin-top: 10px;">
+                                    <div class="leader-avatar" style="width: 32px; height: 32px; border-radius: 50%; background: #4f46e5; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 12px;">S</div>
+                                    <div class="leader-info">
+                                        <div style="font-weight: 700; font-size: 13px;">Sasidhara</div>
+                                        <div style="font-size: 11px; color: var(--text-muted);">Master Researcher</div>
+                                    </div>
+                                    <div class="leader-pulse" style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; margin-left: auto;"></div>
                                 </div>
                             </div>
 
@@ -954,6 +1020,34 @@
                             <p>Live analysis of biomedical publication volumes and emerging focal areas.</p>
                         </div>
 
+                        <!-- Promotional Premiere (LAUNCH TEASER) -->
+                        <div class="promo-premiere-section">
+                            <div class="promo-header">
+                                <span class="premium-badge">WORLD PREMIERE</span>
+                                <h3>BioMedScholar v1.6.0-BETA Cinematic Teasers</h3>
+                            </div>
+                            <div class="promo-grid">
+                                <div class="promo-video-card">
+                                    <img src="https://biomed-scholar.web.app/assets/6min_promo_thumbnail.png" alt="6-Min Promo" class="promo-thumb">
+                                    <div class="promo-info">
+                                        <div class="promo-duration">6:00</div>
+                                        <h4>Revolution: The Command Center</h4>
+                                        <p>Rapid feature overview of v1.6-BETA research dashboards.</p>
+                                        <button class="promo-play-btn" onclick="showToast('Loading Official 6-Min Storyboard...', 'info')">Preview Script</button>
+                                    </div>
+                                </div>
+                                <div class="promo-video-card">
+                                    <img src="https://biomed-scholar.web.app/assets/9min_teaser_thumbnail.png" alt="9-Min Teaser" class="promo-thumb">
+                                    <div class="promo-info">
+                                        <div class="promo-duration">9:00</div>
+                                        <h4>Deep Intelligence: Technical Dive</h4>
+                                        <p>Comprehensive overview of BioBERT reasoning & backend architecture.</p>
+                                        <button class="promo-play-btn" onclick="showToast('Loading Technical 9-Min Storyboard...', 'info')">Preview Script</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="trends-grid">
                             <!-- Fast-Emerging Topics Card -->
                             <div class="trends-card trends-card-primary">
@@ -965,22 +1059,22 @@
                                     <li class="trends-list-item" data-search-term="GLP-1 Agonists"
                                         onclick="searchTrend(this)">
                                         <span class="trends-list-item-label">GLP-1 Agonists</span>
-                                        <span class="trends-list-item-growth">+245%</span>
+                                        <span class="trends-list-item-growth">+24.5%</span>
                                     </li>
                                     <li class="trends-list-item" data-search-term="CRISPR-Cas9 Editing"
                                         onclick="searchTrend(this)">
                                         <span class="trends-list-item-label">CRISPR-Cas9 Editing</span>
-                                        <span class="trends-list-item-growth">+182%</span>
+                                        <span class="trends-list-item-growth">+18.2%</span>
                                     </li>
                                     <li class="trends-list-item" data-search-term="mRNA Immunotherapy"
                                         onclick="searchTrend(this)">
                                         <span class="trends-list-item-label">mRNA Immunotherapy</span>
-                                        <span class="trends-list-item-growth">+134%</span>
+                                        <span class="trends-list-item-growth">+13.4%</span>
                                     </li>
                                     <li class="trends-list-item" data-search-term="AI in Radiology"
                                         onclick="searchTrend(this)">
                                         <span class="trends-list-item-label">AI in Radiology</span>
-                                        <span class="trends-list-item-growth">+115%</span>
+                                        <span class="trends-list-item-growth">+11.5%</span>
                                     </li>
                                 </ul>
                             </div>
@@ -992,20 +1086,86 @@
                                     <h3>Highest Volume (All-Time)</h3>
                                 </div>
                                 <div class="trends-tags">
-                                    <span class="trends-tag" data-search-term="Type 2 Diabetes"
-                                        onclick="searchTrend(this)">Type
-                                        2 Diabetes</span>
-                                    <span class="trends-tag" data-search-term="Breast Cancer"
-                                        onclick="searchTrend(this)">Breast
-                                        Cancer</span>
-                                    <span class="trends-tag" data-search-term="COVID-19"
-                                        onclick="searchTrend(this)">COVID-19</span>
-                                    <span class="trends-tag" data-search-term="Hypertension"
-                                        onclick="searchTrend(this)">Hypertension</span>
-                                    <span class="trends-tag" data-search-term="Alzheimer's"
-                                        onclick="searchTrend(this)">Alzheimer's</span>
-                                    <span class="trends-tag" data-search-term="Depression"
-                                        onclick="searchTrend(this)">Depression</span>
+                                    <span class="trends-tag" data-search-term="Type 2 Diabetes" onclick="searchTrend(this)">Diabetes</span>
+                                    <span class="trends-tag" data-search-term="Breast Cancer" onclick="searchTrend(this)">Oncology</span>
+                                    <span class="trends-tag" data-search-term="COVID-19" onclick="searchTrend(this)">COVID</span>
+                                    <span class="trends-tag" data-search-term="Hypertension" onclick="searchTrend(this)">Cardiac</span>
+                                    <span class="trends-tag" data-search-term="Alzheimer's" onclick="searchTrend(this)">Neuro</span>
+                                </div>
+                            </div>
+
+                            <!-- Sentiment Pulse (NEW) -->
+                            <div class="trends-card trends-card-accent">
+                                <div class="trends-card-header">
+                                    <span>💙</span>
+                                    <h3>Sentiment Pulse</h3>
+                                </div>
+                                <div class="sentiment-container">
+                                    <div class="sentiment-row">
+                                        <span class="sentiment-label">GLP-1 Weight Loss</span>
+                                        <div class="sentiment-bar-wrapper">
+                                            <div class="sentiment-bar pos" style="width: 85%;"></div>
+                                        </div>
+                                        <span class="sentiment-score">8.5/10</span>
+                                    </div>
+                                    <div class="sentiment-row">
+                                        <span class="sentiment-label">mRNA Safety</span>
+                                        <div class="sentiment-bar-wrapper">
+                                            <div class="sentiment-bar pos" style="width: 72%;"></div>
+                                        </div>
+                                        <span class="sentiment-score">7.2/10</span>
+                                    </div>
+                                    <div class="sentiment-row">
+                                        <span class="sentiment-label">AI Diagnostic Bias</span>
+                                        <div class="sentiment-bar-wrapper">
+                                            <div class="sentiment-bar neg" style="width: 45%;"></div>
+                                        </div>
+                                        <span class="sentiment-score">4.5/10</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Research Breakdown (NEW) -->
+                            <div class="trends-card trends-card-glass">
+                                <div class="trends-card-header">
+                                    <span>🌐</span>
+                                    <h3>Global Field Breakdown</h3>
+                                </div>
+                                <div class="breakdown-grid">
+                                    <div class="breakdown-item">
+                                        <div class="breakdown-circle" style="background: conic-gradient(var(--primary-blue) 42%, #ddd 0);">42%</div>
+                                        <span>Oncology</span>
+                                    </div>
+                                    <div class="breakdown-item">
+                                        <div class="breakdown-circle" style="background: conic-gradient(#10b981 28%, #ddd 0);">28%</div>
+                                        <span>Immunology</span>
+                                    </div>
+                                    <div class="breakdown-item">
+                                        <div class="breakdown-circle" style="background: conic-gradient(#f59e0b 15%, #ddd 0);">15%</div>
+                                        <span>Genetics</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Live Discoveries Feed (NEW) -->
+                        <div class="trends-feed-section">
+                            <div class="feed-header">
+                                <h3>⚡ Recent Major Discoveries (24H)</h3>
+                                <span class="live-indicator">LIVE RECAP</span>
+                            </div>
+                            <div class="discoveries-scroll">
+                                <div class="discovery-item">
+                                    <span class="discovery-time">2h ago</span>
+                                    <p>Novel Peptide for <strong>Alzheimer's Clearance</strong> shows 40% reduction in mouse models.</p>
+                                </div>
+                                <div class="discovery-item">
+                                    <span class="discovery-time">5h ago</span>
+                                    <p>Phase III Trial Results for <strong>CRISPR-based Cardiac Repair</strong> published in NEJM.</p>
+                                </div>
+                                <div class="discovery-item">
+                                    <span class="discovery-time">12h ago</span>
+                                    <p>AI Engine detects <strong>Mitochondrial Variant</strong> linked to Rare Muscle Dystrophy.</p>
                                 </div>
                             </div>
                         </div>
@@ -1035,7 +1195,7 @@
                             <path d="M12 32C12 32 18 38 24 38C30 38 36 32 36 32" stroke="#34A853" stroke-width="2.5"
                                 stroke-linecap="round" />
                         </svg>
-                        <span>© 2026 BioMedScholar AI</span>
+                        <span>© 2026 BioMedScholar AI | <span class="version-label">v1.6.0-BETA</span></span>
                     </div>
                     <span class="footer-brand-tagline">AI-Powered Biomedical Research Engine</span>
                 </div>
@@ -2140,7 +2300,7 @@
             <div class="footer-powered-by">
                 <strong>Powered by BioMedScholar Engine</strong>
                 <span class="footer-divider">|</span>
-                <span style="font-weight: 800; color: var(--primary-blue);">v1.6.PRO</span>
+                <span style="font-weight: 800; color: var(--primary-blue);">v1.6.0-BETA</span>
             </div>
             <div class="footer-attribution">
                 <strong>© 2026 Crafted by</strong> <span class="attribution-name"
@@ -2148,6 +2308,69 @@
             </div>
         </div>
     </footer>
+
+    <!-- Floating Action Menu (BETA) -->
+    <div class="fab-menu" id="fab-menu">
+        <button class="fab-main-btn" onclick="toggleFabMenu()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        </button>
+        <div class="fab-options hidden">
+            <button class="fab-option" onclick="startVoiceResearch()" title="Voice Research">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                </svg>
+            </button>
+            <button class="fab-option" onclick="switchTab('chat')" title="AI Chat">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-11.7 8.38 8.38 0 0 1 3.8.9L21 3.5l-1 4.5z"></path>
+                </svg>
+            </button>
+            <button class="fab-option" onclick="showHelpModal()" title="Help Guide">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Beta Features Disclosure & Survey -->
+    <div id="beta-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🧪 Welcome to BioMedScholar BETA</h2>
+                <button class="modal-close" onclick="closeBetaModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="beta-notice">
+                    <p>You are using <strong>BioMedScholar AI v1.6.0-BETA</strong>. We are testing new Multi-Modal capabilities and our Research Insight engine.</p>
+                    <div class="beta-feature-list">
+                        <div class="beta-feature-item">
+                            <span class="beta-feature-icon">🔍</span>
+                            <div class="beta-feature-text">
+                                <strong>Live Research Ticker:</strong> Real-time discovery streaks.
+                            </div>
+                        </div>
+                        <div class="beta-feature-item">
+                            <span class="beta-feature-icon">📊</span>
+                            <div class="beta-feature-text">
+                                <strong>Knowledge Graph Visualization:</strong> Connect various biomedical entities (Preview).
+                            </div>
+                        </div>
+                    </div>
+                    <div class="beta-survey-callout">
+                        Help us improve! Your feedback is invaluable.
+                        <a href="https://wa.me/918500419303" target="_blank" class="beta-survey-btn">Share Feedback</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>

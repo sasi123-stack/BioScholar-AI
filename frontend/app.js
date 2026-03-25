@@ -1,4 +1,4 @@
-// BioMedScholar AI v1.5.PRO - gpt-oss:120b (Claude Code) Integration & Coding Skills
+// BioMedScholar AI v1.6.0 - BETA | Research Intelligence & Multi-Modal Analysis
 // Force browser update - unique id: 20260323...
 
 // Use 'var' (which can be redeclared) or check if it exists first
@@ -4243,8 +4243,10 @@ async function deleteChatHistory() {
     }
 }
 
+let isFirestoreDisabled = false;
+
 async function saveChatToFirestore(role, text) {
-    if (!currentUser || typeof db === 'undefined' || !db) return;
+    if (!currentUser || typeof db === 'undefined' || !db || isFirestoreDisabled) return;
     try {
         await db.collection("users").doc(currentUser.uid).collection("chat_history").add({
             role: role,
@@ -4253,17 +4255,23 @@ async function saveChatToFirestore(role, text) {
         });
     } catch (e) {
         console.error("Error saving chat:", e);
+        if (e.code === 'not-found' || e.message?.includes('database (default) does not exist')) {
+            isFirestoreDisabled = true;
+        }
     }
 }
 
 async function loadMaverickHistory() {
-    if (!currentUser || typeof db === 'undefined' || !db) {
+    if (!currentUser || typeof db === 'undefined' || !db || isFirestoreDisabled) {
         renderChatWelcome();
         return;
     }
     try {
         const snapshot = await db.collection("users").doc(currentUser.uid).collection("chat_history").orderBy("timestamp", "asc").get();
-        if (snapshot.empty) return;
+        if (snapshot.empty) {
+            renderChatWelcome();
+            return;
+        }
 
         const history = document.getElementById('chat-history');
         if (history) {
@@ -4277,6 +4285,10 @@ async function loadMaverickHistory() {
         });
     } catch (e) {
         console.error("Error loading chat history:", e);
+        if (e.code === 'not-found' || e.message?.includes('database (default) does not exist')) {
+            isFirestoreDisabled = true;
+            renderChatWelcome();
+        }
     }
 }
 
@@ -6663,7 +6675,7 @@ function initVoiceSearch() {
 }
 
 /**
- * Scheduled Actions Module (v1.5.0 - PRO)
+ * Scheduled Actions Module (v1.6.0-BETA)
  */
 let scheduledActions = JSON.parse(localStorage.getItem('maverick_scheduled_actions') || '[]');
 
@@ -6964,4 +6976,149 @@ function showNodeDetails(node) {
         .attr("stroke", "#000")
         .attr("stroke-width", 3);
 }
+
+// ==========================================
+// BETA FEATURES LOGIC (v1.6.0)
+// ==========================================
+
+/**
+ * Toggles the Floating Action Menu (FAB) options
+ */
+function toggleFabMenu() {
+    const fabMenu = document.getElementById('fab-menu');
+    if (!fabMenu) return;
+    
+    const options = fabMenu.querySelector('.fab-options');
+    const mainBtn = fabMenu.querySelector('.fab-main-btn');
+    
+    if (options.classList.contains('hidden')) {
+        options.classList.remove('hidden');
+        mainBtn.style.transform = 'scale(1.1) rotate(45deg)';
+    } else {
+        options.classList.add('hidden');
+        mainBtn.style.transform = '';
+    }
+}
+
+/**
+ * Triggers the Knowledge Graph Visualization
+ */
+function toggleKnowledgeGraph() {
+    showToast('Knowledge Graph Visualization building correlations... (BETA)', 'info');
+    
+    // In a real implementation, this would trigger a D3.js overlay
+    // For now, we'll pulse the insight box if visible
+    const insightBox = document.getElementById('maverick-insight-box');
+    if (insightBox && !insightBox.classList.contains('hidden')) {
+        insightBox.style.boxShadow = '0 0 30px var(--primary-blue)';
+        setTimeout(() => insightBox.style.boxShadow = '', 1000);
+    }
+}
+
+/**
+ * Starts Voice Research (reusing existing system)
+ */
+function startVoiceResearch() {
+    const voiceBtn = document.getElementById('chat-voice-btn');
+    if (voiceBtn) {
+        switchTab('chat');
+        setTimeout(() => voiceBtn.click(), 500);
+    } else {
+        showToast('Voice hardware not detected.', 'error');
+    }
+}
+
+/**
+ * Shows the Beta Welcome Modal
+ */
+function showBetaModal() {
+    const modal = document.getElementById('beta-modal');
+    if (modal) {
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+/**
+ * Closes the Beta Welcome Modal
+ */
+function closeBetaModal() {
+    const modal = document.getElementById('beta-modal');
+    if (modal) {
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+        localStorage.setItem('hasSeenBeta16', 'true');
+    }
+}
+
+// Auto-show Beta Modal on first load of v1.6.0
+window.addEventListener('load', () => {
+    if (!localStorage.getItem('hasSeenBeta16')) {
+        setTimeout(showBetaModal, 2000);
+    }
+});
+
+/**
+ * Search Trend Helper (Used by Ticker/Trends)
+ */
+function searchTrend(element) {
+    const term = element.dataset.searchTerm || element.textContent;
+    if (headerSearchInput) {
+        headerSearchInput.value = term;
+        performSearch();
+        if (element.closest('.fab-menu')) toggleFabMenu();
+    }
+}
+
+/**
+ * Achievement Tracking State
+ */
+let sessionUsedSources = new Set();
+const ACHIEVEMENTS = {
+    PIONEER: 'achievement-pioneer',
+    THINKER: 'achievement-thinker'
+};
+
+/**
+ * Checks and unlocks research achievements based on usage patterns
+ */
+function checkAchievementsStatus() {
+    // 1. Evidence Pioneer (All sources used)
+    const currentSource = document.querySelector('.quick-filter-chip[data-type="source"].active')?.dataset.value || 'all';
+    if (currentSource !== 'all') sessionUsedSources.add(currentSource);
+    
+    if (sessionUsedSources.size >= 2) {
+        unlockAchievement(ACHIEVEMENTS.PIONEER);
+        const progress = document.getElementById('progress-pioneer');
+        if (progress) progress.style.width = '100%';
+    } else {
+        const progress = document.getElementById('progress-pioneer');
+        if (progress) progress.style.width = sessionUsedSources.size === 1 ? '50%' : '0%';
+    }
+
+    // 2. Deep Semantic Thinker (100% semantic weight)
+    const alpha = parseInt(document.getElementById('quick-alpha-slider')?.value || 50);
+    if (alpha === 100) {
+        unlockAchievement(ACHIEVEMENTS.THINKER);
+    }
+}
+
+/**
+ * Helper to unlock achievement with visual effect
+ */
+function unlockAchievement(id) {
+    const el = document.getElementById(id);
+    if (el && el.classList.contains('locked')) {
+        el.classList.remove('locked');
+        el.classList.add('unlocked');
+        showToast(`Achievement Unlocked: ${el.querySelector('strong').textContent}!`, 'success');
+    }
+}
+
+// Initialize v1.6.0-BETA Features
+window.addEventListener('load', () => {
+    console.log('BioMedScholar v1.6.0-BETA Ready.');
+    checkAchievementsStatus();
+});
+
 

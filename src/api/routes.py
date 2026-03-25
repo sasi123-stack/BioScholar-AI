@@ -73,12 +73,12 @@ async def health_check(
             status="healthy" if es_connected else "degraded",
             elasticsearch=es_connected,
             models_loaded=qa_engine is not None,
-            version="1.0.3",
+            version="1.6.0-BETA",
             features={
                 "qa_enabled": qa_engine is not None,
                 "reranking_enabled": reranker is not None,
                 "maverick_sync": True,
-                "deploy_time": "2026-02-23 08:35"
+                "deploy_time": "2026-03-25"
             }
         )
     except Exception as e:

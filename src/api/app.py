@@ -77,9 +77,16 @@ def create_app() -> FastAPI:
         FastAPI: Configured application instance
     """
     app = FastAPI(
-        title="Biomedical Search Engine API",
-        description="Intelligent semantic search engine for biomedical literature and clinical trials",
-        version="1.0.0",
+        title="BioMedScholar AI Command Center",
+        description="Unified Semantic Intelligence Hub for Biomedical Research & Clinical Trial Analytics.",
+        version="1.6.0-BETA",
+        contact={
+            "name": "Sasidhara - Lead AI Developer",
+            "url": "https://biomed-scholar.web.app",
+        },
+        license_info={
+            "name": "Proprietary v1.6-BETA License",
+        },
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan
