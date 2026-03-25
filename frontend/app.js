@@ -7120,5 +7120,3 @@ window.addEventListener('load', () => {
     console.log('BioMedScholar v1.6.0-BETA Ready.');
     checkAchievementsStatus();
 });
-
-
