@@ -171,10 +171,14 @@ def fallback_search_entrez(query: str, max_results: int = 20) -> List[Dict]:
                 "title": doc.get("title", "No Title"),
                 "authors": doc.get("authors", []),
                 "journal": doc.get("journal", "PubMed"),
-                "year": doc.get("publication_year", ""),
+                "year": str(doc.get("publication_year", "")),
                 "abstract": doc.get("abstract", ""),
-                "score": 1.0, # Flat score for fallback
-                "source": "pubmed (live)"
+                "score": 1.0,
+                "source": "pubmed",
+                "metadata": {
+                    "pmid": doc.get("pmid", ""),
+                    "source": "pubmed"
+                }
             })
         return results
     except Exception as e:

@@ -2224,7 +2224,7 @@ function displayCurrentResults() {
     const pageResults = results.slice(startIdx, endIdx);
 
     if (resultsCount) {
-        const pubmedResults = results.filter(r => r.source === 'pubmed').length;
+        const pubmedResults = results.filter(r => r.source && r.source.toLowerCase().includes('pubmed')).length;
         const googleResults = results.filter(r => r.source === 'google').length;
         const trialsResults = results.length - pubmedResults - googleResults;
 
@@ -2505,7 +2505,7 @@ function showRelatedSearches(query) {
 }
 
 function createResultCard(result) {
-    const isPubMed = result.source === 'pubmed';
+    const isPubMed = result.source && result.source.toLowerCase().includes('pubmed');
     const isGoogle = result.source === 'google';
     const sourceLabel = isGoogle ? 'Web Search' : (isPubMed ? 'PubMed' : 'Clinical Trial');
     const sourceClass = isGoogle ? 'google' : (isPubMed ? 'pubmed' : 'clinical-trial');
@@ -4359,7 +4359,7 @@ function openDocumentModal(result) {
 
     if (!modal || !modalTitle || !modalBody || !modalFooter) return;
 
-    const isPubMed = result.source === 'pubmed';
+    const isPubMed = result.source && result.source.toLowerCase().includes('pubmed');
     const externalUrl = getExternalUrl(result);
 
     modalTitle.textContent = result.title;
