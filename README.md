@@ -115,14 +115,19 @@ A high-density workspace for literature review:
 
 ---
 
-## 📅 Future Roadmap (May 2026 Trailer)
+## 🎬 Product Launch Calendar
 
-The platform is currently optimized for stability and high-availability search in its **v1.6.0-BETA** state. The following high-performance features are slated for the **v1.6.5-PREMIUM** release in May 2026:
+- **⚡ Teaser Promo**: April 4th, 2026 | 6:00 PM IST
+- **🎥 Official Teaser**: April 6th, 2026 | 6:00 PM IST
 
-- **📄 AI Research Synthesis (v1.6.5)**: One-click export of structured search results and Maverick insights into professional PDF briefings.
-- **🖼️ Vision Lab Integration**: A dedicated workspace for drag-and-drop analysis of medical imaging, charts, and diagrams using Maverick Vision.
-- **🔊 Maverick Voice Briefing**: High-fidelity text-to-speech integration for hands-free research summaries.
-- **📊 Clinical Analytics Gauges**: Real-time safety scoring and methodology variance analysis for trial results.
+## 📅 Roadmap (May 20, 2026 - PREMIUM)
+
+The platform is currently optimized for stability and resilience in its **v1.6.0-BETA** state. The following high-performance features are slated for the **v1.6.5-PREMIUM** release:
+
+- **📄 AI Research Synthesis**: One-click PDF research briefings.
+- **🖼️ Vision Lab Integration**: Multi-modal image analysis workspace.
+- **🔊 Maverick Voice Briefing**: High-fidelity TTS for research summaries.
+- **📊 Clinical Analytics Gauges**: Safety & methodology metrics.
 
 ---
 
@@ -130,7 +135,7 @@ The platform is currently optimized for stability and high-availability search i
 
 **Built with ❤️ for the Biomedical Research Community**
 
-*Last updated: March 26, 2026 (v1.6.0-BETA - Resilience & Roadmap Update)*
+*Last updated: March 26, 2026 (v1.6.0-BETA - Launch Campaign Update)*
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
