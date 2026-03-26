@@ -438,26 +438,14 @@ function closeArticleModal() {
 
 
 function closeAllModals() {
-    // Close Article Modals
-    const artModal = document.getElementById('article-detail-modal');
-    if (artModal) artModal.classList.remove('open', 'active', 'show');
-
-    // Close General Modals
-    document.querySelectorAll('.modal').forEach(m => {
-        m.classList.remove('open', 'active', 'show');
-    });
-
-    // Close Context Panels
+    closeArticleModal();
+    hideAutocomplete();
+    // Close other panels
     const readingListPanel = document.getElementById('reading-list-panel');
     if (readingListPanel && readingListPanel.classList.contains('open')) {
         toggleReadingList();
     }
-
-    // Hide UI elements
-    hideAutocomplete();
-    document.body.style.overflow = '';
 }
-window.closeAllModals = closeAllModals;
 
 function initDynamicScroll() {
     const progressBar = document.getElementById('scroll-progress');
@@ -2698,12 +2686,6 @@ function getExternalUrl(result) {
     if (result.link) return result.link;
     if (result.metadata?.url) return result.metadata.url;
 
-    // Final Fallback: Google Scholar search by title - ensures every article has a link
-    const title = result.title || '';
-    if (title) {
-        return `https://scholar.google.com/scholar?q=${encodeURIComponent(title)}`;
-    }
-
     return null;
 }
 
@@ -4478,7 +4460,12 @@ function closeDocumentModal() {
     }
 }
 
-// Redundant closeAllModals removed in consolidation.
+function closeAllModals() {
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.classList.remove('open');
+    });
+    document.body.style.overflow = '';
+}
 
 // ==========================================
 // NEW KEYBOARD SHORTCUT HELPERS
@@ -5266,10 +5253,10 @@ function openCitationModal(articleData) {
 /**
  * Close citation modal
  */
-window.closeCitationModal = function () {
+function closeCitationModal() {
     const modal = document.getElementById('citation-modal');
     if (modal) {
-        modal.classList.remove('open', 'active', 'show');
+        modal.classList.remove('open');
         document.body.style.overflow = '';
     }
 }
@@ -5434,62 +5421,131 @@ function copyCitation() {
 }
 
 // ==========================================
-// HELP & SHORTCUTS MODAL FUNCTIONS
+// HELP, SHORTCUTS & SCHEDULER MODAL FUNCTIONS
 // ==========================================
 
 /**
  * Show help modal
  */
-/**
- * Modal Management Group (Hardened v1.6.0-BETA)
- */
-
 window.showHelpModal = function (event) {
-    console.log('BioMedScholar: Triggering Help Modal');
+    console.log('BioMedScholar: showHelpModal triggered');
     if (event) {
         if (typeof event.preventDefault === 'function') event.preventDefault();
         if (typeof event.stopPropagation === 'function') event.stopPropagation();
     }
     const modal = document.getElementById('help-modal');
     if (modal) {
+        // Force state reset first to ensure visibility
+        modal.classList.remove('hidden');
         modal.classList.add('open', 'active');
         document.body.style.overflow = 'hidden';
         
-        // Auto-close dropdown menu
+        // Auto-close overlaying menus
+        const options = document.querySelector('.fab-options');
+        if (options && !options.classList.contains('hidden')) options.classList.add('hidden');
+
         const headerMenu = document.getElementById('header-menu');
         if (headerMenu) headerMenu.classList.add('hidden');
+        
+        showToast('Opening Help Guide...', 'info');
+    } else {
+        console.error('Help modal element not found!');
+        showToast('Error: Help Modal not found', 'error');
     }
 }
 
+/**
+ * Close help modal
+ */
 window.closeHelpModal = function () {
     const modal = document.getElementById('help-modal');
     if (modal) {
-        modal.classList.remove('open', 'active', 'show');
+        modal.classList.remove('open', 'active');
         document.body.style.overflow = '';
     }
 }
 
+/**
+ * Show keyboard shortcuts modal
+ */
 window.showKeyboardShortcuts = function (event) {
-    console.log('BioMedScholar: Triggering Shortcuts Modal');
+    console.log('BioMedScholar: showKeyboardShortcuts triggered');
     if (event) {
         if (typeof event.preventDefault === 'function') event.preventDefault();
         if (typeof event.stopPropagation === 'function') event.stopPropagation();
     }
     const modal = document.getElementById('shortcuts-modal');
     if (modal) {
+        modal.classList.remove('hidden');
         modal.classList.add('open', 'active');
         document.body.style.overflow = 'hidden';
         
-        // Auto-close dropdown menu
+        // Auto-close overlaying menus
+        const options = document.querySelector('.fab-options');
+        if (options && !options.classList.contains('hidden')) options.classList.add('hidden');
+
         const headerMenu = document.getElementById('header-menu');
         if (headerMenu) headerMenu.classList.add('hidden');
+        
+        showToast('Keyboard Shortcuts', 'info');
+    } else {
+        console.error('Shortcuts modal element not found!');
+        showToast('Error: Shortcuts Modal not found', 'error');
     }
 }
 
+/**
+ * Close keyboard shortcuts modal
+ */
 window.closeShortcutsModal = function () {
     const modal = document.getElementById('shortcuts-modal');
     if (modal) {
-        modal.classList.remove('open', 'active', 'show');
+        modal.classList.remove('open', 'active');
+        document.body.style.overflow = '';
+    }
+}
+
+/**
+ * Show scheduled actions modal
+ */
+window.openScheduledActionsModal = function (event) {
+    console.log('BioMedScholar: openScheduledActionsModal triggered');
+    if (event) {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    }
+    const modal = document.getElementById('scheduler-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('open', 'active');
+        document.body.style.overflow = 'hidden';
+        
+        // Auto-close overlaying menus
+        const options = document.querySelector('.fab-options');
+        if (options && !options.classList.contains('hidden')) options.classList.add('hidden');
+
+        const headerMenu = document.getElementById('header-menu');
+        if (headerMenu) headerMenu.classList.add('hidden');
+        
+        // Refresh scheduled actions list
+        if (typeof renderScheduledActions === 'function') {
+            renderScheduledActions();
+        }
+        
+        showToast('Scheduled Actions', 'info');
+    } else {
+        console.error('Scheduler modal element not found!');
+        showToast('Error: Scheduler Modal not found', 'error');
+    }
+}
+
+/**
+ * Close scheduled actions modal
+ */
+window.closeScheduledActionsModal = function () {
+    const modal = document.getElementById('scheduler-modal');
+    if (modal) {
+        modal.classList.remove('open', 'active');
         document.body.style.overflow = '';
     }
 }
@@ -6446,7 +6502,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initialize Chat Resizer
     initChatResizer();
-    initScheduledActions();
 
     // Close notification dropdown when clicking outside
     document.addEventListener('click', function (e) {
@@ -6674,29 +6729,12 @@ function initScheduledActions() {
     setTimeout(checkScheduledActions, 2000);
 }
 
-window.openScheduledActionsModal = function (event) {
-    console.log('BioMedScholar: Triggering Scheduled Actions Modal');
-    if (event) {
-        if (typeof event.preventDefault === 'function') event.preventDefault();
-        if (typeof event.stopPropagation === 'function') event.stopPropagation();
-    }
-    const modal = document.getElementById('scheduler-modal');
-    if (modal) {
-        modal.classList.add('open', 'active');
-        document.body.style.overflow = 'hidden';
-        
-        // Auto-close dropdown
-        const headerMenu = document.getElementById('header-menu');
-        if (headerMenu) headerMenu.classList.add('hidden');
-        
-        renderScheduledActions();
-    }
-}
 
-window.closeScheduledActionsModal = function () {
+function closeScheduledActionsModal() {
     const modal = document.getElementById('scheduler-modal');
     if (modal) {
-        modal.classList.remove('open', 'active', 'show');
+        modal.classList.remove('open');
+        modal.classList.remove('active');
         document.body.style.overflow = '';
     }
 }

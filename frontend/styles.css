@@ -3112,10 +3112,9 @@ body.chat-mode .scholar-footer {
 }
 
 .result-action-btn.primary {
-    background: var(--primary-blue);
-    color: white !important;
+    background: var(--primary-blue-light);
+    color: var(--primary-blue);
     border-color: transparent;
-    font-weight: 600;
 }
 
 .result-action-btn.primary:hover {
@@ -3723,11 +3722,11 @@ mark {
     right: 0;
     bottom: 0;
     padding-top: 80px; /* Offset for header */
-    background: rgba(0, 0, 0, 0.75);
-    z-index: 999999; /* Force global priority top layer */
-    align-items: flex-start;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 200000; /* Priority top layer */
+    align-items: flex-start; /* Start from top with padding */
     justify-content: center;
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(8px);
     opacity: 0;
     transition: opacity 0.2s ease;
 }
