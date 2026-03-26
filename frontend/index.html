@@ -162,17 +162,16 @@
                         </svg>
                         <span>History</span>
                     </button>
-                    <button class="menu-item" onclick="showKeyboardShortcuts(event)">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <rect x="2" y="4" width="20" height="16" rx="2" ry="2" />
-                            <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M8 16h8" />
+                    <div class="menu-divider"></div>
+                    <button class="menu-item" onclick="window.showKeyboardShortcuts(event)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                            <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M8 16h8"></path>
                         </svg>
                         <span>Shortcuts</span>
                     </button>
-                    <button class="menu-item" onclick="openScheduledActionsModal(event)">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
+                    <button class="menu-item" onclick="window.openScheduledActionsModal(event)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                             <line x1="16" y1="2" x2="16" y2="6"></line>
                             <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -180,13 +179,11 @@
                         </svg>
                         <span>Scheduled Actions</span>
                     </button>
-                    <div class="menu-divider"></div>
-                    <button class="menu-item" onclick="showHelpModal(event)">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <circle cx="12" cy="12" r="10" />
-                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                    <button class="menu-item" onclick="window.showHelpModal(event)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
                         </svg>
                         <span>Help Guide</span>
                     </button>
@@ -1022,6 +1019,8 @@
 
 
 
+
+
                         <div class="trends-grid">
                             <!-- Fast-Emerging Topics Card -->
                             <div class="trends-card trends-card-primary">
@@ -1313,463 +1312,8 @@
                 </div>
             </div>
         </div>
-    </div>
+    <!-- Duplicate and simplified modals removed for v1.6.0-BETA consolidation -->
 
-    <!-- Keyboard Shortcuts Modal -->
-    <div id="shortcuts-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>⌨️ Keyboard Shortcuts</h2>
-                <button class="modal-close" onclick="closeShortcutsModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="shortcuts-grid">
-                    <div class="shortcut-category">Navigation</div>
-                    <div class="shortcut-item">
-                        <kbd>1</kbd>
-                        <span>Research Desk</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <kbd>←</kbd> <kbd>→</kbd>
-                        <span>Navigate pages</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <kbd>Home</kbd>
-                        <span>Scroll to top</span>
-                    </div>
-
-                    <div class="shortcut-category">Search</div>
-                    <div class="shortcut-item">
-                        <kbd>Ctrl</kbd> + <kbd>K</kbd>
-                        <span>Focus search bar</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <kbd>Ctrl</kbd> + <kbd>E</kbd>
-                        <span>Export results (CSV)</span>
-                    </div>
-
-                    <div class="shortcut-category">Panels & Actions</div>
-                    <div class="shortcut-item">
-                        <kbd>B</kbd>
-                        <span>Toggle reading list</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <kbd>N</kbd>
-                        <span>Toggle notifications</span>
-                    </div>
-
-                    <div class="shortcut-item">
-                        <kbd>G</kbd>
-                        <span>Toggle filters sidebar</span>
-                    </div>
-
-                    <div class="shortcut-category">Article Modal</div>
-                    <div class="shortcut-item">
-                        <kbd>S</kbd>
-                        <span>Share article</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <kbd>C</kbd>
-                        <span>Cite article</span>
-                    </div>
-
-                    <div class="shortcut-category">Display</div>
-                    <div class="shortcut-item">
-                        <kbd>D</kbd>
-                        <span>Toggle dark mode</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <kbd>Z</kbd>
-                        <span>Toggle Zen mode</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <kbd>F</kbd>
-                        <span>Toggle fullscreen</span>
-                    </div>
-
-                    <div class="shortcut-category">Help & Modals</div>
-                    <div class="shortcut-item">
-                        <kbd>?</kbd>
-                        <span>Show shortcuts</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <kbd>H</kbd>
-                        <span>Open help guide</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <kbd>Escape</kbd>
-                        <span>Close modal / panel</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Help Modal -->
-    <div id="help-modal" class="modal">
-        <div class="modal-content modal-large">
-            <div class="modal-header">
-                <h2>📚 BioMed Scholar Help Guide</h2>
-                <button class="modal-close" onclick="closeHelpModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="help-tabs">
-                    <button class="help-tab active" data-section="getting-started"
-                        onclick="switchHelpTab('getting-started', this)">Getting Started</button>
-                    <button class="help-tab" data-section="authentication"
-                        onclick="switchHelpTab('authentication', this)">Authentication</button>
-                    <button class="help-tab" data-section="search-tips"
-                        onclick="switchHelpTab('search-tips', this)">Search Modes</button>
-                    <button class="help-tab" data-section="maverick-ai"
-                        onclick="switchHelpTab('maverick-ai', this)">Research AI Chat</button>
-                    <button class="help-tab" data-section="library"
-                        onclick="switchHelpTab('library', this)">Library</button>
-                    <button class="help-tab" data-section="shortcuts"
-                        onclick="switchHelpTab('shortcuts', this)">Shortcuts</button>
-                    <button class="help-tab" data-section="faq" onclick="switchHelpTab('faq', this)">FAQ</button>
-                </div>
-
-                <div class="help-content">
-                    <!-- Getting Started -->
-                    <div class="help-section active" id="help-getting-started">
-                        <h3>🚀 Welcome to BioMed Scholar</h3>
-                        <p>BioMed Scholar is an AI-powered search engine for biomedical literature. Search millions of
-                            PubMed articles and clinical trials with semantic understanding.</p>
-
-                        <div class="help-card">
-                            <h4>🔍 Quick Search</h4>
-                            <ol>
-                                <li>Type your query in the search bar (e.g., "COVID-19 vaccine efficacy")</li>
-                                <li>Press Enter or click the search button</li>
-                                <li>Browse results with article details, authors, and publication dates</li>
-                            </ol>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>🤖 Research AI Chat</h4>
-                            <ol>
-                                <li>Switch to the "Research AI Chat" tab</li>
-                                <li>Ask complex biomedical questions directly to our integrated gpt-oss:120b (Claude Code) AI</li>
-                                <li>Get synthesized answers with citations from indexed literature</li>
-                            </ol>
-                        </div>
-
-
-                    </div>
-
-                    <!-- Authentication -->
-                    <div class="help-section" id="help-authentication">
-                        <h3>🔐 Authentication</h3>
-                        <p>Create an account to sync your research across devices and personalize your experience.</p>
-
-                        <div class="help-card">
-                            <h4>Sign Up / Login</h4>
-                            <ol>
-                                <li>Click the <strong>"Login"</strong> button in the top-right header</li>
-                                <li><strong>To Sign Up:</strong> Click "Sign up", enter Name, Email, Password, and click
-                                    "Sign Up"</li>
-                                <li><strong>To Login:</strong> Enter Email and Password, then click "Sign In"</li>
-                                <li><strong>Google Sign-In:</strong> Click "Continue with Google" for instant access
-                                </li>
-                            </ol>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>Why create an account?</h4>
-                            <ul>
-                                <li><strong>Cloud Sync:</strong> Your Reading List is saved to the cloud, accessible
-                                    from any device</li>
-                                <li><strong>Personalization:</strong> Settings and preferences follow you</li>
-                                <li><strong>Secure:</strong> Powered by Firebase Authentication</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- Search Tips -->
-                    <div class="help-section" id="help-search-tips">
-                        <h3>💡 Search & Q&A Strategies</h3>
-
-                        <div class="help-card">
-                            <h4>Search Modes</h4>
-                            <ul>
-                                <li><strong>Keyword (0%):</strong> Strict exact word matching. Good for specific codes.
-                                </li>
-                                <li><strong>Balanced (50%):</strong> Default. Combines keywords with meaning.</li>
-                                <li><strong>Semantic (100%):</strong> Focuses on meaning. Great for natural language
-                                    queries.</li>
-                            </ul>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>Filters</h4>
-                            <ul>
-                                <li><strong>Source Type:</strong> PubMed or Clinical Trials</li>
-                                <li><strong>Date Range:</strong> Filter by publication year</li>
-                                <li><strong>Article Type:</strong> Research, Review, Meta-Check, etc.</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- Research AI (Maverick) -->
-                    <div class="help-section" id="help-maverick-ai">
-                        <h3>🤖 Maverick Research AI</h3>
-                        <p>Leveraging advanced RAG (Retrieval-Augmented Generation) to analyze biomedical data in
-                            real-time.</p>
-
-                        <div class="help-card">
-                            <h4>🧠 Transparent Thinking</h4>
-                            <p>Maverick now shows its internal analytical steps line-by-line, including query
-                                interpretation, metadata checking, and evidence contextualization. You can expand the
-                                <strong>"Thinking Process"</strong> toggle on any response to see the full logic.
-                            </p>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>🎙️ Interactive Tools</h4>
-                            <ul>
-                                <li><strong>Speak:</strong> Click the speaker icon to vocalize Maverick's synthesis.
-                                </li>
-                                <li><strong>Stop:</strong> Click the red Stop button while Maverick is thinking to abort
-                                    a request instantly.</li>
-                                <li><strong>Follow-ups:</strong> Use the Suggested Research Chips to dive deeper into
-                                    specific results.</li>
-                                <li><strong>Feedback:</strong> Use Thumbs Up/Down to help improve Maverick's research
-                                    accuracy.</li>
-                            </ul>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>📅 Scheduled Actions (NEW)</h4>
-                            <p>Configure Maverick to act proactively even when you're not chatting:</p>
-                            <ul>
-                                <li><strong>Personal Reminders:</strong> Set dates for literature review tasks.</li>
-                                <li><strong>AI Triggers:</strong> Maverick can wish you on birthdays or anniversaries
-                                    with personalized biomedical quotes.</li>
-                                <li><strong>Management:</strong> Click the <strong>Calendar icon</strong> in Maverick's
-                                    Tool matrix to view and manage active schedules.</li>
-                            </ul>
-                        </div>
-                    </div>
-
-
-                    <!-- Library Management -->
-                    <div class="help-section" id="help-library">
-                        <h3>📚 Managing Your Library</h3>
-
-                        <div class="help-card">
-                            <h4>Reading List</h4>
-                            <ul>
-                                <li><strong>Save:</strong> Click the Bookmark icon on any result to save it</li>
-                                <li><strong>View:</strong> Click the Bookmark icon in the header or press <kbd>B</kbd>
-                                </li>
-                                <li><strong>Export:</strong> Download your list as CSV or BibTeX from the panel</li>
-                                <li><strong>Save All:</strong> Click "Save All" in results header to bookmark all
-                                    results at once</li>
-                            </ul>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>Citations</h4>
-                            <p>Generate citations instantly for any article:</p>
-                            <ol>
-                                <li>Click the "Cite" button on a result card (or press <kbd>C</kbd> in article modal)
-                                </li>
-                                <li>Choose format: <strong>APA, MLA, Chicago, BibTeX</strong></li>
-                                <li>Click "Copy to Clipboard"</li>
-                            </ol>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>Share Articles</h4>
-                            <p>Share articles with colleagues easily:</p>
-                            <ul>
-                                <li><strong>From Results:</strong> Click the "Share" button on any search result card
-                                </li>
-                                <li><strong>From Modal:</strong> Click the share icon in the article detail view, or
-                                    press <kbd>S</kbd></li>
-                                <li><strong>Native Sharing:</strong> Uses your device's native share dialog on mobile
-                                </li>
-                                <li><strong>Clipboard Fallback:</strong> On desktop, the article title and link are
-                                    copied to clipboard</li>
-                            </ul>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>Export Results</h4>
-                            <ul>
-                                <li><strong>CSV:</strong> Click the CSV button in the results header or press
-                                    <kbd>Ctrl</kbd>+<kbd>E</kbd>
-                                </li>
-                                <li><strong>BibTeX:</strong> Click the BibTeX button for reference manager import</li>
-                                <li><strong>Print:</strong> Click the Print button or use <kbd>Ctrl</kbd>+<kbd>P</kbd>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- Keyboard Shortcuts -->
-                    <div class="help-section" id="help-shortcuts">
-                        <h3>⌨️ Keyboard Shortcuts</h3>
-                        <p>Speed up your workflow with these keyboard shortcuts. Press <kbd>?</kbd> anytime to see a
-                            quick reference.</p>
-
-                        <div class="help-card">
-                            <h4>Navigation</h4>
-                            <ul>
-                                <li><kbd>1</kbd> <kbd>2</kbd> — Switch between Research Desk and Research AI Chat tabs
-                                </li>
-                                <li><kbd>←</kbd> <kbd>→</kbd> — Navigate between result pages</li>
-                                <li><kbd>Home</kbd> — Scroll back to the top of the page</li>
-                            </ul>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>Search</h4>
-                            <ul>
-                                <li><kbd>Ctrl</kbd>+<kbd>K</kbd> — Focus the search bar from anywhere</li>
-                                <li><kbd>Ctrl</kbd>+<kbd>E</kbd> — Quick export results as CSV</li>
-                            </ul>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>Panels & Actions</h4>
-                            <ul>
-                                <li><kbd>B</kbd> — Toggle Reading List sidebar</li>
-                                <li><kbd>N</kbd> — Toggle Notifications panel</li>
-
-                                <li><kbd>G</kbd> — Toggle filters sidebar (mobile)</li>
-                            </ul>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>Article Modal</h4>
-                            <ul>
-                                <li><kbd>S</kbd> — Share the currently open article</li>
-                                <li><kbd>C</kbd> — Generate a citation for the current article</li>
-                            </ul>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>Display & Modes</h4>
-                            <ul>
-                                <li><kbd>D</kbd> — Toggle dark / light mode</li>
-                                <li><kbd>Z</kbd> — Toggle Zen (focus) mode</li>
-                                <li><kbd>F</kbd> — Toggle fullscreen</li>
-                            </ul>
-                        </div>
-
-                        <div class="help-card">
-                            <h4>Help & Modals</h4>
-                            <ul>
-                                <li><kbd>?</kbd> — Show keyboard shortcuts quick reference</li>
-                                <li><kbd>H</kbd> — Open this Help Guide</li>
-                                <li><kbd>Escape</kbd> — Close any open modal or panel</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- FAQ -->
-                    <div class="help-section" id="help-faq">
-                        <h3>❓ Frequently Asked Questions</h3>
-
-                        <div class="faq-item">
-                            <h4>What data sources are included?</h4>
-                            <p>BioMed Scholar indexes articles from PubMed (biomedical literature) and
-                                ClinicalTrials.gov (clinical trial registries).</p>
-                        </div>
-
-                        <div class="faq-item">
-                            <h4>How does semantic search work?</h4>
-                            <p>We use BioBERT, a language model trained on biomedical text, to understand the meaning of
-                                your query. This allows finding relevant results even when exact keywords don't match.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Notification Settings Modal -->
-            <div id="notification-settings-modal" class="modal">
-                <div class="modal-content modal-small">
-                    <div class="modal-header">
-                        <h2>🔔 Notification Settings</h2>
-                        <button class="modal-close" onclick="closeNotificationSettings()">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="settings-group">
-                            <div class="settings-item">
-                                <label class="toggle-container">
-                                    <span>Enable Notifications</span>
-                                    <input type="checkbox" id="notif-enabled-main" checked
-                                        onchange="updatePref('enabled', this.checked)">
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
-                            <div class="settings-item">
-                                <label class="toggle-container">
-                                    <span>Sound Effects</span>
-                                    <input type="checkbox" id="notif-sound" checked
-                                        onchange="updatePref('sound', this.checked)">
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
-                            <div class="settings-item">
-                                <label class="toggle-container">
-                                    <span>Browser Notifications</span>
-                                    <input type="checkbox" id="notif-browser"
-                                        onchange="toggleBrowserNotifs(this.checked)">
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="settings-divider">Categories</div>
-                        <div class="settings-grid">
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="cat-articles" checked
-                                    onchange="updatePrefCat('articles', this.checked)">
-                                <span>Library Updates</span>
-                            </label>
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="cat-searches" checked
-                                    onchange="updatePrefCat('searches', this.checked)">
-                                <span>Search History</span>
-                            </label>
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="cat-updates" checked
-                                    onchange="updatePrefCat('updates', this.checked)">
-                                <span>System Updates</span>
-                            </label>
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="cat-achievements" checked
-                                    onchange="updatePrefCat('achievements', this.checked)">
-                                <span>Achievements</span>
-                            </label>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="modal-btn primary" onclick="closeNotificationSettings()">Done</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <h4>Is my data private?</h4>
-                <p>Yes! Your reading list is private to your account. We don't track your individual
-                    searches.</p>
-            </div>
-
-            <div class="faq-item">
-                <h4>Can I use this for medical advice?</h4>
-                <p>⚠️ BioMed Scholar is a research tool, not a substitute for professional medical advice.
-                    Always consult healthcare providers for medical decisions.</p>
-            </div>
-        </div>
-    </div>
-    </div>
-
-    </div>
-    </div>
 
 
 
@@ -1979,11 +1523,8 @@
                     </svg>
                     Cite This Article
                 </h2>
-                <button class="modal-close-btn" onclick="closeCitationModal()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                <button class="modal-close" onclick="closeCitationModal()">
+                    &times;
                 </button>
             </div>
             <div class="modal-body">
@@ -2014,7 +1555,8 @@
     </div>
 
     <!-- Help & Guide Modal -->
-    <div class="modal" id="help-modal">
+    <!-- Help & Guide Modal (v1.6.0-BETA) -->
+    <div id="help-modal" class="modal" onclick="if(event.target === this) closeHelpModal()">
         <div class="modal-overlay" onclick="closeHelpModal()"></div>
         <div class="modal-container help-modal-container">
             <div class="modal-header">
@@ -2026,11 +1568,8 @@
                     </svg>
                     Help & Guide
                 </h2>
-                <button class="modal-close-btn" onclick="closeHelpModal()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                <button class="modal-close" onclick="closeHelpModal()">
+                    &times;
                 </button>
             </div>
             <div class="modal-body help-modal-body">
@@ -2103,11 +1642,8 @@
                     </svg>
                     Keyboard Shortcuts
                 </h2>
-                <button class="modal-close-btn" onclick="closeShortcutsModal()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                <button class="modal-close" onclick="closeShortcutsModal()">
+                    &times;
                 </button>
             </div>
             <div class="modal-body shortcuts-modal-body">
@@ -2209,9 +1745,10 @@
 
 
 
-    <!-- Scheduled Actions Modal -->
-    <div id="scheduler-modal" class="modal">
-        <div class="modal-content">
+    <!-- Scheduled Actions Modal (v1.6.0-BETA) -->
+    <div id="scheduler-modal" class="modal" onclick="if(event.target === this) closeScheduledActionsModal()">
+        <div class="modal-overlay" onclick="closeScheduledActionsModal()"></div>
+        <div class="modal-container scheduler-modal-container">
             <div class="modal-header">
                 <h2>📅 Scheduled Actions</h2>
                 <button class="modal-close" onclick="closeScheduledActionsModal()">&times;</button>
@@ -2257,7 +1794,60 @@
                         <button class="modal-btn-primary" onclick="addScheduledAction()" style="width: 100%;">Add
                             Action</button>
                     </div>
+
+                    <div class="scheduler-footer" style="margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                        <button class="modal-btn secondary full-width" onclick="closeScheduledActionsModal()" style="font-weight: 700;">Done & Close</button>
+                    </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Settings Modal -->
+    <div id="notification-settings-modal" class="modal" onclick="if(event.target === this) closeNotificationSettings()">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>🔔 Notification Settings</h2>
+                <button class="modal-close" onclick="closeNotificationSettings()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-group">
+                    <div class="settings-item">
+                        <label class="toggle-container">
+                            <span>Enable Notifications</span>
+                            <input type="checkbox" id="notif-enabled-main" checked
+                                onchange="updatePref('enabled', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn primary full-width" onclick="closeNotificationSettings()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal" onclick="if(event.target === this) closeLoginModal()">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>🔐 Login to BioMed Scholar</h2>
+                <button class="modal-close" onclick="closeLoginModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="auth-subtitle">Save your research across all your devices.</p>
+                <form id="login-form" onsubmit="handleLogin(event)">
+                    <div class="filter-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" required placeholder="name@example.com">
+                    </div>
+                    <div class="filter-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="modal-btn primary full-width">Sign In</button>
+                </form>
             </div>
         </div>
     </div>
@@ -2283,38 +1873,45 @@
         </div>
     </footer>
 
+    <!-- Quick Access Taskbar (Shortcuts, Scheduler, Help) -->
+    <div class="quick-taskbar" id="quick-taskbar">
+        <button class="task-btn" onclick="window.showKeyboardShortcuts(event)" title="Keyboard Shortcuts">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M8 16h8"></path></svg>
+        </button>
+        <button class="task-btn" onclick="window.openScheduledActionsModal(event)" title="Scheduled Actions">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        </button>
+        <button class="task-btn" onclick="window.showHelpModal(event)" title="Help Guide">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        </button>
+    </div>
+
     <!-- Floating Action Menu (BETA) -->
     <div class="fab-menu" id="fab-menu">
-        <button class="fab-main-btn" onclick="toggleFabMenu()">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button class="fab-main-btn" id="fab-main-btn" onclick="toggleFabMenu()" title="More Options" aria-label="More Options">
+            <svg id="fab-icon-plus" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform 0.3s;">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
         </button>
-        <div class="fab-options hidden">
-            <button class="fab-option" onclick="startVoiceResearch()" title="Voice Research">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                </svg>
+        <div class="fab-options hidden" id="fab-options-panel">
+            <button class="fab-speed-item" onclick="startVoiceResearch(); toggleFabMenu();">
+                <span class="fab-item-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                </span>
+                <span class="fab-item-label">Voice Research</span>
             </button>
-            <button class="fab-option" onclick="switchTab('chat')" title="AI Chat">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-11.7 8.38 8.38 0 0 1 3.8.9L21 3.5l-1 4.5z"></path>
-                </svg>
-            </button>
-            <button class="fab-option" onclick="showHelpModal()" title="Help Guide">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                </svg>
+            <button class="fab-speed-item" onclick="switchTab('chat'); toggleFabMenu();">
+                <span class="fab-item-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-11.7 8.38 8.38 0 0 1 3.8.9L21 3.5l-1 4.5z"></path></svg>
+                </span>
+                <span class="fab-item-label">Maverick AI Chat</span>
             </button>
         </div>
     </div>
 
-    <!-- Beta Features Disclosure & Survey -->
-    <div id="beta-modal" class="modal">
+    <!-- Beta Features Disclosure & Survey (v1.6.0-BETA) -->
+    <div id="beta-modal" class="modal" onclick="if(event.target === this) closeBetaModal()">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>🧪 Welcome to BioMedScholar BETA</h2>
@@ -2322,7 +1919,7 @@
             </div>
             <div class="modal-body">
                 <div class="beta-notice">
-                    <p>You are using <strong>BioMedScholar AI v1.6.0-BETA</strong>. We are testing new Multi-Modal capabilities and our Research Insight engine.</p>
+                    <p>You are using <strong>BioMedScholar AI v1.6.0-BETA (Harden-V1)</strong>. We are testing new Multi-Modal capabilities and our Research Insight engine.</p>
                     <div class="beta-feature-list">
                         <div class="beta-feature-item">
                             <span class="beta-feature-icon">🔍</span>
@@ -2341,10 +1938,16 @@
                         Help us improve! Your feedback is invaluable.
                         <a href="https://wa.me/918500419303" target="_blank" class="beta-survey-btn">Share Feedback</a>
                     </div>
+
+                    <div class="beta-footer-actions" style="margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border-light);">
+                        <button class="modal-btn primary full-width" onclick="closeBetaModal()" style="padding: 14px; font-size: 15px; letter-spacing: 0.5px;">Got it! Explore v1.6.0</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+
 
 
 

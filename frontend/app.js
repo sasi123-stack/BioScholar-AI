@@ -1,4 +1,4 @@
-// BioMedScholar AI v1.6.0 - BETA | Research Intelligence & Multi-Modal Analysis
+// BioMedScholar AI v1.6.0-BETA (Harden-V1) | Research Intelligence & Multi-Modal Analysis
 // Force browser update - unique id: 20260323...
 
 // Use 'var' (which can be redeclared) or check if it exists first
@@ -438,14 +438,26 @@ function closeArticleModal() {
 
 
 function closeAllModals() {
-    closeArticleModal();
-    hideAutocomplete();
-    // Close other panels
+    // Close Article Modals
+    const artModal = document.getElementById('article-detail-modal');
+    if (artModal) artModal.classList.remove('open', 'active', 'show');
+
+    // Close General Modals
+    document.querySelectorAll('.modal').forEach(m => {
+        m.classList.remove('open', 'active', 'show');
+    });
+
+    // Close Context Panels
     const readingListPanel = document.getElementById('reading-list-panel');
     if (readingListPanel && readingListPanel.classList.contains('open')) {
         toggleReadingList();
     }
+
+    // Hide UI elements
+    hideAutocomplete();
+    document.body.style.overflow = '';
 }
+window.closeAllModals = closeAllModals;
 
 function initDynamicScroll() {
     const progressBar = document.getElementById('scroll-progress');
@@ -2686,6 +2698,12 @@ function getExternalUrl(result) {
     if (result.link) return result.link;
     if (result.metadata?.url) return result.metadata.url;
 
+    // Final Fallback: Google Scholar search by title - ensures every article has a link
+    const title = result.title || '';
+    if (title) {
+        return `https://scholar.google.com/scholar?q=${encodeURIComponent(title)}`;
+    }
+
     return null;
 }
 
@@ -2818,10 +2836,17 @@ function updateReadingListCount() {
     }
 }
 
-function toggleReadingList() {
+function toggleReadingList(event) {
+    if (event) {
+        event.stopPropagation();
+    }
     const panel = document.getElementById('reading-list-panel');
     panel?.classList.toggle('open');
     renderReadingList();
+
+    // Auto-close Header Menu if open
+    const headerMenu = document.getElementById('header-menu');
+    if (headerMenu) headerMenu.classList.add('hidden');
 }
 
 
@@ -4453,20 +4478,7 @@ function closeDocumentModal() {
     }
 }
 
-function showKeyboardShortcuts() {
-    document.getElementById('shortcuts-modal')?.classList.add('open');
-}
-
-function closeShortcutsModal() {
-    document.getElementById('shortcuts-modal')?.classList.remove('open');
-}
-
-function closeAllModals() {
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.classList.remove('open');
-    });
-    document.body.style.overflow = '';
-}
+// Redundant closeAllModals removed in consolidation.
 
 // ==========================================
 // NEW KEYBOARD SHORTCUT HELPERS
@@ -4747,56 +4759,8 @@ function setExampleQuestion(question) {
 }
 
 // ==========================================
-// HELP MODAL
-// ==========================================
-function showHelpModal() {
-    const modal = document.getElementById('help-modal');
-    if (modal) {
-        modal.classList.add('open');
-        document.body.style.overflow = 'hidden';
-        // Reset to first tab when opening
-        const firstTab = modal.querySelector('.help-tab[data-section="getting-started"]');
-        if (firstTab) switchHelpTab('getting-started', firstTab);
-    }
-}
+// Initial UI setup and logic removed (consolidated in init)
 
-function closeHelpModal() {
-    const modal = document.getElementById('help-modal');
-    if (modal) {
-        modal.classList.remove('open');
-        document.body.style.overflow = '';
-    }
-}
-
-function switchHelpTab(sectionName, btn) {
-    if (!sectionName || !btn) return;
-
-    // Update tab buttons
-    document.querySelectorAll('.help-tab').forEach(t => t.classList.remove('active'));
-    btn.classList.add('active');
-
-    // Update sections
-    const sectionId = `help-${sectionName}`;
-    document.querySelectorAll('.help-section').forEach(s => s.classList.remove('active'));
-
-    const targetSection = document.getElementById(sectionId);
-    if (targetSection) {
-        targetSection.classList.add('active');
-        // Scroll help content to top when switching tabs
-        const modalBody = document.querySelector('.help-modal .modal-body');
-        if (modalBody) modalBody.scrollTop = 0;
-    } else {
-        console.warn(`BioMedScholar AI: Help section not found: ${sectionId}`);
-    }
-}
-
-// ==========================================
-// Add H key shortcut for help
-// Keyboard Shortcuts and Initialization logic consolidated in initKeyboardShortcuts
-
-
-// Initialize on load
-document.addEventListener('DOMContentLoaded', init);
 
 // Initialized on load section functions removed or moved
 
@@ -5302,10 +5266,10 @@ function openCitationModal(articleData) {
 /**
  * Close citation modal
  */
-function closeCitationModal() {
+window.closeCitationModal = function () {
     const modal = document.getElementById('citation-modal');
     if (modal) {
-        modal.classList.remove('open');
+        modal.classList.remove('open', 'active', 'show');
         document.body.style.overflow = '';
     }
 }
@@ -5476,43 +5440,56 @@ function copyCitation() {
 /**
  * Show help modal
  */
-function showHelpModal() {
+/**
+ * Modal Management Group (Hardened v1.6.0-BETA)
+ */
+
+window.showHelpModal = function (event) {
+    console.log('BioMedScholar: Triggering Help Modal');
+    if (event) {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    }
     const modal = document.getElementById('help-modal');
     if (modal) {
-        modal.classList.add('open');
+        modal.classList.add('open', 'active');
         document.body.style.overflow = 'hidden';
+        
+        // Auto-close dropdown menu
+        const headerMenu = document.getElementById('header-menu');
+        if (headerMenu) headerMenu.classList.add('hidden');
     }
 }
 
-/**
- * Close help modal
- */
-function closeHelpModal() {
+window.closeHelpModal = function () {
     const modal = document.getElementById('help-modal');
     if (modal) {
-        modal.classList.remove('open');
+        modal.classList.remove('open', 'active', 'show');
         document.body.style.overflow = '';
     }
 }
 
-/**
- * Show keyboard shortcuts modal
- */
-function showKeyboardShortcuts() {
+window.showKeyboardShortcuts = function (event) {
+    console.log('BioMedScholar: Triggering Shortcuts Modal');
+    if (event) {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    }
     const modal = document.getElementById('shortcuts-modal');
     if (modal) {
-        modal.classList.add('open');
+        modal.classList.add('open', 'active');
         document.body.style.overflow = 'hidden';
+        
+        // Auto-close dropdown menu
+        const headerMenu = document.getElementById('header-menu');
+        if (headerMenu) headerMenu.classList.add('hidden');
     }
 }
 
-/**
- * Close keyboard shortcuts modal
- */
-function closeShortcutsModal() {
+window.closeShortcutsModal = function () {
     const modal = document.getElementById('shortcuts-modal');
     if (modal) {
-        modal.classList.remove('open');
+        modal.classList.remove('open', 'active', 'show');
         document.body.style.overflow = '';
     }
 }
@@ -6469,6 +6446,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initialize Chat Resizer
     initChatResizer();
+    initScheduledActions();
 
     // Close notification dropdown when clicking outside
     document.addEventListener('click', function (e) {
@@ -6696,21 +6674,31 @@ function initScheduledActions() {
     setTimeout(checkScheduledActions, 2000);
 }
 
-function openScheduledActionsModal(event) {
+window.openScheduledActionsModal = function (event) {
+    console.log('BioMedScholar: Triggering Scheduled Actions Modal');
     if (event) {
-        event.preventDefault();
-        event.stopPropagation();
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
     }
     const modal = document.getElementById('scheduler-modal');
-    if (modal) modal.classList.add('open');
-    const headerMenu = document.getElementById('header-menu');
-    if (headerMenu) headerMenu.classList.add('hidden');
-    renderScheduledActions();
+    if (modal) {
+        modal.classList.add('open', 'active');
+        document.body.style.overflow = 'hidden';
+        
+        // Auto-close dropdown
+        const headerMenu = document.getElementById('header-menu');
+        if (headerMenu) headerMenu.classList.add('hidden');
+        
+        renderScheduledActions();
+    }
 }
 
-function closeScheduledActionsModal() {
+window.closeScheduledActionsModal = function () {
     const modal = document.getElementById('scheduler-modal');
-    if (modal) modal.classList.remove('open');
+    if (modal) {
+        modal.classList.remove('open', 'active', 'show');
+        document.body.style.overflow = '';
+    }
 }
 
 function addScheduledAction() {
@@ -6987,16 +6975,37 @@ function showNodeDetails(node) {
 function toggleFabMenu() {
     const fabMenu = document.getElementById('fab-menu');
     if (!fabMenu) return;
-    
+
     const options = fabMenu.querySelector('.fab-options');
     const mainBtn = fabMenu.querySelector('.fab-main-btn');
-    
-    if (options.classList.contains('hidden')) {
-        options.classList.remove('hidden');
-        mainBtn.style.transform = 'scale(1.1) rotate(45deg)';
-    } else {
+    const isOpen = !options.classList.contains('hidden');
+
+    if (isOpen) {
+        // Close
         options.classList.add('hidden');
         mainBtn.style.transform = '';
+        mainBtn.style.background = '';
+        document.removeEventListener('click', _fabOutsideClick);
+    } else {
+        // Open
+        options.classList.remove('hidden');
+        mainBtn.style.transform = 'scale(1.05) rotate(45deg)';
+        mainBtn.style.background = '#1d4ed8';
+        // Close on outside click
+        setTimeout(() => {
+            document.addEventListener('click', _fabOutsideClick);
+        }, 10);
+    }
+}
+
+function _fabOutsideClick(e) {
+    const fabMenu = document.getElementById('fab-menu');
+    if (fabMenu && !fabMenu.contains(e.target)) {
+        const options = fabMenu.querySelector('.fab-options');
+        const mainBtn = fabMenu.querySelector('.fab-main-btn');
+        if (options) options.classList.add('hidden');
+        if (mainBtn) { mainBtn.style.transform = ''; mainBtn.style.background = ''; }
+        document.removeEventListener('click', _fabOutsideClick);
     }
 }
 
@@ -7046,16 +7055,15 @@ function closeBetaModal() {
     const modal = document.getElementById('beta-modal');
     if (modal) {
         modal.classList.remove('open');
+        modal.classList.remove('active');
         document.body.style.overflow = '';
         localStorage.setItem('hasSeenBeta16', 'true');
     }
 }
 
-// Auto-show Beta Modal on first load of v1.6.0
+// Force show Beta Modal on every load (v1.6.0-BETA Showcase)
 window.addEventListener('load', () => {
-    if (!localStorage.getItem('hasSeenBeta16')) {
-        setTimeout(showBetaModal, 2000);
-    }
+    setTimeout(showBetaModal, 1500); // Trigger after slight delay for visual impact
 });
 
 /**

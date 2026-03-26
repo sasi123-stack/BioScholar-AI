@@ -51,11 +51,6 @@ tests/screenshots/
 *.jpeg
 *.gif
 
-# Whitelist Promotional Assets
-!frontend/assets/promos/*.png
-!frontend/assets/promos/*.jpg
-!frontend/assets/promos/*.jpeg
-
 # Build Artifacts
 .next/
 node_modules/
