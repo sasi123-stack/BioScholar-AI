@@ -120,7 +120,7 @@ A high-density workspace for literature review:
 - **⚡ Teaser Promo**: April 4th, 2026 | 6:00 PM IST
 - **🎥 Official Teaser**: April 6th, 2026 | 6:00 PM IST
 
-## 📅 Roadmap (May 20, 2026 - PREMIUM)
+## 📅 Roadmap (May, 2026 - PREMIUM)
 
 The platform is currently optimized for stability and resilience in its **v1.6.0-BETA** state. The following high-performance features are slated for the **v1.6.5-PREMIUM** release:
 
