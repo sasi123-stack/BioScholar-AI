@@ -8,16 +8,16 @@ app_port: 7860
 ---
 
 <div align="center">
-
-# 🔬 BioMedScholar AI
-
-### *Evidence-Based Biomedical Research Intelligence Platform*
-
-[![Live](https://img.shields.io/badge/🌐_Web_App-Live-brightgreen?style=for-the-badge)](https://biomed-scholar.web.app)
-[![Bot](https://img.shields.io/badge/🤖_Telegram_Bot-Active-blue?style=for-the-badge)](https://t.me/Meverick_AI_bot)
-[![API](https://img.shields.io/badge/⚡_Backend_API-Running-orange?style=for-the-badge)](https://huggingface.co/spaces/sasidhara123/biomed-scholar-api)
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=for-the-badge&logo=github)](https://github.com/sasi123-stack/BioScholar-AI)
-
+ 
+# 🧬 BioMedScholar AI: 1.6.5 PREMIUM
+ 
+### *Elite Biomedical Research Intelligence & Discovery Engine*
+ 
+[![Live App](https://img.shields.io/badge/Launch-Firebase-orange?style=for-the-badge&logo=firebase)](https://biomed-scholar.web.app)
+[![Hugging Face](https://img.shields.io/badge/Full--Stack-HF%20Space-yellow?style=for-the-badge&logo=huggingface)](https://huggingface.co/spaces/sasidhara123/biomed-scholar-api)
+[![Maverick AI](https://img.shields.io/badge/Powered--By-Llama--3.3--70B-blue?style=for-the-badge&logo=meta)](https://huggingface.co/spaces/sasidhara123/maverick-ai-bot)
+[![Version](https://img.shields.io/badge/Version-1.6.5%20PREMIUM-blueviolet?style=for-the-badge)](#)
+ 
 </div>
 
 ---
@@ -55,8 +55,9 @@ Implemented a high-availability search architecture to ensure zero downtime:
 - **Failover Engine**: Real-time integration with **NCBI Entrez API**.
 - **Auto-Switching**: The system automatically detects upstream provider outages and reroutes queries to ensure consistent delivery.
 
-### 🧠 Maverick AI Insight (RAG Synthesis)
+### 🧠 Maverick AI Insight (v2 - Llama 3.3)
 The centerpiece of the Research Desk, providing real-time evidence synthesis:
+- **Llama 3.3 Powered**: High-speed, high-accuracy RAG synthesis via Groq.
 - **Maverick Insight Box**: Automatically generates a structured "Research Briefing" above search results.
 - **Context-Aware Linkage**: Seamless navigation between Research Desk, Maverick Bot, and Research Trends.
 - **Dynamic Source Mapping**: Identifies and links citations across all indexed sources.
