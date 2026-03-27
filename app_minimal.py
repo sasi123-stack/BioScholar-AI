@@ -278,18 +278,30 @@ async def startup_event():
     init_db()
     print(">>> [STARTUP] API ready", flush=True)
 
+# Mount frontend assets
+frontend_dir = os.path.join(os.path.dirname(__file__), "frontend")
+if os.path.exists(frontend_dir):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dir, "assets")), name="assets")
+    # Also mount any other needed dirs from frontend
+    for d in ["js", "css", "images"]:
+        if os.path.exists(os.path.join(frontend_dir, d)):
+             app.mount(f"/{d}", StaticFiles(directory=os.path.join(frontend_dir, d)), name=d)
+
 @app.get("/")
 async def root():
-    """Root endpoint with API information."""
+    """Serve frontend or API info."""
+    index_path = os.path.join(frontend_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    
     return {
-        "message": "💠 BioMed Scholar AI Research Engine",
+        "message": "💠 BioMed Scholar AI 1.6.5 PREMIUM",
         "version": "2.1.4",
         "docs": "/docs",
         "features": {
             "search": "/api/v1/search",
             "chat": "/api/v1/maverick/chat",
-            "health": "/api/v1/health",
-            "statistics": "/api/v1/statistics"
+            "health": "/api/v1/health"
         }
     }
 
