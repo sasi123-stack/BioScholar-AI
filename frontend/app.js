@@ -1,4 +1,4 @@
-// BioMedScholar AI v1.6.0-BETA (Harden-V1) | Research Intelligence & Multi-Modal Analysis
+// BioMedScholar AI 1.6.5 PREMIUM (Harden-V1) | Research Intelligence & Multi-Modal Analysis
 // Force browser update - unique id: 20260323...
 
 // Use 'var' (which can be redeclared) or check if it exists first
@@ -6636,8 +6636,8 @@ document.addEventListener('DOMContentLoaded', function () {
 function updateSyncStatus(status) {
     const wrapper = document.getElementById('maverick-sync-indicator');
     const dot = wrapper?.querySelector('.sync-dot');
-    const text = wrapper?.querySelector('.sync-text');
-
+    
+    // The indicator is officially removed in 1.6.5 PREMIUM
     if (!wrapper || !dot) return;
 
     dot.classList.remove('synced', 'syncing', 'offline');
@@ -6645,22 +6645,13 @@ function updateSyncStatus(status) {
     switch (status) {
         case 'synced':
             dot.classList.add('synced');
-            if (text) text.textContent = 'LIVE';
-            wrapper.title = 'Maverick Synced & Online';
             break;
         case 'syncing':
             dot.classList.add('syncing');
-            if (text) text.textContent = 'STARTING';
-            wrapper.title = 'Maverick is starting up (HF Space warming up)...';
             break;
         case 'offline':
-            dot.classList.add('offline');
-            if (text) text.textContent = 'OFFLINE';
-            wrapper.title = 'Maverick Offline';
-            break;
         default:
             dot.classList.add('offline');
-            if (text) text.textContent = 'ERROR';
             break;
     }
 }
@@ -6743,7 +6734,7 @@ function initVoiceSearch() {
 }
 
 /**
- * Scheduled Actions Module (v1.6.0-BETA)
+ * Scheduled Actions Module (1.6.5 PREMIUM)
  */
 let scheduledActions = JSON.parse(localStorage.getItem('maverick_scheduled_actions') || '[]');
 
@@ -7134,7 +7125,7 @@ function closeBetaModal() {
     }
 }
 
-// Force show Beta Modal on every load (v1.6.0-BETA Showcase)
+// Force show Beta Modal on every load (1.6.5 PREMIUM Showcase)
 window.addEventListener('load', () => {
     setTimeout(showBetaModal, 1500); // Trigger after slight delay for visual impact
 });
@@ -7197,9 +7188,9 @@ function unlockAchievement(id) {
     }
 }
 
-// Initialize v1.6.0-BETA Features
+// Initialize 1.6.5 PREMIUM Features
 window.addEventListener('load', () => {
-    console.log('BioMedScholar v1.6.0-BETA Ready.');
+    console.log('BioMedScholar 1.6.5 PREMIUM Ready.');
     checkAchievementsStatus();
 });
 
