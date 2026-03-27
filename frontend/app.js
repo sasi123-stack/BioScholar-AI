@@ -3065,10 +3065,11 @@ function executeAdvancedSearch() {
 }
 
 function searchTrend(element) {
-    const searchTerm = element.getAttribute('data-search-term');
+    const searchTerm = element.getAttribute('data-search-term') || element.dataset.searchTerm || element.textContent;
     if (searchTerm && headerSearchInput) {
         headerSearchInput.value = searchTerm;
-        performSearch();
+        switchTab('articles');
+        setTimeout(() => performSearch(), 100);
     }
 }
 
@@ -7142,10 +7143,11 @@ window.addEventListener('load', () => {
  * Search Trend Helper (Used by Ticker/Trends)
  */
 function searchTrend(element) {
-    const term = element.dataset.searchTerm || element.textContent;
+    const term = element.dataset.searchTerm || element.getAttribute('data-search-term') || element.textContent;
     if (headerSearchInput) {
         headerSearchInput.value = term;
-        performSearch();
+        switchTab('articles');
+        setTimeout(() => performSearch(), 100);
         if (element.closest('.fab-menu')) toggleFabMenu();
     }
 }
@@ -7205,6 +7207,20 @@ window.addEventListener('load', () => {
  * Gemini Nano (Chrome Prompt API) Integration
  * Allows local, on-device AI summarization of research papers.
  */
+/**
+ * Open Research Trends Tab
+ */
+function openTrendsTab() {
+    if (typeof switchTab === 'function') {
+        switchTab('trends');
+        showToast('Macro Trends Analysis Initialized', 'info');
+    }
+}
+
+// Ensure global access
+window.openTrendsTab = openTrendsTab;
+window.searchTrend = searchTrend;
+
 async function initGeminiNano() {
     try {
         if (typeof window.ai !== 'undefined' && window.ai.languageModel) {
