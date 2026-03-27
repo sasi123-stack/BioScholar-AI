@@ -112,6 +112,8 @@ var currentView = 'list';
 var currentCitationArticle = null;
 var currentCitationFormat = 'apa';
 var currentSearchAbortController = null;
+var isGeminiEnabled = false;
+var geminiSession = null;
 
 // Auth State
 var currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
@@ -268,6 +270,9 @@ async function init() {
         checkHealth().catch(err => console.warn('Early health check failed:', err));
         // Load statistics (uses static counts — no network call)
         loadStatistics();
+        
+        // Detect Gemini Nano (Chrome Prompt API)
+        initGeminiNano();
 
         console.log('BioMedScholar AI: Initialization Complete.');
     } catch (error) {
@@ -327,7 +332,25 @@ function openArticleModal(resultId, fallbackTitle = null) {
 
     // Populate modal content
     document.getElementById('modal-article-title').textContent = result.title;
-    document.getElementById('modal-article-abstract').textContent = result.abstract || 'No abstract available.';
+    const abstractText = result.abstract || 'No abstract available.';
+    document.getElementById('modal-article-abstract').textContent = abstractText;
+
+    // Reset Gemini Summary Section
+    const geminiSection = document.getElementById('gemini-summary-section');
+    if (geminiSection) {
+        geminiSection.classList.add('hidden');
+        document.getElementById('gemini-summary-text').innerHTML = '';
+        
+        if (isGeminiEnabled && abstractText.length > 50) {
+            geminiSection.classList.remove('hidden');
+            const summaryBtn = document.getElementById('gen-gemini-summary-btn');
+            if (summaryBtn) {
+                summaryBtn.classList.remove('hidden');
+                summaryBtn.innerHTML = '✨ Summarize with Gemini Nano';
+                summaryBtn.disabled = false;
+            }
+        }
+    }
 
     // Sanitize authors inline
     let authors = result.metadata?.authors;
@@ -7166,3 +7189,64 @@ window.addEventListener('load', () => {
     console.log('BioMedScholar v1.6.0-BETA Ready.');
     checkAchievementsStatus();
 });
+
+/**
+ * Gemini Nano (Chrome Prompt API) Integration
+ * Allows local, on-device AI summarization of research papers.
+ */
+async function initGeminiNano() {
+    try {
+        if (typeof window.ai !== 'undefined' && window.ai.languageModel) {
+            const capabilities = await window.ai.languageModel.capabilities();
+            if (capabilities.available !== 'no') {
+                isGeminiEnabled = true;
+                console.log('✨ Gemini Nano detected and available.');
+                // Pre-warm the model if possible
+                if (capabilities.available === 'readily') {
+                    geminiSession = await window.ai.languageModel.create({
+                        systemPrompt: "You are a professional medical research assistant. Provide concise, accurate summaries of clinical abstracts."
+                    });
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Gemini Nano initialization failed:', e);
+    }
+}
+
+async function generateGeminiSummary() {
+    const abstractText = document.getElementById('modal-article-abstract').textContent;
+    const summaryTextTarget = document.getElementById('gemini-summary-text');
+    const summaryBtn = document.getElementById('gen-gemini-summary-btn');
+
+    if (!abstractText || abstractText === 'No abstract available.') return;
+
+    try {
+        summaryBtn.innerHTML = '<span class="loading-spinner"></span> Generating...';
+        summaryBtn.disabled = true;
+        summaryTextTarget.innerHTML = '<div class="ai-writing-indicator">Gemini is analyzing the evidence...</div>';
+
+        if (!geminiSession) {
+            geminiSession = await window.ai.languageModel.create({
+                systemPrompt: "You are a professional medical research assistant. Provide concise, bulleted summaries of clinical abstracts. Use bold for key findings."
+            });
+        }
+
+        const prompt = `Please summarize this biomedical research abstract in 3-4 concise bullet points focusing on the primary outcome and clinical significance: \n\n ${abstractText}`;
+        const response = await geminiSession.prompt(prompt);
+        
+        // Minimal markdown to HTML conversion for bullets
+        const htmlResponse = response.replace(/\*(.*?)\*/g, '<b>$1</b>')
+                                     .replace(/\n\n/g, '<br><br>')
+                                     .replace(/^- /gm, '• ')
+                                     .replace(/\n/g, '<br>');
+                                     
+        summaryTextTarget.innerHTML = `<div class="gemini-ai-badge">LOCAL AI SUMMARY</div>${htmlResponse}`;
+        summaryBtn.classList.add('hidden');
+    } catch (e) {
+        console.error('Gemini Summary Error:', e);
+        summaryTextTarget.innerHTML = `<div class="error-text">Failed to generate local summary: ${e.message}</div>`;
+        summaryBtn.disabled = false;
+        summaryBtn.innerHTML = 'Retry Summary';
+    }
+}
