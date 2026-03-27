@@ -35,7 +35,7 @@ app_port: 7860
 
 ---
 
-## ✨ Features (v1.6.0-BETA - Harden V1)
+## ✨ Features (1.6.5 PREMIUM - Harden V1)
 
 ### 📈 Macro Research Trends (NEW)
 A dedicated analytical hub for real-time biomedical discovery tracking:
@@ -133,7 +133,7 @@ The centerpiece of the Research Desk, providing real-time evidence synthesis:
 
 **Built with ❤️ for the Biomedical Research Community**
 
-*Last updated: March 27, 2026 (v1.6.0-BETA - Research Trends & Web Integration)*
+*Last updated: March 27, 2026 (1.6.5 PREMIUM - Research Trends & Web Integration)*
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
