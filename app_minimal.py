@@ -13,6 +13,8 @@ import httpx
 import base64
 import requests
 from typing import List, Dict, Any, Optional
+from src.utils.web_search import WebSearchTool
+
 
 
 # Ensure 'src' is in path for imports
@@ -372,6 +374,36 @@ async def search(request: SearchRequest):
                     indices = 'pubmed_articles'
                 elif request.index == 'clinical_trials':
                     indices = 'clinical_trials'
+                elif request.index == 'google':
+                    # Handle Web Search via Serper API
+                    tool = WebSearchTool()
+                    web_results = await tool.search(request.query, num_results=request.max_results)
+                    results = []
+                    for res in web_results:
+                        results.append({
+                            "id": f"google_{hash(res['link'])}",
+                            "title": res.get("title", "No Title"),
+                            "authors": "Web Search (Google)",
+                            "journal": res.get("link"), # Using link as journal/source
+                            "year": "2026", # Placeholder for web search
+                            "abstract": res.get("snippet", ""),
+                            "score": 1.0,
+                            "source": "google",
+                            "link": res.get("link"),
+                            "url": res.get("link"),
+                            "metadata": {
+                                "link": res.get("link"),
+                                "url": res.get("link"),
+                                "source": "google"
+                            }
+                        })
+                    return {
+                        "query": request.query,
+                        "total_results": len(results),
+                        "results": results,
+                        "search_time_ms": 0,
+                        "engine": "web_search"
+                    }
                 else:
                     indices = 'pubmed_articles,clinical_trials'
                 
@@ -452,6 +484,28 @@ async def search(request: SearchRequest):
             
         if query_trials:
             fallback_results.extend(fallback_search_trials(request.query, max_results=max_each))
+
+        if request.index == 'google':
+            tool = WebSearchTool()
+            web_results = await tool.search(request.query, num_results=request.max_results)
+            for res in web_results:
+                fallback_results.append({
+                    "id": f"google_{hash(res['link'])}",
+                    "title": res.get("title", "No Title"),
+                    "authors": "Web Search (Google)",
+                    "journal": res.get("link"),
+                    "year": "2026",
+                    "abstract": res.get("snippet", ""),
+                    "score": 1.0,
+                    "source": "google",
+                    "link": res.get("link"),
+                    "url": res.get("link"),
+                    "metadata": {
+                        "link": res.get("link"),
+                        "url": res.get("link"),
+                        "source": "google"
+                    }
+                })
         
         return {
             "query": request.query,

@@ -4786,7 +4786,10 @@ if (typeof isRegisterMode === 'undefined') {
 
 function openLoginModal() {
     const modal = document.getElementById('login-modal');
-    if (modal) modal.classList.add('open');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('open');
+    }
     // Reset to login mode
     isRegisterMode = false;
     updateAuthModalUI();
@@ -4794,7 +4797,10 @@ function openLoginModal() {
 
 function closeLoginModal() {
     const modal = document.getElementById('login-modal');
-    if (modal) modal.classList.remove('open');
+    if (modal) {
+        modal.classList.remove('open');
+        modal.classList.add('hidden');
+    }
 }
 
 function toggleAuthMode() {
