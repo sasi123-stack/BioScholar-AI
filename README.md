@@ -35,26 +35,31 @@ app_port: 7860
 
 ---
 
-## ✨ Features (v1.6.0-BETA)
+## ✨ Features (v1.6.0-BETA - Harden V1)
 
-### 🧩 Hybrid Search Resilience (NEW)
+### 📈 Macro Research Trends (NEW)
+A dedicated analytical hub for real-time biomedical discovery tracking:
+- **Fast-Emerging Topics**: Pulse-tracking of high-growth research areas (e.g., GLP-1, mRNA).
+- **Sentiment Pulse**: AI-driven community sentiment analysis on research safety and efficacy.
+- **Global Field Breakdown**: Visualizing the distribution of publications across Oncology, Immunology, etc.
+- **Live Discovery Feed**: Real-time ticker of major breakthrough papers within the last 24 hours.
+
+### 🌐 Integrated Web Search (Google)
+Expanded search universe beyond peer-reviewed literature:
+- **Serper API Integration**: One-click toggle to fetch real-world news, clinical trial updates, and public health reports from the World Wide Web.
+- **Unified Results**: Web results are seamlessly blended with PubMed/ClinicalTrials data with functional source linking.
+
+### 🧩 Hybrid Search Resilience
 Implemented a high-availability search architecture to ensure zero downtime:
 - **Primary Engine**: High-speed semantic search via **Bonsai Elasticsearch**.
 - **Failover Engine**: Real-time integration with **NCBI Entrez API**.
-- **Auto-Switching**: The system automatically detects upstream provider outages (403/504 errors) and reroutes queries to ensure consistent result delivery.
+- **Auto-Switching**: The system automatically detects upstream provider outages and reroutes queries to ensure consistent delivery.
 
 ### 🧠 Maverick AI Insight (RAG Synthesis)
 The centerpiece of the Research Desk, providing real-time evidence synthesis:
 - **Maverick Insight Box**: Automatically generates a structured "Research Briefing" above search results.
-- **RAG Methodology**: Retrieves the top 10 most relevant publications and synthesizes a 3-paragraph executive summary with clinical implications.
-- **Dynamic Source Mapping**: Identifies and links citations across PubMed and ClinicalTrials.gov sources.
-
-### 🔬 Research Desk (Analytical Engine)
-A high-density workspace for literature review:
-- **Advanced Filtering**: Slice 35M+ articles by Date, Source, and Evidence Tier (RCTs, Meta-Analysis).
-- **Deep-Dive Modals**: Expanding an article exposes structured abstracts and sanitized metadata.
-- **D3.js Knowledge Graph**: Visualizes research connections between papers and topics.
-- **Multi-Modal Uploads**: Incorporate local PDF/Image context into AI reasoning loops.
+- **Context-Aware Linkage**: Seamless navigation between Research Desk, Maverick Bot, and Research Trends.
+- **Dynamic Source Mapping**: Identifies and links citations across all indexed sources.
 
 ### 🤖 Maverick Telegram Bot (`@Meverick_AI_bot`)
 | Command | Description |
@@ -94,24 +99,26 @@ A high-density workspace for literature review:
 |---|---|
 | **Frontend** | HTML5, CSS3, Vanilla JS |
 | **Backend** | FastAPI (Python 3.10) |
-| **Search** | Bonsai Elasticsearch + NCBI Entrez API |
-| **AI Inference** | Groq GPT OSS 120B / Llama-3 |
+| **Search** | Bonsai Elasticsearch, NCBI Entrez, Serper API |
+| **AI Inference** | Groq & Chrome Gemini Nano (On-Device) |
 | **Hosting** | Firebase & Hugging Face Spaces |
-| **Visualization** | D3.js v7 |
-| **PDF Processing** | PyMuPDF (fitz) |
+| **Visualization** | D3.js v7 & CSS Custom Properties |
 
 ---
 
-## ✅ System Milestones (March 26, 2026)
+## ✅ System Milestones (March 27, 2026)
 
-### 🏥 Search Failover System ✅ **DEPLOYED**
-- **Location**: `app_minimal.py` + `app.js`
-- **Feature**: Integrated native PubMed Entrez API as a live fallback for Elasticsearch.
-- **Benefit**: Ensures search works even when the primary database cluster is in "maintenance" or "locked" states.
+### 📈 Research Trends Hub ✅ **LIVE**
+- **Feature**: Connected Research Desk and Maverick Bot to a centralized Trends Tab.
+- **Outcome**: Users can pivot from search results to macro-level field analysis with one click.
 
-### 💠 Maverick Insight Restoration ✅ **LIVE**
-- **Status**: The RAG Synthesis panel has been restored to the main Research Desk.
-- **Logic**: Optimized token usage for faster synthesis across high-volume search queries.
+### 🏥 Web Search Integration ✅ **DEPLOYED**
+- **Feature**: Integrated Serper API for real-time web discovery alongside PubMed.
+- **Benefit**: Provides a holistic view including scientific literature and global health news.
+
+### 🛡️ Harden-V1 Security ✅ **COMPLETED**
+- **Status**: Sanitized all frontend triggers and optimized modal visibility logic.
+- **Logic**: Enforced `!important` CSS overrides and explicit JavaScript class toggling.
 
 ---
 
@@ -120,22 +127,13 @@ A high-density workspace for literature review:
 - **⚡ Teaser Promo**: April 4th, 2026 | 6:00 PM IST
 - **🎥 Official Teaser**: April 6th, 2026 | 6:00 PM IST
 
-## 📅 Roadmap (May, 2026 - PREMIUM)
-
-The platform is currently optimized for stability and resilience in its **v1.6.0-BETA** state. The following high-performance features are slated for the **v1.6.5-PREMIUM** release:
-
-- **📄 AI Research Synthesis**: One-click PDF research briefings.
-- **🖼️ Vision Lab Integration**: Multi-modal image analysis workspace.
-- **🔊 Maverick Voice Briefing**: High-fidelity TTS for research summaries.
-- **📊 Clinical Analytics Gauges**: Safety & methodology metrics.
-
 ---
 
 <div align="center">
 
 **Built with ❤️ for the Biomedical Research Community**
 
-*Last updated: March 26, 2026 (v1.6.0-BETA - Launch Campaign Update)*
+*Last updated: March 27, 2026 (v1.6.0-BETA - Research Trends & Web Integration)*
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
