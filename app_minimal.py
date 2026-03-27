@@ -76,6 +76,33 @@ ES_PASS = os.getenv("ELASTICSEARCH_PASSWORD", "38aa998d6c5c2891232c")
 
 OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
 
+# --- ES CONNECTION HELPER ---
+def get_es_client():
+    """Try Local ES first, then Bonsai."""
+    # 1. Try Local (9201) - specifically for active development environments
+    try:
+        from opensearchpy import OpenSearch
+        client = OpenSearch(hosts=[{'host': 'localhost', 'port': 9201}], timeout=1)
+        if client.ping():
+            return client, "local"
+    except:
+        pass
+        
+    # 2. Try Bonsai (Remote)
+    try:
+        from opensearchpy import OpenSearch
+        client = OpenSearch(
+            hosts=[{'host': ES_HOST, 'port': 443}],
+            http_auth=(ES_USER, ES_PASS),
+            use_ssl=True, verify_certs=True, timeout=3
+        )
+        if client.ping():
+            return client, "bonsai"
+    except:
+        pass
+        
+    return None, None
+
 # --- PYDANTIC MODELS ---
 class SearchRequest(BaseModel):
     query: str
@@ -185,6 +212,41 @@ def fallback_search_entrez(query: str, max_results: int = 20) -> List[Dict]:
         logger.error(f"Fallback search failed: {e}")
         return []
 
+def fallback_search_trials(query: str, max_results: int = 10) -> List[Dict]:
+    """Fallback search using ClinicalTrials.gov API v2."""
+    try:
+        # Search studies matching the query
+        url = f"https://clinicaltrials.gov/api/v2/studies?query.term={query}&pageSize={max_results}"
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            results = []
+            for study in data.get("studies", []):
+                protocol = study.get("protocolSection", {})
+                id_info = protocol.get("identificationModule", {})
+                status_box = protocol.get("statusModule", {})
+                description = protocol.get("descriptionModule", {})
+                nct_id = id_info.get("nctId", "N/A")
+                
+                results.append({
+                    "id": nct_id,
+                    "title": id_info.get("briefTitle", "No Title"),
+                    "authors": id_info.get("organization", {}).get("fullName", "N/A"),
+                    "journal": "ClinicalTrials.gov",
+                    "year": status_box.get("startDateStruct", {}).get("value", "")[:4],
+                    "abstract": description.get("briefSummary", ""),
+                    "score": 0.5,
+                    "source": "clinical_trials",
+                    "metadata": {
+                        "nct_id": nct_id,
+                        "source": "clinical_trials"
+                    }
+                })
+            return results
+    except Exception as e:
+        logger.warning(f"Clinical Trials fallback failed: {e}")
+    return []
+
 # --- FASTAPI APP ---
 app = FastAPI(
     title="BioMed Scholar API",
@@ -238,8 +300,8 @@ async def favicon():
 @app.get("/api/v1/health")
 async def health():
     """Health check endpoint."""
-    es_stats = get_elasticsearch_stats()
-    es_healthy = bool(es_stats and any(s.get("index_exists") for s in es_stats.values()))
+    client, engine = get_es_client()
+    es_healthy = client is not None
     groq_healthy = bool(GROQ_API_KEY)
     
     return {
@@ -255,7 +317,8 @@ async def health():
             "search_enabled": es_healthy,
             "chat_enabled": groq_healthy,
             "history_enabled": True
-        }
+        },
+        "index_source": engine or "fallback"
     }
 
 @app.get("/api/v1/statistics")
@@ -295,80 +358,84 @@ async def diagnostic():
 async def search(request: SearchRequest):
     """Search biomedical literature and clinical trials with live fallback."""
     try:
-        from opensearchpy import OpenSearch
-        
         if not request.query:
-            return {
-                "query": "",
-                "total_results": 0,
-                "results": [],
-                "search_time_ms": 0,
-                "warning": "No query provided"
-            }
+            return {"query": "", "total_results": 0, "results": [], "warning": "No query provided"}
         
-        # Attempt Primary: OpenSearch (Bonsai)
-        try:
-            client = OpenSearch(
-                hosts=[f"https://{ES_USER}:{ES_PASS}@{ES_HOST}:443"],
-                use_ssl=True, verify_certs=True,
-                timeout=3 # Aggressive timeout
-            )
-            
-            # Index logic
-            if request.index == 'pubmed':
-                index_name = 'pubmed_articles'
-            elif request.index == 'clinical_trials':
-                index_name = 'clinical_trials'
-            else:
-                index_name = 'pubmed_articles,clinical_trials'
-            
-            # Simple query (faster)
-            es_query = {
-                "size": request.max_results,
-                "query": {
-                    "match": {
-                        "title": request.query
+        # Attempt Primary: OpenSearch
+        client, engine = get_es_client()
+        if client:
+            try:
+                # Index logic
+                if request.index == 'pubmed':
+                    indices = 'pubmed_articles'
+                elif request.index == 'clinical_trials':
+                    indices = 'clinical_trials'
+                else:
+                    indices = 'pubmed_articles,clinical_trials'
+                
+                es_query = {
+                    "size": request.max_results,
+                    "query": {
+                        "multi_match": {
+                            "query": request.query,
+                            "fields": ["title^3", "abstract", "authors", "journal"]
+                        }
                     }
                 }
-            }
+                
+                res = client.search(index=indices, body=es_query)
+                results = []
+                for hit in res['hits']['hits']:
+                    source_data = hit['_source']
+                    index_name = hit['_index']
+                    # Map source correctly based on index name
+                    source_type = "clinical_trials" if "clinical_trials" in index_name else "pubmed"
+                    
+                    results.append({
+                        "id": hit['_id'],
+                        "title": source_data.get("title", "No Title"),
+                        "authors": source_data.get("authors", "Unknown"),
+                        "journal": source_data.get("journal", "Biomedical Literature"),
+                        "year": str(source_data.get("publication_year", source_data.get("year", "")))[:4],
+                        "abstract": source_data.get("abstract", ""),
+                        "score": hit['_score'],
+                        "source": source_type,
+                        "metadata": {**source_data, "source": source_type}
+                    })
+                
+                return {
+                    "query": request.query,
+                    "total_results": len(results),
+                    "results": results,
+                    "search_time_ms": res.get('took', 0),
+                    "engine": engine
+                }
+            except Exception as e:
+                logger.warning(f"OS Search error: {e}")
+
+        # FALLBACK: Combined Live Search (PubMed + ClinicalTrials.gov)
+        fallback_results = []
+        
+        # Determine sources to query
+        query_pubmed = request.index in ('both', 'pubmed')
+        query_trials = request.index in ('both', 'clinical_trials')
+        
+        max_each = request.max_results // 2 if query_pubmed and query_trials else request.max_results
+        
+        if query_pubmed:
+            fallback_results.extend(fallback_search_entrez(request.query, max_results=max_each))
             
-            res = client.search(index=index_name, body=es_query)
-            
-            results = []
-            for hit in res['hits']['hits']:
-                source = hit['_source']
-                results.append({
-                    "id": hit['_id'],
-                    "title": source.get("title", "No Title"),
-                    "authors": source.get("authors", "Unknown"),
-                    "journal": source.get("journal", "Biomedical Literature"),
-                    "year": str(source.get("publication_year", source.get("year", "")))[:4],
-                    "abstract": source.get("abstract", ""),
-                    "score": hit['_score'],
-                    "source": source.get("source", "pubmed")
-                })
-            
-            return {
-                "query": request.query,
-                "total_results": len(results),
-                "results": results,
-                "search_time_ms": res['took']
-            }
-            
-        except Exception as es_err:
-            logger.warning(f"Bonsai index offline ({es_err}). Switching to Entrez...")
-            
-            # FALLBACK START
-            fallback_results = fallback_search_entrez(request.query, max_results=request.max_results)
-            
-            # ALWAYS return 200 even if fallback is empty
-            return {
-                "query": request.query,
-                "total_results": len(fallback_results),
-                "results": fallback_results,
-                "search_time_ms": 0,
-                "warning": "Primary search index (Bonsai) is unavailable. Displaying live PubMed results."
-            }
+        if query_trials:
+            fallback_results.extend(fallback_search_trials(request.query, max_results=max_each))
+        
+        return {
+            "query": request.query,
+            "total_results": len(fallback_results),
+            "results": fallback_results,
+            "search_time_ms": 0,
+            "warning": "Search index unavailable. Showing live results from PubMed & ClinicalTrials.gov.",
+            "engine": "live_fallback"
+        }
 
     except Exception as e:
         logger.error(f"Search endpoint critical failure: {e}")
@@ -376,7 +443,6 @@ async def search(request: SearchRequest):
             "query": request.query,
             "total_results": 0,
             "results": [],
-            "search_time_ms": 0,
             "warning": f"Search unavailable: {str(e)}"
         }
 
