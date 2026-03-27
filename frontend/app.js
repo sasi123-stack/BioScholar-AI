@@ -1804,7 +1804,7 @@ async function loadStatistics() {
         const data = await response.json();
 
         const pubmed = data.pubmed_articles?.document_count || 17464;
-        const trials = data.clinical_trials?.document_count || 19749;
+        const trials = data.clinical_trials?.document_count || 20493;
         const total = pubmed + trials;
 
         pubmedCountVals.forEach(el => el.textContent = pubmed.toLocaleString());
@@ -1814,8 +1814,8 @@ async function loadStatistics() {
         console.warn('Backend statistics fetch failed, using known local counts:', error);
         // Fallback to latest known counts
         pubmedCountVals.forEach(el => el.textContent = '17,464');
-        trialsCountVals.forEach(el => el.textContent = '19,749');
-        totalDocsCountVals.forEach(el => el.textContent = '37,213');
+        trialsCountVals.forEach(el => el.textContent = '20,493');
+        totalDocsCountVals.forEach(el => el.textContent = '37,957');
     }
 }
 
@@ -2376,6 +2376,7 @@ function filterAndSortResults(results) {
                 else if (type.includes('review')) type = 'review';
                 else if (type.includes('case report') || type.includes('case study')) type = 'case-study';
                 else if (type.includes('journal article') || type.includes('research')) type = 'research';
+                else if (type.includes('interventional') || type.includes('observational')) type = 'research';
             }
 
             return currentFilters.articleTypes.includes(type);
@@ -2590,7 +2591,9 @@ function createResultCard(result) {
         if (titleLower.includes('review') || titleLower.includes('overview')) type = 'Review';
         else if (titleLower.includes('meta-analysis')) type = 'Meta-Analysis';
         else if (titleLower.includes('case study') || titleLower.includes('report')) type = 'Case Study';
+        else if (result.source === 'clinical_trials') type = 'Clinical Study';
         else type = 'Research Article';
+
     }
 
     return `
@@ -2610,7 +2613,9 @@ function createResultCard(result) {
                     <span class="meta-date">${date}</span>
                     <span class="meta-separator">•</span>
                     <span class="meta-type">${type}</span>
+                    ${result.metadata?.nct_id ? `<span class="nct-badge" style="background: rgba(46, 125, 50, 0.1); color: #2e7d32; font-family: monospace; font-weight: 700; padding: 4px 8px; border-radius: 4px; margin-left: 4px; font-size: 11px; border: 1px dashed #2e7d32;">${result.metadata.nct_id}</span>` : ''}
                     ${isRecent ? '<span class="recent-badge">Recent</span>' : ''}
+
                 </div>
                 <div class="result-snippet">
                     ${abstract}

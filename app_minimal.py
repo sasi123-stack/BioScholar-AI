@@ -11,7 +11,9 @@ import time
 import logging
 import httpx
 import base64
+import requests
 from typing import List, Dict, Any, Optional
+
 
 # Ensure 'src' is in path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -378,29 +380,51 @@ async def search(request: SearchRequest):
                     "query": {
                         "multi_match": {
                             "query": request.query,
-                            "fields": ["title^3", "abstract", "authors", "journal"]
+                            "fields": ["title^3", "abstract", "authors", "journal", "sponsor"],
+                            "type": "best_fields"
                         }
+
                     }
                 }
                 
-                res = client.search(index=indices, body=es_query)
+                if request.index == 'both' or not request.index:
+                    # Search each index separately to ensure a balanced view (prevents PubMed dominating)
+                    half_size = max(5, request.max_results // 2)
+                    p_res = client.search(index='pubmed_articles', body={**es_query, "size": half_size})
+                    t_res = client.search(index='clinical_trials', body={**es_query, "size": half_size})
+                    
+                    # Interleave results
+                    p_hits = p_res['hits']['hits']
+                    t_hits = t_res['hits']['hits']
+                    all_hits = []
+                    for i in range(max(len(p_hits), len(t_hits))):
+                        if i < len(p_hits): all_hits.append(p_hits[i])
+                        if i < len(t_hits): all_hits.append(t_hits[i])
+                    
+                    res = {'hits': {'hits': all_hits[:request.max_results]}, 'took': p_res.get('took', 0) + t_res.get('took', 0)}
+                else:
+                    res = client.search(index=indices, body=es_query)
+
                 results = []
                 for hit in res['hits']['hits']:
                     source_data = hit['_source']
-                    index_name = hit['_index']
+                    index_name = hit.get('_index', '')
                     # Map source correctly based on index name
                     source_type = "clinical_trials" if "clinical_trials" in index_name else "pubmed"
                     
+                    # For clinical trials, ensure id is mapped if missing
+                    doc_id = hit.get('_id', source_data.get('id', source_data.get('nct_id', 'unknown')))
+                    
                     results.append({
-                        "id": hit['_id'],
-                        "title": source_data.get("title", "No Title"),
-                        "authors": source_data.get("authors", "Unknown"),
-                        "journal": source_data.get("journal", "Biomedical Literature"),
+                        "id": doc_id,
+                        "title": source_data.get("title", source_data.get("briefTitle", "No Title")),
+                        "authors": source_data.get("authors", source_data.get("sponsor", "Scientific Group")),
+                        "journal": source_data.get("journal", "ClinicalTrials.gov" if source_type == "clinical_trials" else "PubMed"),
                         "year": str(source_data.get("publication_year", source_data.get("year", "")))[:4],
-                        "abstract": source_data.get("abstract", ""),
-                        "score": hit['_score'],
+                        "abstract": source_data.get("abstract", source_data.get("briefSummary", "")),
+                        "score": hit.get('_score', 1.0),
                         "source": source_type,
-                        "metadata": {**source_data, "source": source_type}
+                        "metadata": {**source_data, "source": source_type, "nct_id": source_data.get("nct_id", source_data.get("id") if source_type == "clinical_trials" else None)}
                     })
                 
                 return {
@@ -410,6 +434,7 @@ async def search(request: SearchRequest):
                     "search_time_ms": res.get('took', 0),
                     "engine": engine
                 }
+
             except Exception as e:
                 logger.warning(f"OS Search error: {e}")
 
