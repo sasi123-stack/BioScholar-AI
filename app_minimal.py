@@ -122,6 +122,9 @@ class SearchRequest(BaseModel):
 class ChatRequest(BaseModel):
     question: str
     context: List[Dict[str, str]] = []
+    user_id: Optional[int] = None
+    index: Optional[str] = None
+    attachments: Optional[List[Dict[str, Any]]] = None
 
 class Attachment(BaseModel):
     name: str
@@ -132,6 +135,8 @@ class ChatWithImageRequest(BaseModel):
     question: str
     attachments: List[Attachment] = []
     context: List[Dict[str, str]] = []
+    user_id: Optional[int] = None
+    index: Optional[str] = None
 
 # --- DATABASE ---
 def init_db():
@@ -574,41 +579,47 @@ async def maverick_chat(request: ChatRequest):
             messages.append({"role": "user", "content": request.question})
         
         client = AsyncGroq(api_key=GROQ_API_KEY)
-        models_to_try = [MODEL_NAME, "llama-3.3-70b-versatile", "llama3-70b-8192"]
+        # Use officially supported Groq models
+        models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"]
         answer = None
         
         for model in models_to_try:
             try:
+                logger.info(f">>> [MAVERICK] Trying model: {model}")
                 response = await client.chat.completions.create(
                     model=model,
                     messages=messages,
                     temperature=0.3,
-                    max_tokens=2048
+                    max_tokens=1024
                 )
                 temp_answer = response.choices[0].message.content
-                if temp_answer and ("<!DOCTYPE" in temp_answer[:20] or "<html>" in temp_answer.lower()[:20]):
-                    logger.warning(f"Model {model} returned HTML error. Trying next...")
-                    continue
-                answer = temp_answer
-                break
+                if temp_answer and len(temp_answer) > 20:
+                    answer = temp_answer
+                    logger.info(f">>> [MAVERICK] Model {model} success")
+                    break
             except Exception as e:
-                logger.warning(f"Model {model} failed: {e}")
+                logger.warning(f">>> [MAVERICK] Model {model} failed: {e}")
                 continue
         
         if not answer:
-            answer = "❌ <b>Maverick System Error</b>: Upstream AI interface is currently unstable. Please try again in 1 minute."
+            answer = "❌ <b>Maverick System Error</b>: Upstream AI interface (Groq) is currently unstable. Please try again in 1 minute."
         elif "💠" not in answer[:15]:
             answer = "💠 " + answer
         
         return {
             "status": "success",
             "answer": answer,
-            "reasoning": "Maverick AI synthesis via GPT OSS 120B on Groq",
+            "reasoning": f"BioMed Intelligence (v1.6.5) via Llama-3-70B (Groq)",
             "sources": []
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f">>> [CRITICAL] Maverick Chat Crash: {e}")
+        return {
+            "status": "error",
+            "message": f"Maverick Engine Crash: {str(e)}",
+            "answer": "❌ <b>Maverick Internal Crash</b>: Please notify system administrator."
+        }
 
 async def get_vision_completion(prompt: str, image_base64: str):
     """Get completion from a vision model via OpenRouter."""
