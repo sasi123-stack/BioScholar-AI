@@ -1250,37 +1250,6 @@
         </div>
     </div>
 
-    <!-- Citation Modal -->
-    <div id="citation-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>📝 Cite This Article</h2>
-                <button class="modal-close" onclick="closeCitationModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="citation-tabs">
-                    <button class="citation-tab active" data-format="apa">APA</button>
-                    <button class="citation-tab" data-format="mla">MLA</button>
-                    <button class="citation-tab" data-format="chicago">Chicago</button>
-                    <button class="citation-tab" data-format="bibtex">BibTeX</button>
-                </div>
-                <div class="citation-content">
-                    <pre id="citation-text"></pre>
-                    <button class="copy-citation-btn" onclick="copyCitation()">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </svg>
-                        Copy to Clipboard
-                    </button>
-                </div>
-            </div>
-        </div>
-    <!-- Duplicate and simplified modals removed for 1.6.5 PREMIUM consolidation -->
-
-
-
 
     <!-- Login Modal (Consolidated) -->
     <div id="login-modal" class="modal hidden" onclick="if(event.target === this) closeLoginModal()">
