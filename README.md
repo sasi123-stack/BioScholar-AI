@@ -125,8 +125,8 @@ The centerpiece of the Research Desk, providing real-time evidence synthesis:
 
 ## 🎬 Product Launch Calendar
 
-- **⚡ Teaser Promo**: April 6th, 2026 (6 PM) | 6:00 PM IST
-- **🎥 Official Teaser**: April 6th, 2026 | 6:00 PM IST
+- **⚡ Teaser Promo**: March 31st, 2026 | 6:00 PM IST
+- **🎥 Official Launch Video**: April 6th, 2026 | 6:00 PM IST
 
 ---
 
