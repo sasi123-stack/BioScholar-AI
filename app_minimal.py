@@ -79,6 +79,8 @@ ES_USER = os.getenv("ELASTICSEARCH_USER", "0204784e62")
 ES_PASS = os.getenv("ELASTICSEARCH_PASSWORD", "38aa998d6c5c2891232c")
 
 OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+RUN_BOT = os.getenv("RUN_BOT", "true")
 
 # --- ES CONNECTION HELPER ---
 def get_es_client():
@@ -137,6 +139,11 @@ class ChatWithImageRequest(BaseModel):
     context: List[Dict[str, str]] = []
     user_id: Optional[int] = None
     index: Optional[str] = None
+
+class BotSendRequest(BaseModel):
+    chat_id: int
+    message: str
+    parse_mode: str = "HTML"
 
 # --- DATABASE ---
 def init_db():
@@ -721,6 +728,40 @@ async def maverick_history(user_id: int = 1):
         }
     except:
         return {"status": "success", "user_id": user_id, "history": []}
+
+# --- TELEGRAM BOT API ---
+@app.get("/api/v1/bot/status")
+async def get_bot_status():
+    """Check the health and status of the Telegram Bot."""
+    return {
+        "status": "active" if TELEGRAM_BOT_TOKEN else "unconfigured",
+        "bot_enabled_in_this_space": RUN_BOT != "false",
+        "has_token": bool(TELEGRAM_BOT_TOKEN),
+        "dns_patch_active": True
+    }
+
+@app.post("/api/v1/bot/send")
+async def send_bot_message(request: BotSendRequest):
+    """Send a message to a Telegram chat via the bot."""
+    if not TELEGRAM_BOT_TOKEN:
+        raise HTTPException(status_code=503, detail="Telegram Bot Token not configured")
+    
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": request.chat_id,
+        "text": request.message,
+        "parse_mode": request.parse_mode
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(url, json=payload)
+            if response.status_code == 200:
+                return {"status": "success", "message_sent": True}
+            else:
+                return {"status": "error", "detail": response.json()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
