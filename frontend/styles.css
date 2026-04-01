@@ -6839,38 +6839,40 @@ body {
 .quick-taskbar {
     position: fixed;
     bottom: 30px;
-    right: 100px; /* Offset to the left of the main FAB */
+    right: 110px; /* Increased offset from main FAB */
     display: flex;
-    gap: 12px;
-    z-index: 195000;
+    gap: 10px;
+    z-index: 10000; /* Robust but below modals and main FAB */
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 6px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
-.task-btn {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    color: var(--primary-blue);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+[data-theme="dark"] .quick-taskbar {
+    background: rgba(30, 41, 59, 0.4);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 .task-btn:hover {
     background: var(--primary-blue);
     color: white;
     border-color: var(--primary-blue);
-    transform: translateY(-4px) scale(1.05);
-    box-shadow: 0 8px 24px rgba(59,130,246,0.3);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
 }
 
-[data-theme="dark"] .task-btn {
-    background: var(--bg-secondary);
-    border-color: var(--border-color);
+@media (max-width: 768px) {
+    .quick-taskbar {
+        display: none; /* Hide secondary taskbar only on mobile to focus on FAB */
+    }
+    .fab-menu {
+        bottom: 20px;
+        right: 20px;
+    }
 }
 
 /* Floating Action Menu (FAB) */
