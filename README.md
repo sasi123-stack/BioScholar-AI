@@ -107,27 +107,44 @@ The centerpiece of the Research Desk, providing real-time evidence synthesis:
 
 ---
 
-## ✅ System Milestones (March 27, 2026)
+## ✅ System Milestones (April 1, 2026)
 
-### 📈 Research Trends Hub ✅ **LIVE**
-- **Feature**: Connected Research Desk and Maverick Bot to a centralized Trends Tab.
-- **Outcome**: Users can pivot from search results to macro-level field analysis with one click.
+### 📊 Modernized Research Trends ✅ **PRODUCTION**
+- **Feature**: Replaced legacy trends with a high-fidelity dashboard featuring **Live Analysis** simulation.
+- **Outcome**: Real-time jittering data and dynamic discovery injection via Maverick AI.
 
-### 🏥 Web Search Integration ✅ **DEPLOYED**
-- **Feature**: Integrated Serper API for real-time web discovery alongside PubMed.
-- **Benefit**: Provides a holistic view including scientific literature and global health news.
+### 🧠 Gemini Nano Integration ✅ **HARDENED**
+- **Feature**: On-device "Local AI Summary" container in article details.
+- **Benefit**: Zero-latency research synthesis for Chrome users.
 
-### 🛡️ Harden-V1 Security ✅ **COMPLETED**
-- **Status**: Sanitized all frontend triggers and optimized modal visibility logic.
-- **Logic**: Enforced `!important` CSS overrides and explicit JavaScript class toggling.
+### 🛡️ v1.6.5 PREMIUM Hardening ✅ **COMPLETED**
+- **Status**: Removed all traces of "BETA" labels across UI/UX.
+- **Logic**: Consolidated Trends CSS (24px radius, 28px padding) for a premium production feel.
 
 ---
 
-## 🎬 Product Launch Calendar
+## 🎬 Production Showcase Automation (v1.6.5)
 
-- **⚡ Teaser Promo**: March 31st, 2026 | 6:00 PM IST
-- **🎥 Initial Product Demo Video**: April 6th, 2026 | 6:00 PM IST
-- **🎥 Official Product Launch Video**: Will Be Updated Soon
+We have implemented a high-fidelity **Selenium-based Showcase Script** (`selenium_test.py`) for automated product demos and QA verification.
+
+### 🚀 How to Run the Showcase:
+1. **Prepare Environment**:
+   ```bash
+   pip install selenium webdriver-manager
+   ```
+2. **Execute Script**:
+   ```bash
+   python selenium_test.py
+   ```
+3. **Wait for Playback**: The script will automatically navigate the v1.6.5 platform, trigger live analysis, execute searches, and highlight the Local AI summaries. Perfect for creating promotional videos with voiceovers.
+
+---
+
+## 📅 Product Launch Calendar
+
+- **⚡ Teaser Promo**: March 31st, 2026 ✅ **LAUNCHED**
+- **🎥 Initial Product Demo Video**: April 1st, 2026 | **IN PRODUCTION** (Using Showcase script)
+- **🎥 Official Product Launch**: April 6th, 2026 | 6:00 PM IST
 
 ---
 
@@ -135,7 +152,7 @@ The centerpiece of the Research Desk, providing real-time evidence synthesis:
 
 **Built with ❤️ for the Biomedical Research Community**
 
-*Last updated: March 27, 2026 (1.6.5 PREMIUM - Research Trends & Web Integration)*
+*Last updated: April 1, 2026 (1.6.5 PREMIUM - Production Showcase & UI Hardening)*
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
