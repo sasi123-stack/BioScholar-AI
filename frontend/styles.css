@@ -6838,7 +6838,7 @@ body {
 /* Quick Access Taskbar (Shortcuts, Scheduler, Help) */
 .quick-taskbar {
     position: fixed;
-    bottom: 30px;
+    bottom: 75px; /* Float above the fixed footer */
     right: 110px; /* Increased offset from main FAB */
     display: flex;
     gap: 10px;
@@ -6878,9 +6878,9 @@ body {
 /* Floating Action Menu (FAB) */
 .fab-menu {
     position: fixed;
-    bottom: 30px;
-    right: 30px;
-    z-index: 195000; /* Above all dash components, below pure modal layer */
+    bottom: 75px; /* Float above footer */
+    right: 25px;
+    z-index: 10001; /* Above taskbar but below pure modal layer */
     display: flex;
     flex-direction: column;
     align-items: center;
