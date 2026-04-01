@@ -7286,7 +7286,7 @@ body {
 
 /* Discoveries Feed */
 .trends-feed-section {
-    margin-top: 100px; /* Spacer after chart */
+    margin-top: 0; /* Align with global layout */
     background: var(--bg-primary);
     border-radius: 20px;
     padding: 32px;
