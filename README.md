@@ -11,7 +11,7 @@ app_port: 7860
  
 # 🧬 BioMedScholar AI: 1.6.5 PREMIUM
  
-### *Elite Biomedical Research Intelligence & Discovery Engine*
+### *Intelligent Biomedical Research Engine powered by OpenClaw RAG and Llama 4 Maverick*
  
 [![Live App](https://img.shields.io/badge/Launch-Firebase-orange?style=for-the-badge&logo=firebase)](https://biomed-scholar.web.app)
 [![Hugging Face](https://img.shields.io/badge/Full--Stack-HF%20Space-yellow?style=for-the-badge&logo=huggingface)](https://huggingface.co/spaces/sasidhara123/biomed-scholar-api)
