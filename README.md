@@ -141,8 +141,6 @@ We have implemented a high-fidelity **Selenium-based Showcase Script** (`seleniu
 ---
 
 ## 📅 Product Launch Calendar
-
-- **⚡ Teaser Promo**: March 31st, 2026 ✅ **LAUNCHED**
 - **🎥 Initial Product Demo Video**: April 9th, 2026 | 9:00 AM IST
 - **🎥 Official Product Launch**: WILL BE UPDATED SOON
 ---
