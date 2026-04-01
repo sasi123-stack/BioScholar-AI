@@ -2014,106 +2014,35 @@ body.chat-mode .scholar-footer {
 /* ==========================================
    TRENDS DASHBOARD UI
    ========================================== */
-.trends-dashboard {
-    padding: 24px;
-    background: var(--bg-secondary);
-    min-height: calc(100vh - var(--header-height) - var(--nav-height));
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-}
-
-.trends-header-new {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--bg-primary);
-    padding: 24px 32px;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--border-color);
-}
-
-.trends-header-new h2 {
-    font-size: 24px;
-    margin-bottom: 4px;
-}
-
-.stats-mini {
-    display: flex;
-    gap: 24px;
-}
-
-.stat-mini-item {
-    display: flex;
-    flex-direction: column;
-}
-
-.stat-mini-item .label {
-    font-size: 11px;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    font-weight: 700;
-}
-
-.stat-mini-item .value {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.stat-mini-item .value.positive {
-    color: var(--google-green);
-}
-
 /* ================================================
-   MODERNIZED RESEARCH TRENDS TAB - Vibrant Gradients
+   MODERNIZED RESEARCH TRENDS TAB (v1.6.5 PREMIUM)
    ================================================ */
 
 .trends-container {
-    padding: 24px !important;
+    padding: 32px;
+    background: var(--bg-secondary);
     min-height: calc(100vh - var(--header-height) - var(--nav-height));
+    animation: fadeIn 0.4s ease-out;
 }
 
 .trends-wrapper {
-    max-width: 1200px;
+    max-width: 1300px;
     margin: 0 auto;
-}
-
-.trends-header {
-    margin-bottom: 32px;
-    animation: fadeInDown 0.6s ease-out;
-}
-
-.trends-header h2 {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 8px;
-}
-
-.trends-header p {
-    font-size: 15px;
-    color: var(--text-secondary);
-}
-
-/* Responsive Grid */
-/* Trends Tab Enhancements (v1.6.5 PREMIUM) */
-.trends-container {
-    padding: 32px;
 }
 
 .trends-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    margin-bottom: 40px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 24px;
 }
 
 .trends-header h2 {
     font-size: 32px;
     font-weight: 800;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-blue) 100%);
     background-clip: text;
     -webkit-background-clip: text;
@@ -2121,8 +2050,15 @@ body.chat-mode .scholar-footer {
 }
 
 .trends-header p {
-    color: var(--text-secondary);
-    font-size: 16px;
+    color: var(--text-muted);
+    font-size: 15px;
+    margin: 0;
+}
+
+.trends-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
 }
 
 .live-status {
