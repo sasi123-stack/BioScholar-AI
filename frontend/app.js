@@ -5719,35 +5719,84 @@ function searchTrend(element) {
 
 function refreshTrendsData() {
     const btn = document.querySelector('.refresh-trends-btn');
+    const liveStatus = document.querySelector('.live-status');
+    const feedContainer = document.querySelector('.discoveries-scroll');
+    
     if (btn) btn.classList.add('spinning');
+    if (liveStatus) liveStatus.style.background = 'rgba(16, 185, 129, 0.2)';
 
-    showToast('Refreshing real-time research metrics...', 'info');
+    showToast('Engaging Maverick AI for real-time analysis...', 'info');
 
-    // Simulate fetch delay
+    // Simulate analysis delay
     setTimeout(() => {
         if (btn) btn.classList.remove('spinning');
-        renderTrendsChart(true); // Forced rerender
-        showToast('Research metrics updated.', 'success');
-    }, 1200);
+        if (liveStatus) liveStatus.style.background = '';
+        
+        // Jitter the last 3 data points slightly for 'Live' effect
+        const baseData = [105000, 115000, 132000, 150000, 165000, 185000, 245000, 265000, 285000, 310000, 335000, 358400];
+        const jittered = baseData.map((v, i) => {
+            if (i > baseData.length - 4) {
+               return v + (Math.floor(Math.random() * 5000) - 2500);
+            }
+            return v;
+        });
+
+        // Add a new discovery if feed exists
+        if (feedContainer) {
+            const newDiscovery = document.createElement('div');
+            newDiscovery.className = 'discovery-item';
+            newDiscovery.style.opacity = '0';
+            newDiscovery.style.transform = 'translateY(-20px)';
+            
+            const randomSource = ['Cell', 'Bio-Intelligence', 'JAMA', 'BMJ'][Math.floor(Math.random() * 4)];
+            const randomTitle = [
+                'New <strong>Stem Cell Pathway</strong> identified for retinal repair.',
+                'Large-scale study confirms <strong>AI-Driven Diagnostics</strong> parity with senior radiologists.',
+                'Breakthrough in <strong>Nano-Particle Drug Delivery</strong> for solid tumors.',
+                'Research suggests <strong>Epigenetic Markers</strong> can predict therapy resistance early.'
+            ][Math.floor(Math.random() * 4)];
+
+            newDiscovery.innerHTML = `
+                <div class="discovery-meta">
+                    <span class="discovery-time">JUST NOW</span>
+                    <span class="discovery-source">${randomSource}</span>
+                </div>
+                <p>${randomTitle}</p>
+            `;
+
+            feedContainer.prepend(newDiscovery);
+            
+            // Animation for new item
+            setTimeout(() => {
+                newDiscovery.style.transition = 'all 0.5s ease-out';
+                newDiscovery.style.opacity = '1';
+                newDiscovery.style.transform = 'translateY(0)';
+            }, 50);
+
+            // Keep list clean (max 5 items)
+            if (feedContainer.children.length > 5) {
+                feedContainer.lastElementChild.remove();
+            }
+        }
+
+        renderTrendsChart(true, jittered); // Force rerender with new jittered data
+        showToast('Macro analysis complete. Global velocity updated.', 'success');
+    }, 1800);
 }
 
-function renderTrendsChart(force = false) {
+function renderTrendsChart(force = false, customData = null) {
     const canvas = document.getElementById('publication-trend-chart');
     if (!canvas) return;
 
     if (trendsChartInstance && !force) {
-        return; // Already rendered and not forced
+        return; 
     }
 
     if (trendsChartInstance) {
         trendsChartInstance.destroy();
     }
 
-    // Check if Chart is loaded
-    if (typeof Chart === 'undefined') {
-        console.warn('Chart.js is not loaded.');
-        return;
-    }
+    if (typeof Chart === 'undefined') return;
 
     const ctx = canvas.getContext('2d');
     const chartGradient = ctx.createLinearGradient(0, 0, 0, 400);
@@ -5758,8 +5807,8 @@ function renderTrendsChart(force = false) {
     const currentYear = new Date().getFullYear();
     const years = Array.from({ length: 12 }, (_, i) => currentYear - 11 + i);
 
-    // Premium Data Curve (Exponential Growth)
-    const dataVolumes = [105000, 115000, 132000, 150000, 165000, 185000, 245000, 265000, 285000, 310000, 335000, 358400];
+    // Default or custom data
+    const dataVolumes = customData || [105000, 115000, 132000, 150000, 165000, 185000, 245000, 265000, 285000, 310000, 335000, 358400];
 
     const isDarkMode = document.body.dataset.theme === 'dark' || document.body.classList.contains('dark-theme');
     const textColor = isDarkMode ? '#94a3b8' : '#475569';
