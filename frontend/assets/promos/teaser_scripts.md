@@ -22,4 +22,4 @@ This folder contains the high-fidelity narrative blueprints for the v1.6-BETA pr
 *   **[2:00] Scene 2**: Performance. "Experience sub-second hybrid search at scale. Our multi-modal engine handles PDFs, images, and text with a unified vector architecture."
 *   **[4:30] Scene 3**: Knowledge Graph. "See the world differently. Watch as our engine builds your private knowledge graph as you work, enabling discovery of hidden scientific links."
 *   **[7:00] Scene 4**: Achievement System. "Gamifying complexity. Every discovery earns you badges—from Evidence Pioneer to Deep Semantic Thinker."
-*   **[9:00] End Card**: "BioMedScholar AI: The Scientific Decision-Support Engine. v1.6.0-BETA."
+*   **[9:00] End Card**: "BioMedScholar AI: The Scientific Decision-Support Engine. v1.6.5 PREMIUM."

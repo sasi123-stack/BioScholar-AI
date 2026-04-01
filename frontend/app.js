@@ -270,7 +270,7 @@ async function init() {
         checkHealth().catch(err => console.warn('Early health check failed:', err));
         // Load statistics (uses static counts — no network call)
         loadStatistics();
-        
+
         // Detect Gemini Nano (Chrome Prompt API)
         initGeminiNano();
 
@@ -340,7 +340,7 @@ function openArticleModal(resultId, fallbackTitle = null) {
     if (geminiSection) {
         geminiSection.classList.add('hidden');
         document.getElementById('gemini-summary-text').innerHTML = '';
-        
+
         if (isGeminiEnabled && abstractText.length > 50) {
             geminiSection.classList.remove('hidden');
             const summaryBtn = document.getElementById('gen-gemini-summary-btn');
@@ -1948,11 +1948,11 @@ async function performSearch() {
 
         const data = await response.json();
         currentResults = data.results || [];
-        
+
         if (data.warning) {
             showToast(data.warning, 'info');
         }
-        
+
         displayCurrentResults();
         showRelatedSearches(query);
 
@@ -3250,14 +3250,14 @@ function formatMaverickResponse(text) {
     html = html.replace(/```(\w*)\s*([\s\S]*?)```/g, (match, lang, code) => {
         const index = codeBlocks.length;
         const language = lang || 'Code';
-        
+
         // Safely escape the code content
         const escapedCode = code
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .trim();
-            
+
         codeBlocks.push(`
             <div class="grok-code-block">
                 <div class="grok-code-header">
@@ -3305,7 +3305,7 @@ function formatMaverickResponse(text) {
 
     // 6. Links (Markdown and Auto-detect)
     html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="maverick-link">$1</a>');
-    
+
     html = html.replace(/(^|\s)(https?:\/\/[^\s<>"\)]+)/g, (match, space, url) => {
         const cleanUrl = url.replace(/[.,;:!?]*$/, '');
         return `${space}<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="maverick-link">🔗 ${cleanUrl}</a>`;
@@ -3505,7 +3505,7 @@ function handleChatSubmit(isVision = false) {
     updateSyncStatus('calculating');
 
     const endpoint = isVision ? `${API_BASE_URL}/maverick/chat_with_image` : `${API_BASE_URL}/maverick/chat`;
-    
+
     const body = {
         question: message,
         context: getHistoryForAPI(),
@@ -3516,75 +3516,75 @@ function handleChatSubmit(isVision = false) {
 
     fetch(endpoint, {
         method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json', 
-            'ngrok-skip-browser-warning': 'true' 
+        headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
         },
         signal: currentChatController.signal,
         body: JSON.stringify(body)
     })
-    .then(res => {
-        if (!res.ok) throw new Error(`Maverick API returned ${res.status}`);
-        return res.json();
-    })
-    .then(data => {
-        updateSyncStatus('synced');
-        
-        if (data.status === 'error') {
-            throw new Error(data.message || 'Maverick core engine error');
-        }
+        .then(res => {
+            if (!res.ok) throw new Error(`Maverick API returned ${res.status}`);
+            return res.json();
+        })
+        .then(data => {
+            updateSyncStatus('synced');
 
-        const aiText = data.answer;
-        const reasoning = data.reasoning;
-        const sources = data.sources || [];
+            if (data.status === 'error') {
+                throw new Error(data.message || 'Maverick core engine error');
+            }
 
-        // Map sources to standard format for UI
-        const mappedSources = sources.map(s => ({
-            title: s.source_title || 'Research Source',
-            url: getExternalUrl({
-                source: s.source_type,
-                id: s.source_id,
-                pmid: s.source_type === 'pubmed' ? s.source_id : null,
-                nct_id: s.source_type !== 'pubmed' ? s.source_id : null
-            }),
-            score: s.confidence,
-            type: s.source_type,
-            snippet: s.context || '',
-            id: s.source_id
-        }));
+            const aiText = data.answer;
+            const reasoning = data.reasoning;
+            const sources = data.sources || [];
 
-        addChatMessage('ai', aiText, mappedSources, reasoning, true, false, data.graph_data);
-        showSuggestedQuestions(message);
-        
-        // Clear attachments after successful send
-        currentAttachments = [];
-        const preview = document.getElementById('chat-attachment-preview');
-        if (preview) {
-            preview.innerHTML = '';
-            preview.classList.add('hidden');
-        }
-    })
-    .catch(err => {
-        if (err.name === 'AbortError') {
-            console.log('Chat stopped by user');
-            return;
-        }
-        updateSyncStatus('synced');
-        console.error('Maverick Chat Error:', err);
-        addChatMessage('ai',
-            `🔍 **Maverick Engine Connectivity Issue**\n\n` +
-            `I encountered an error while processing your research request: *${err.message}*\n\n` +
-            `**Try these options:**\n` +
-            `• 🔄 **Retry** — tap send again in a few seconds\n` +
-            `• 📋 Use the **Research Desk** tab to search the static index\n` +
-            `• 🤖 Check your local network or API key configuration`);
-    })
-    .finally(() => {
-        currentChatController = null;
-        removeChatLoading();
-        document.getElementById('chat-stop-btn')?.classList.add('hidden');
-        document.getElementById('chat-send-btn')?.classList.remove('hidden');
-    });
+            // Map sources to standard format for UI
+            const mappedSources = sources.map(s => ({
+                title: s.source_title || 'Research Source',
+                url: getExternalUrl({
+                    source: s.source_type,
+                    id: s.source_id,
+                    pmid: s.source_type === 'pubmed' ? s.source_id : null,
+                    nct_id: s.source_type !== 'pubmed' ? s.source_id : null
+                }),
+                score: s.confidence,
+                type: s.source_type,
+                snippet: s.context || '',
+                id: s.source_id
+            }));
+
+            addChatMessage('ai', aiText, mappedSources, reasoning, true, false, data.graph_data);
+            showSuggestedQuestions(message);
+
+            // Clear attachments after successful send
+            currentAttachments = [];
+            const preview = document.getElementById('chat-attachment-preview');
+            if (preview) {
+                preview.innerHTML = '';
+                preview.classList.add('hidden');
+            }
+        })
+        .catch(err => {
+            if (err.name === 'AbortError') {
+                console.log('Chat stopped by user');
+                return;
+            }
+            updateSyncStatus('synced');
+            console.error('Maverick Chat Error:', err);
+            addChatMessage('ai',
+                `🔍 **Maverick Engine Connectivity Issue**\n\n` +
+                `I encountered an error while processing your research request: *${err.message}*\n\n` +
+                `**Try these options:**\n` +
+                `• 🔄 **Retry** — tap send again in a few seconds\n` +
+                `• 📋 Use the **Research Desk** tab to search the static index\n` +
+                `• 🤖 Check your local network or API key configuration`);
+        })
+        .finally(() => {
+            currentChatController = null;
+            removeChatLoading();
+            document.getElementById('chat-stop-btn')?.classList.add('hidden');
+            document.getElementById('chat-send-btn')?.classList.remove('hidden');
+        });
 }
 
 function sendChatMessage(message) {
@@ -3660,10 +3660,10 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
                 </div>
                 ${graphData ? `
                     <button class="view-graph-btn" style="margin-top: 10px;" onclick="openGraphModalById('${(() => {
-                        const id = 'graph-' + Date.now() + '-typing';
-                        graphDataMap.set(id, graphData);
-                        return id;
-                    })()}')">
+                    const id = 'graph-' + Date.now() + '-typing';
+                    graphDataMap.set(id, graphData);
+                    return id;
+                })()}')">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                         View Knowledge Map
                     </button>
@@ -3687,17 +3687,17 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
             </div>
         `;
         history.appendChild(msgDiv);
-        
+
         const typingSpan = msgDiv.querySelector('.typing-text');
         // We set innerHTML immediately but hide it if we wanted real streaming.
         // For a beautiful "teaser" feel, we'll use a fast typing simulation.
         let i = 0;
         const typeSpeed = formattedText.length > 500 ? 5 : 15;
-        
+
         // Use a more robust typing that handles HTML tags
         typingSpan.innerHTML = formattedText;
         msgDiv.querySelector('.message-bubble').classList.add('typing-active');
-        
+
         setTimeout(() => {
             msgDiv.querySelector('.message-bubble').classList.remove('typing-active');
             msgDiv.querySelector('.chat-sources')?.classList.remove('hidden');
@@ -3724,10 +3724,10 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
                 </div>
                 ${graphData ? `
                     <button class="view-graph-btn" style="margin-top: 10px;" onclick="openGraphModalById('${(() => {
-                        const id = 'graph-' + Date.now() + '-static';
-                        graphDataMap.set(id, graphData);
-                        return id;
-                    })()}')">
+                    const id = 'graph-' + Date.now() + '-static';
+                    graphDataMap.set(id, graphData);
+                    return id;
+                })()}')">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                         View Knowledge Map
                     </button>
@@ -3760,7 +3760,7 @@ function addChatMessage(role, text, sources = [], reasoning = null, shouldScroll
     }
 
     history.appendChild(msgDiv);
-    
+
 
     // Smooth scroll to bottom
     if (shouldScroll) {
@@ -5474,14 +5474,14 @@ window.showHelpModal = function (event) {
         modal.classList.remove('hidden');
         modal.classList.add('open', 'active');
         document.body.style.overflow = 'hidden';
-        
+
         // Auto-close overlaying menus
         const options = document.querySelector('.fab-options');
         if (options && !options.classList.contains('hidden')) options.classList.add('hidden');
 
         const headerMenu = document.getElementById('header-menu');
         if (headerMenu) headerMenu.classList.add('hidden');
-        
+
         showToast('Opening Help Guide...', 'info');
     } else {
         console.error('Help modal element not found!');
@@ -5514,14 +5514,14 @@ window.showKeyboardShortcuts = function (event) {
         modal.classList.remove('hidden');
         modal.classList.add('open', 'active');
         document.body.style.overflow = 'hidden';
-        
+
         // Auto-close overlaying menus
         const options = document.querySelector('.fab-options');
         if (options && !options.classList.contains('hidden')) options.classList.add('hidden');
 
         const headerMenu = document.getElementById('header-menu');
         if (headerMenu) headerMenu.classList.add('hidden');
-        
+
         showToast('Keyboard Shortcuts', 'info');
     } else {
         console.error('Shortcuts modal element not found!');
@@ -5554,19 +5554,19 @@ window.openScheduledActionsModal = function (event) {
         modal.classList.remove('hidden');
         modal.classList.add('open', 'active');
         document.body.style.overflow = 'hidden';
-        
+
         // Auto-close overlaying menus
         const options = document.querySelector('.fab-options');
         if (options && !options.classList.contains('hidden')) options.classList.add('hidden');
 
         const headerMenu = document.getElementById('header-menu');
         if (headerMenu) headerMenu.classList.add('hidden');
-        
+
         // Refresh scheduled actions list
         if (typeof renderScheduledActions === 'function') {
             renderScheduledActions();
         }
-        
+
         showToast('Scheduled Actions', 'info');
     } else {
         console.error('Scheduler modal element not found!');
@@ -5751,37 +5751,39 @@ function renderTrendsChart(force = false) {
 
     const ctx = canvas.getContext('2d');
     const chartGradient = ctx.createLinearGradient(0, 0, 0, 400);
-    chartGradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
+    chartGradient.addColorStop(0, 'rgba(59, 130, 246, 0.45)');
+    chartGradient.addColorStop(0.6, 'rgba(59, 130, 246, 0.1)');
     chartGradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
 
     const currentYear = new Date().getFullYear();
     const years = Array.from({ length: 12 }, (_, i) => currentYear - 11 + i);
-    
-    // Premium Data Curve (Simulated)
-    const dataVolumes = [110200, 120500, 134200, 151000, 168900, 190500, 245000, 267300, 289000, 312000, 335000, 358400];
+
+    // Premium Data Curve (Exponential Growth)
+    const dataVolumes = [105000, 115000, 132000, 150000, 165000, 185000, 245000, 265000, 285000, 310000, 335000, 358400];
 
     const isDarkMode = document.body.dataset.theme === 'dark' || document.body.classList.contains('dark-theme');
-    const textColor = isDarkMode ? '#94a3b8' : '#64748b';
-    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)';
+    const textColor = isDarkMode ? '#94a3b8' : '#475569';
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)';
 
     trendsChartInstance = new Chart(canvas, {
         type: 'line',
         data: {
             labels: years,
             datasets: [{
-                label: 'Publications',
+                label: 'Global Research Velocity',
                 data: dataVolumes,
-                borderColor: '#3b82f6',
+                borderColor: '#2563eb',
                 backgroundColor: chartGradient,
                 borderWidth: 4,
-                tension: 0.45,
+                tension: 0.4,
                 fill: true,
                 pointBackgroundColor: '#fff',
-                pointBorderColor: '#3b82f6',
-                pointBorderWidth: 2,
-                pointRadius: 5,
-                pointHoverRadius: 8,
-                pointHoverBackgroundColor: '#3b82f6',
+                pointBorderColor: '#2563eb',
+                pointBorderWidth: 3,
+                pointRadius: 4,
+                pointHitRadius: 10,
+                pointHoverRadius: 7,
+                pointHoverBackgroundColor: '#2563eb',
                 pointHoverBorderColor: '#fff',
                 pointHoverBorderWidth: 3
             }]
@@ -5789,6 +5791,7 @@ function renderTrendsChart(force = false) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: { padding: { top: 10, bottom: 0 } },
             interaction: {
                 intersect: false,
                 mode: 'index'
@@ -5796,12 +5799,15 @@ function renderTrendsChart(force = false) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-                    titleColor: isDarkMode ? '#f1f5f9' : '#1e293b',
-                    bodyColor: isDarkMode ? '#cbd5e1' : '#64748b',
-                    padding: 12,
-                    borderColor: '#3b82f6',
-                    borderWidth: 1,
+                    backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+                    titleColor: isDarkMode ? '#f8fafc' : '#0f172a',
+                    titleFont: { size: 14, weight: 'bold' },
+                    bodyColor: isDarkMode ? '#94a3b8' : '#475569',
+                    bodyFont: { size: 13 },
+                    padding: 16,
+                    cornerRadius: 12,
+                    borderColor: '#2563eb',
+                    borderWidth: 1.5,
                     displayColors: false,
                     callbacks: {
                         label: function (context) {
@@ -5813,11 +5819,12 @@ function renderTrendsChart(force = false) {
             scales: {
                 y: {
                     beginAtZero: false,
-                    suggestedMin: 100000,
+                    suggestedMin: 80000,
                     grid: { color: gridColor, drawBorder: false },
                     ticks: {
                         color: textColor,
-                        font: { size: 11, weight: '600' },
+                        font: { size: 10, weight: '500' },
+                        maxTicksLimit: 6,
                         callback: function (value) { return value / 1000 + 'k'; }
                     }
                 },
@@ -5825,7 +5832,7 @@ function renderTrendsChart(force = false) {
                     grid: { display: false },
                     ticks: {
                         color: textColor,
-                        font: { size: 11, weight: '600' }
+                        font: { size: 10, weight: '500' }
                     }
                 }
             }
@@ -6701,7 +6708,7 @@ document.addEventListener('DOMContentLoaded', function () {
 function updateSyncStatus(status) {
     const wrapper = document.getElementById('maverick-sync-indicator');
     const dot = wrapper?.querySelector('.sync-dot');
-    
+
     // The indicator is officially removed in 1.6.5 PREMIUM
     if (!wrapper || !dot) return;
 
@@ -6944,11 +6951,11 @@ function openGraphModal(data) {
         showToast('No graph data available for this research', 'info');
         return;
     }
-    
+
     activeGraphData = data;
     const modal = document.getElementById('graph-modal');
     if (modal) modal.classList.add('open');
-    
+
     // Allow animation/layout to settle before rendering
     setTimeout(() => renderResearchGraph(data), 100);
 }
@@ -6966,21 +6973,21 @@ function resetGraph() {
 function renderResearchGraph(data) {
     const container = document.getElementById('knowledge-graph-container');
     if (!container) return;
-    
+
     // Clear previous
     container.innerHTML = '';
-    
+
     const width = container.clientWidth;
     const height = container.clientHeight;
-    
+
     const svg = d3.select("#knowledge-graph-container")
         .append("svg")
         .attr("width", "100%")
         .attr("height", "100%")
         .attr("viewBox", [0, 0, width, height]);
-        
+
     const g = svg.append("g");
-    
+
     // Zoom behavior
     svg.call(d3.zoom()
         .extent([[0, 0], [width, height]])
@@ -7040,18 +7047,18 @@ function renderResearchGraph(data) {
             event.subject.fx = event.subject.x;
             event.subject.fy = event.subject.y;
         }
-        
+
         function dragged(event) {
             event.subject.fx = event.x;
             event.subject.fy = event.y;
         }
-        
+
         function dragended(event) {
             if (!event.active) simulation.alphaTarget(0);
             event.subject.fx = null;
             event.subject.fy = null;
         }
-        
+
         return d3.drag()
             .on("start", dragstarted)
             .on("drag", dragged)
@@ -7062,11 +7069,11 @@ function renderResearchGraph(data) {
 function showNodeDetails(node) {
     const details = document.getElementById('graph-details');
     if (!details) return;
-    
+
     const isPaper = node.group === "paper";
     const title = isPaper ? "Research Paper" : "Scientific Topic";
     const icon = isPaper ? "📄" : "🧬";
-    
+
     details.innerHTML = `
         <div class="node-details">
             <span class="meta">${icon} ${title}</span>
@@ -7079,13 +7086,13 @@ function showNodeDetails(node) {
             ` : ""}
         </div>
     `;
-    
+
     // Highlight node circles in SVG
     d3.selectAll(".node circle")
         .transition().duration(200)
         .attr("stroke", "#fff")
         .attr("stroke-width", 2);
-        
+
     d3.selectAll(".node")
         .filter(d => d.id === node.id)
         .select("circle")
@@ -7095,7 +7102,7 @@ function showNodeDetails(node) {
 }
 
 // ==========================================
-// BETA FEATURES LOGIC (v1.6.0)
+// BETA FEATURES LOGIC (v1.6.5)
 // ==========================================
 
 /**
@@ -7143,7 +7150,7 @@ function _fabOutsideClick(e) {
  */
 function toggleKnowledgeGraph() {
     showToast('Knowledge Graph Visualization building correlations... (BETA)', 'info');
-    
+
     // In a real implementation, this would trigger a D3.js overlay
     // For now, we'll pulse the insight box if visible
     const insightBox = document.getElementById('maverick-insight-box');
@@ -7224,7 +7231,7 @@ function checkAchievementsStatus() {
     // 1. Evidence Pioneer (All sources used)
     const currentSource = document.querySelector('.quick-filter-chip[data-type="source"].active')?.dataset.value || 'all';
     if (currentSource !== 'all') sessionUsedSources.add(currentSource);
-    
+
     if (sessionUsedSources.size >= 2) {
         unlockAchievement(ACHIEVEMENTS.PIONEER);
         const progress = document.getElementById('progress-pioneer');
@@ -7317,13 +7324,13 @@ async function generateGeminiSummary() {
 
         const prompt = `Please summarize this biomedical research abstract in 3-4 concise bullet points focusing on the primary outcome and clinical significance: \n\n ${abstractText}`;
         const response = await geminiSession.prompt(prompt);
-        
+
         // Minimal markdown to HTML conversion for bullets
         const htmlResponse = response.replace(/\*(.*?)\*/g, '<b>$1</b>')
-                                     .replace(/\n\n/g, '<br><br>')
-                                     .replace(/^- /gm, '• ')
-                                     .replace(/\n/g, '<br>');
-                                     
+            .replace(/\n\n/g, '<br><br>')
+            .replace(/^- /gm, '• ')
+            .replace(/\n/g, '<br>');
+
         summaryTextTarget.innerHTML = `<div class="gemini-ai-badge">LOCAL AI SUMMARY</div>${htmlResponse}`;
         summaryBtn.classList.add('hidden');
     } catch (e) {

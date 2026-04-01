@@ -2115,6 +2115,7 @@ body.chat-mode .scholar-footer {
     font-weight: 800;
     margin-bottom: 8px;
     background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-blue) 100%);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -2378,11 +2379,10 @@ body.chat-mode .scholar-footer {
     height: 10px;
     background: #ef4444;
     border-radius: 50%;
-    box-shadow: 0 0 0 rgba(239, 68, 68, 0.4);
-    animation: p-pulse 2s infinite;
+    animation: pulse-red 2s infinite;
 }
 
-@keyframes p-pulse {
+@keyframes pulse-red {
     0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
     70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
     100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
@@ -2440,9 +2440,7 @@ body.chat-mode .scholar-footer {
     .trends-header { flex-direction: column; align-items: flex-start; gap: 20px; }
 }
 
-.trends-header h2 {
-    background-clip: text;
-}
+
 
 
 /* Animations */
@@ -6780,7 +6778,7 @@ body {
 }
 
 /* ==========================================
-   BETA UI FEATURES (v1.6.0)
+   BETA UI FEATURES (v1.6.5)
    ========================================== */
 
 /* Live Ticker Bar */
@@ -7220,7 +7218,7 @@ body {
     }
 }
 
-/* Trends Tab Enhancements (v1.6.0-BETA) */
+/* Trends Tab Enhancements (v1.6.5 PREMIUM) */
 .sentiment-container {
     display: flex;
     flex-direction: column;
@@ -7348,7 +7346,7 @@ body {
     color: var(--text-primary);
 }
 
-/* Gemini Nano Local AI Container (v1.6.0-BETA) */
+/* Gemini Nano Local AI Container (v1.6.5 PREMIUM) */
 .gemini-summary-container {
     background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 51, 234, 0.05) 100%);
     border: 1.5px solid rgba(59, 130, 246, 0.2);
@@ -7399,6 +7397,7 @@ body {
     letter-spacing: 1.5px;
     color: var(--primary-blue);
     background: linear-gradient(90deg, var(--primary-blue), #9333ea);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
