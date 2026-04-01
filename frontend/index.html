@@ -996,6 +996,62 @@
                             </div>
                         </div>
 
+                        <!-- Dual Column Layout for Feed and Chart (v1.6.5 PREMIUM Highlight) -->
+                        <div class="trends-secondary-layout" style="margin-bottom: 40px;">
+                            <!-- Live Discoveries Feed -->
+                            <div class="trends-feed-section glass-morph">
+                                <div class="feed-header">
+                                    <div class="feed-title-area">
+                                        <div class="pulse-indicator"></div>
+                                        <h3>Major Discoveries (Past 24H)</h3>
+                                    </div>
+                                    <span class="live-badge">REAL-TIME</span>
+                                </div>
+                                <div class="discoveries-scroll">
+                                    <div class="discovery-item">
+                                        <div class="discovery-meta">
+                                            <span class="discovery-time">2h ago</span>
+                                            <span class="discovery-source">Lancet</span>
+                                        </div>
+                                        <p>Novel Peptide for <strong>Alzheimer's Clearance</strong> shows 40% reduction in mouse models.</p>
+                                    </div>
+                                    <div class="discovery-item">
+                                        <div class="discovery-meta">
+                                            <span class="discovery-time">5h ago</span>
+                                            <span class="discovery-source">NEJM</span>
+                                        </div>
+                                        <p>Phase III Trial Results for <strong>CRISPR-based Cardiac Repair</strong> published with high success.</p>
+                                    </div>
+                                    <div class="discovery-item">
+                                        <div class="discovery-meta">
+                                            <span class="discovery-time">12h ago</span>
+                                            <span class="discovery-source">Nature</span>
+                                        </div>
+                                        <p>AI Engine detects <strong>Mitochondrial Variant</strong> linked to Rare Muscle Dystrophy.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Publication Volume Chart -->
+                            <div class="trends-chart-section glass-morph">
+                                <div class="chart-header">
+                                    <div class="chart-title-area">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                            <polyline points="17 6 23 6 23 12"></polyline>
+                                        </svg>
+                                        <h3>Biomedical Output (Global Velocity)</h3>
+                                    </div>
+                                    <div class="chart-legend">
+                                        <span class="legend-dot papers"></span> Papers
+                                    </div>
+                                </div>
+                                <div class="trends-chart-container">
+                                    <canvas id="publication-trend-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Key Metrics Row -->
                         <div class="trends-metrics-row">
                             <div class="metric-glass-card">
@@ -1148,61 +1204,7 @@
                             </div>
                         </div>
 
-                        <!-- Dual Column Layout for Feed and Chart -->
-                        <div class="trends-secondary-layout">
-                            <!-- Live Discoveries Feed -->
-                            <div class="trends-feed-section glass-morph">
-                                <div class="feed-header">
-                                    <div class="feed-title-area">
-                                        <div class="pulse-indicator"></div>
-                                        <h3>Major Discoveries (Past 24H)</h3>
-                                    </div>
-                                    <span class="live-badge">REAL-TIME</span>
-                                </div>
-                                <div class="discoveries-scroll">
-                                    <div class="discovery-item">
-                                        <div class="discovery-meta">
-                                            <span class="discovery-time">2h ago</span>
-                                            <span class="discovery-source">Lancet</span>
-                                        </div>
-                                        <p>Novel Peptide for <strong>Alzheimer's Clearance</strong> shows 40% reduction in mouse models.</p>
-                                    </div>
-                                    <div class="discovery-item">
-                                        <div class="discovery-meta">
-                                            <span class="discovery-time">5h ago</span>
-                                            <span class="discovery-source">NEJM</span>
-                                        </div>
-                                        <p>Phase III Trial Results for <strong>CRISPR-based Cardiac Repair</strong> published with high success.</p>
-                                    </div>
-                                    <div class="discovery-item">
-                                        <div class="discovery-meta">
-                                            <span class="discovery-time">12h ago</span>
-                                            <span class="discovery-source">Nature</span>
-                                        </div>
-                                        <p>AI Engine detects <strong>Mitochondrial Variant</strong> linked to Rare Muscle Dystrophy.</p>
-                                    </div>
-                                </div>
-                            </div>
 
-                            <!-- Publication Volume Chart -->
-                            <div class="trends-chart-section glass-morph">
-                                <div class="chart-header">
-                                    <div class="chart-title-area">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                                            <polyline points="17 6 23 6 23 12"></polyline>
-                                        </svg>
-                                        <h3>Biomedical Output (Global Velocity)</h3>
-                                    </div>
-                                    <div class="chart-legend">
-                                        <span class="legend-dot papers"></span> Papers
-                                    </div>
-                                </div>
-                                <div class="trends-chart-container">
-                                    <canvas id="publication-trend-chart"></canvas>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
