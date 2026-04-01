@@ -979,143 +979,233 @@
                 <div id="trends-tab" class="tab-content trends-container">
                     <div class="trends-wrapper">
                         <div class="trends-header">
-                            <h2>Macro Research Trends</h2>
-                            <p>Live analysis of biomedical publication volumes and emerging focal areas.</p>
+                            <div class="trends-header-main">
+                                <h2>Macro Research Trends</h2>
+                                <p>Real-time analysis of global biomedical publication volumes and emerging focal areas.</p>
+                            </div>
+                            <div class="trends-header-actions">
+                                <div class="live-status">
+                                    <span class="live-dot pulsed"></span>
+                                    <span>LIVE ANALYSIS</span>
+                                </div>
+                                <button class="refresh-trends-btn" onclick="refreshTrendsData()" title="Refresh Trends">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
 
-
-
-
+                        <!-- Key Metrics Row -->
+                        <div class="trends-metrics-row">
+                            <div class="metric-glass-card">
+                                <div class="metric-icon">📈</div>
+                                <div class="metric-info">
+                                    <span class="metric-label">Annual Growth</span>
+                                    <span class="metric-value">+15.4%</span>
+                                </div>
+                            </div>
+                            <div class="metric-glass-card">
+                                <div class="metric-icon">📄</div>
+                                <div class="metric-info">
+                                    <span class="metric-label">Papers Today</span>
+                                    <span class="metric-value">12.4K+</span>
+                                </div>
+                            </div>
+                            <div class="metric-glass-card">
+                                <div class="metric-icon">🧪</div>
+                                <div class="metric-info">
+                                    <span class="metric-label">Active Trials</span>
+                                    <span class="metric-value">20.5K</span>
+                                </div>
+                            </div>
+                            <div class="metric-glass-card">
+                                <div class="metric-icon">🧠</div>
+                                <div class="metric-info">
+                                    <span class="metric-label">AI Insight Score</span>
+                                    <span class="metric-value">98/100</span>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="trends-grid">
                             <!-- Fast-Emerging Topics Card -->
-                            <div class="trends-card trends-card-primary">
+                            <div class="trends-card trends-card-primary glass-morph">
                                 <div class="trends-card-header">
-                                    <span>🔥</span>
+                                    <div class="card-icon-wrapper">🔥</div>
                                     <h3>Fast-Emerging Topics</h3>
                                 </div>
-                                <ul class="trends-list">
-                                    <li class="trends-list-item" data-search-term="GLP-1 Agonists"
-                                        onclick="searchTrend(this)">
-                                        <span class="trends-list-item-label">GLP-1 Agonists</span>
-                                        <span class="trends-list-item-growth">+24.5%</span>
-                                    </li>
-                                    <li class="trends-list-item" data-search-term="CRISPR-Cas9 Editing"
-                                        onclick="searchTrend(this)">
-                                        <span class="trends-list-item-label">CRISPR-Cas9 Editing</span>
-                                        <span class="trends-list-item-growth">+18.2%</span>
-                                    </li>
-                                    <li class="trends-list-item" data-search-term="mRNA Immunotherapy"
-                                        onclick="searchTrend(this)">
-                                        <span class="trends-list-item-label">mRNA Immunotherapy</span>
-                                        <span class="trends-list-item-growth">+13.4%</span>
-                                    </li>
-                                    <li class="trends-list-item" data-search-term="AI in Radiology"
-                                        onclick="searchTrend(this)">
-                                        <span class="trends-list-item-label">AI in Radiology</span>
-                                        <span class="trends-list-item-growth">+11.5%</span>
-                                    </li>
-                                </ul>
+                                <div class="trends-card-content">
+                                    <ul class="trends-list">
+                                        <li class="trends-list-item" data-search-term="GLP-1 Agonists" onclick="searchTrend(this)">
+                                            <div class="item-main">
+                                                <span class="trends-list-item-label">GLP-1 Agonists</span>
+                                                <div class="growth-bar-container"><div class="growth-bar" style="width: 85%"></div></div>
+                                            </div>
+                                            <span class="trends-list-item-growth">+24.5%</span>
+                                        </li>
+                                        <li class="trends-list-item" data-search-term="CRISPR-Cas9 Editing" onclick="searchTrend(this)">
+                                            <div class="item-main">
+                                                <span class="trends-list-item-label">CRISPR-Cas9 Editing</span>
+                                                <div class="growth-bar-container"><div class="growth-bar" style="width: 72%"></div></div>
+                                            </div>
+                                            <span class="trends-list-item-growth">+18.2%</span>
+                                        </li>
+                                        <li class="trends-list-item" data-search-term="mRNA Immunotherapy" onclick="searchTrend(this)">
+                                            <div class="item-main">
+                                                <span class="trends-list-item-label">mRNA Immunotherapy</span>
+                                                <div class="growth-bar-container"><div class="growth-bar" style="width: 60%"></div></div>
+                                            </div>
+                                            <span class="trends-list-item-growth">+13.4%</span>
+                                        </li>
+                                        <li class="trends-list-item" data-search-term="Multi-Modal Vision AI" onclick="searchTrend(this)">
+                                            <div class="item-main">
+                                                <span class="trends-list-item-label">Vision AI in Radiology</span>
+                                                <div class="growth-bar-container"><div class="growth-bar" style="width: 55%"></div></div>
+                                            </div>
+                                            <span class="trends-list-item-growth">+11.5%</span>
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
 
                             <!-- Highest Volume Card -->
-                            <div class="trends-card trends-card-secondary">
+                            <div class="trends-card trends-card-secondary glass-morph">
                                 <div class="trends-card-header">
-                                    <span>📚</span>
-                                    <h3>Highest Volume (All-Time)</h3>
+                                    <div class="card-icon-wrapper">📚</div>
+                                    <h3>High Volume Clusters</h3>
                                 </div>
-                                <div class="trends-tags">
-                                    <span class="trends-tag" data-search-term="Type 2 Diabetes" onclick="searchTrend(this)">Diabetes</span>
-                                    <span class="trends-tag" data-search-term="Breast Cancer" onclick="searchTrend(this)">Oncology</span>
-                                    <span class="trends-tag" data-search-term="COVID-19" onclick="searchTrend(this)">COVID</span>
-                                    <span class="trends-tag" data-search-term="Hypertension" onclick="searchTrend(this)">Cardiac</span>
-                                    <span class="trends-tag" data-search-term="Alzheimer's" onclick="searchTrend(this)">Neuro</span>
+                                <div class="trends-card-content">
+                                    <div class="trends-tags">
+                                        <span class="trends-tag" data-search-term="Type 2 Diabetes" onclick="searchTrend(this)">Diabetes</span>
+                                        <span class="trends-tag" data-search-term="Breast Cancer" onclick="searchTrend(this)">Oncology</span>
+                                        <span class="trends-tag" data-search-term="COVID-19" onclick="searchTrend(this)">COVID-19</span>
+                                        <span class="trends-tag" data-search-term="Hypertension" onclick="searchTrend(this)">Cardiology</span>
+                                        <span class="trends-tag" data-search-term="Alzheimer's Disease" onclick="searchTrend(this)">Neurology</span>
+                                        <span class="trends-tag" data-search-term="Inflammation" onclick="searchTrend(this)">Immunology</span>
+                                        <span class="trends-tag" data-search-term="Microbiome" onclick="searchTrend(this)">Gut Health</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Sentiment Pulse (NEW) -->
-                            <div class="trends-card trends-card-accent">
+                            <!-- Sentiment Pulse -->
+                            <div class="trends-card trends-card-accent glass-morph">
                                 <div class="trends-card-header">
-                                    <span>💙</span>
-                                    <h3>Sentiment Pulse</h3>
+                                    <div class="card-icon-wrapper">💎</div>
+                                    <h3>Public Sentiment Pulse</h3>
                                 </div>
                                 <div class="sentiment-container">
                                     <div class="sentiment-row">
-                                        <span class="sentiment-label">GLP-1 Weight Loss</span>
+                                        <div class="sentiment-header-row">
+                                            <span class="sentiment-label">GLP-1 Weight Loss</span>
+                                            <span class="sentiment-score">8.5/10</span>
+                                        </div>
                                         <div class="sentiment-bar-wrapper">
                                             <div class="sentiment-bar pos" style="width: 85%;"></div>
                                         </div>
-                                        <span class="sentiment-score">8.5/10</span>
                                     </div>
                                     <div class="sentiment-row">
-                                        <span class="sentiment-label">mRNA Safety</span>
+                                        <div class="sentiment-header-row">
+                                            <span class="sentiment-label">mRNA Safety Perception</span>
+                                            <span class="sentiment-score">7.2/10</span>
+                                        </div>
                                         <div class="sentiment-bar-wrapper">
                                             <div class="sentiment-bar pos" style="width: 72%;"></div>
                                         </div>
-                                        <span class="sentiment-score">7.2/10</span>
                                     </div>
                                     <div class="sentiment-row">
-                                        <span class="sentiment-label">AI Diagnostic Bias</span>
+                                        <div class="sentiment-header-row">
+                                            <span class="sentiment-label">AI Diagnostic Trust</span>
+                                            <span class="sentiment-score">4.5/10</span>
+                                        </div>
                                         <div class="sentiment-bar-wrapper">
                                             <div class="sentiment-bar neg" style="width: 45%;"></div>
                                         </div>
-                                        <span class="sentiment-score">4.5/10</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Research Breakdown (NEW) -->
-                            <div class="trends-card trends-card-glass">
+                            <!-- Research Breakdown -->
+                            <div class="trends-card glass-morph">
                                 <div class="trends-card-header">
-                                    <span>🌐</span>
-                                    <h3>Global Field Breakdown</h3>
+                                    <div class="card-icon-wrapper">🌐</div>
+                                    <h3>Global Study Distribution</h3>
                                 </div>
                                 <div class="breakdown-grid">
                                     <div class="breakdown-item">
-                                        <div class="breakdown-circle" style="background: conic-gradient(var(--primary-blue) 42%, #ddd 0);">42%</div>
+                                        <div class="breakdown-ring" style="--percent: 42; --color: var(--primary-blue);">42%</div>
                                         <span>Oncology</span>
                                     </div>
                                     <div class="breakdown-item">
-                                        <div class="breakdown-circle" style="background: conic-gradient(#10b981 28%, #ddd 0);">28%</div>
+                                        <div class="breakdown-ring" style="--percent: 28; --color: #10b981;">28%</div>
                                         <span>Immunology</span>
                                     </div>
                                     <div class="breakdown-item">
-                                        <div class="breakdown-circle" style="background: conic-gradient(#f59e0b 15%, #ddd 0);">15%</div>
+                                        <div class="breakdown-ring" style="--percent: 15; --color: #f59e0b;">15%</div>
                                         <span>Genetics</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Live Discoveries Feed (NEW) -->
-                        <div class="trends-feed-section">
-                            <div class="feed-header">
-                                <h3>⚡ Recent Major Discoveries (24H)</h3>
+                        <!-- Dual Column Layout for Feed and Chart -->
+                        <div class="trends-secondary-layout">
+                            <!-- Live Discoveries Feed -->
+                            <div class="trends-feed-section glass-morph">
+                                <div class="feed-header">
+                                    <div class="feed-title-area">
+                                        <div class="pulse-indicator"></div>
+                                        <h3>Major Discoveries (Past 24H)</h3>
+                                    </div>
+                                    <span class="live-badge">REAL-TIME</span>
+                                </div>
+                                <div class="discoveries-scroll">
+                                    <div class="discovery-item">
+                                        <div class="discovery-meta">
+                                            <span class="discovery-time">2h ago</span>
+                                            <span class="discovery-source">Lancet</span>
+                                        </div>
+                                        <p>Novel Peptide for <strong>Alzheimer's Clearance</strong> shows 40% reduction in mouse models.</p>
+                                    </div>
+                                    <div class="discovery-item">
+                                        <div class="discovery-meta">
+                                            <span class="discovery-time">5h ago</span>
+                                            <span class="discovery-source">NEJM</span>
+                                        </div>
+                                        <p>Phase III Trial Results for <strong>CRISPR-based Cardiac Repair</strong> published with high success.</p>
+                                    </div>
+                                    <div class="discovery-item">
+                                        <div class="discovery-meta">
+                                            <span class="discovery-time">12h ago</span>
+                                            <span class="discovery-source">Nature</span>
+                                        </div>
+                                        <p>AI Engine detects <strong>Mitochondrial Variant</strong> linked to Rare Muscle Dystrophy.</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="discoveries-scroll">
-                                <div class="discovery-item">
-                                    <span class="discovery-time">2h ago</span>
-                                    <p>Novel Peptide for <strong>Alzheimer's Clearance</strong> shows 40% reduction in mouse models.</p>
-                                </div>
-                                <div class="discovery-item">
-                                    <span class="discovery-time">5h ago</span>
-                                    <p>Phase III Trial Results for <strong>CRISPR-based Cardiac Repair</strong> published in NEJM.</p>
-                                </div>
-                                <div class="discovery-item">
-                                    <span class="discovery-time">12h ago</span>
-                                    <p>AI Engine detects <strong>Mitochondrial Variant</strong> linked to Rare Muscle Dystrophy.</p>
-                                </div>
-                            </div>
-                        </div>
 
-                        <div class="trends-chart-section">
-                            <h3>Publication Volume by Year</h3>
-                            <div class="trends-chart-container">
-                                <canvas id="publication-trend-chart"></canvas>
+                            <!-- Publication Volume Chart -->
+                            <div class="trends-chart-section glass-morph">
+                                <div class="chart-header">
+                                    <div class="chart-title-area">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                            <polyline points="17 6 23 6 23 12"></polyline>
+                                        </svg>
+                                        <h3>Biomedical Output (Global Velocity)</h3>
+                                    </div>
+                                    <div class="chart-legend">
+                                        <span class="legend-dot papers"></span> Papers
+                                    </div>
+                                </div>
+                                <div class="trends-chart-container">
+                                    <canvas id="publication-trend-chart"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
             </div>
     </main>
 

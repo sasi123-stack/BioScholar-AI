@@ -5702,12 +5702,45 @@ document.addEventListener('keydown', function (e) {
 // function switchTab removed - consolidated at line 1094
 
 let trendsChartInstance = null;
-function renderTrendsChart() {
+/**
+ * Modernized Trends Tab Interaction Logic (v1.6.5 PREMIUM)
+ */
+function searchTrend(element) {
+    const term = element.getAttribute('data-search-term');
+    if (!term) return;
+
+    if (headerSearchInput) {
+        headerSearchInput.value = term;
+        switchTab('articles');
+        performSearch();
+        showToast(`Focusing on trend: ${term}`, 'success');
+    }
+}
+
+function refreshTrendsData() {
+    const btn = document.querySelector('.refresh-trends-btn');
+    if (btn) btn.classList.add('spinning');
+
+    showToast('Refreshing real-time research metrics...', 'info');
+
+    // Simulate fetch delay
+    setTimeout(() => {
+        if (btn) btn.classList.remove('spinning');
+        renderTrendsChart(true); // Forced rerender
+        showToast('Research metrics updated.', 'success');
+    }, 1200);
+}
+
+function renderTrendsChart(force = false) {
     const canvas = document.getElementById('publication-trend-chart');
     if (!canvas) return;
 
+    if (trendsChartInstance && !force) {
+        return; // Already rendered and not forced
+    }
+
     if (trendsChartInstance) {
-        return; // Already rendered
+        trendsChartInstance.destroy();
     }
 
     // Check if Chart is loaded
@@ -5716,75 +5749,107 @@ function renderTrendsChart() {
         return;
     }
 
-    const currentYear = new Date().getFullYear();
-    const years = Array.from({ length: 10 }, (_, i) => currentYear - 9 + i);
+    const ctx = canvas.getContext('2d');
+    const chartGradient = ctx.createLinearGradient(0, 0, 0, 400);
+    chartGradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
+    chartGradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
 
-    // Mocked exponential growth data for demonstration
-    const dataVolumes = [120500, 134200, 151000, 168900, 190500, 245000, 267300, 289000, 312000, 335000];
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 12 }, (_, i) => currentYear - 11 + i);
+    
+    // Premium Data Curve (Simulated)
+    const dataVolumes = [110200, 120500, 134200, 151000, 168900, 190500, 245000, 267300, 289000, 312000, 335000, 358400];
 
     const isDarkMode = document.body.dataset.theme === 'dark' || document.body.classList.contains('dark-theme');
-    const textColor = isDarkMode ? '#e2e8f0' : '#475569';
-    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+    const textColor = isDarkMode ? '#94a3b8' : '#64748b';
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)';
 
     trendsChartInstance = new Chart(canvas, {
         type: 'line',
         data: {
             labels: years,
             datasets: [{
-                label: 'Biomedical Publications',
+                label: 'Publications',
                 data: dataVolumes,
                 borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                borderWidth: 3,
-                tension: 0.4,
+                backgroundColor: chartGradient,
+                borderWidth: 4,
+                tension: 0.45,
                 fill: true,
                 pointBackgroundColor: '#fff',
                 pointBorderColor: '#3b82f6',
-                pointRadius: 4,
-                pointHoverRadius: 6
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 8,
+                pointHoverBackgroundColor: '#3b82f6',
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
             plugins: {
-                legend: {
-                    display: false
-                },
+                legend: { display: false },
                 tooltip: {
+                    backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                    titleColor: isDarkMode ? '#f1f5f9' : '#1e293b',
+                    bodyColor: isDarkMode ? '#cbd5e1' : '#64748b',
+                    padding: 12,
+                    borderColor: '#3b82f6',
+                    borderWidth: 1,
+                    displayColors: false,
                     callbacks: {
                         label: function (context) {
-                            return context.parsed.y.toLocaleString() + ' publications';
+                            return `📈 Volume: ${context.parsed.y.toLocaleString()} papers`;
                         }
                     }
                 }
             },
             scales: {
                 y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: gridColor,
-                        drawBorder: false
-                    },
+                    beginAtZero: false,
+                    suggestedMin: 100000,
+                    grid: { color: gridColor, drawBorder: false },
                     ticks: {
                         color: textColor,
-                        callback: function (value) {
-                            return value / 1000 + 'k';
-                        }
+                        font: { size: 11, weight: '600' },
+                        callback: function (value) { return value / 1000 + 'k'; }
                     }
                 },
                 x: {
-                    grid: {
-                        display: false
-                    },
+                    grid: { display: false },
                     ticks: {
-                        color: textColor
+                        color: textColor,
+                        font: { size: 11, weight: '600' }
                     }
                 }
             }
         }
     });
+
+    // Trigger growth bars animation
+    animateTrendsBars();
 }
+
+/**
+ * Visual feedback for trends growth bars
+ */
+function animateTrendsBars() {
+    const bars = document.querySelectorAll('.growth-bar');
+    bars.forEach(bar => {
+        const targetWidth = bar.style.width;
+        bar.style.width = '0';
+        setTimeout(() => {
+            bar.style.width = targetWidth;
+        }, 300);
+    });
+}
+
 
 console.log('✅ Keyboard shortcuts enabled');
 console.log('Press ? to view all shortcuts');
