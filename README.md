@@ -9,7 +9,7 @@ app_port: 7860
 
 <div align="center">
  
-# 🧬 BioMedScholar AI: 1.6.5 PREMIUM
+# 🧬 BioMedScholar AI: 1.6.5 PROFESSIONAL
  
 ### *Intelligent Biomedical Research Engine powered by OpenClaw RAG and Llama 4 Maverick*
  
@@ -62,6 +62,12 @@ The centerpiece of the Research Desk, providing real-time evidence synthesis:
 - **Context-Aware Linkage**: Seamless navigation between Research Desk, Maverick Bot, and Research Trends.
 - **Dynamic Source Mapping**: Identifies and links citations across all indexed sources.
 
+### 🎭 Interactive Presentation Deck (NEW)
+A professional, cinematic web-based slide deck for the April 10th showcase:
+- **Premium Design**: Space Grotesk typography & Glassmorphism UI.
+- **Presenter Notes**: Fast-access one-liners for a polished 10-minute delivery.
+- **3D Transitions**: Seamless navigation between architectural and feature pillars.
+
 ### 🤖 Maverick Telegram Bot (`@Meverick_AI_bot`)
 | Command | Description |
 |---|---|
@@ -109,9 +115,11 @@ The centerpiece of the Research Desk, providing real-time evidence synthesis:
 
 ## ✅ System Milestones (April 1, 2026)
 
-### 📊 Modernized Research Trends ✅ **PRODUCTION**
-- **Feature**: Replaced legacy trends with a high-fidelity dashboard featuring **Live Analysis** simulation.
-- **Outcome**: Real-time jittering data and dynamic discovery injection via Maverick AI.
+### 🎥 Professional Showcase Deck ✅ **PRODUCTION READY**
+- **Feature**: Standalone interactive presentation app in `/presentation`.
+- **Outcome**: Optimized for the April 10th 10-minute presentation at 3:20 PM IST.
+
+### 📊 Modernized Research Trends ✅ **HARDENED**
 
 ### 🧠 Gemini Nano Integration ✅ **HARDENED**
 - **Feature**: On-device "Local AI Summary" container in article details.
@@ -142,14 +150,15 @@ We have implemented a high-fidelity **Selenium-based Showcase Script** (`seleniu
 
 ## 📅 Product Launch Calendar
 - **🎥 Initial Product Demo Video**: April 9th, 2026 | 9:00 AM IST
-- **🎥 Official Product Launch**: WILL BE UPDATED SOON
+- **🎥 Official Product Showcase**: April 10th, 2026 | 3:20 PM IST
+- **📊 Interactive Deck**: `/presentation/index.html`
 ---
 
 <div align="center">
 
 **Built with ❤️ for the Biomedical Research Community**
 
-*Last updated: April 1, 2026 (1.6.5 PREMIUM - Production Showcase & UI Hardening)*
+*Last updated: April 5, 2026 (1.6.5 PROFESSIONAL - Presentation Finalization & UI Polish)*
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
