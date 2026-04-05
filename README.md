@@ -151,7 +151,8 @@ We have implemented a high-fidelity **Selenium-based Showcase Script** (`seleniu
 ## 📅 Product Launch Calendar
 - **🎥 Initial Product Demo Video**: April 9th, 2026 | 9:00 AM IST
 - **🎥 Official Product Showcase**: April 9th, 2026 | 3:40 PM IST
-- **📊 Interactive Deck**: `/presentation/index.html`
+- **📊 Interactive Deck (Live)**: https://biomed-scholar.web.app/presentation/index.html
+- **📊 Interactive Deck (Local)**: `/presentation/index.html`
 ---
 
 <div align="center">
