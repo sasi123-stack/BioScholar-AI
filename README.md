@@ -14,9 +14,10 @@ app_port: 7860
 ### *Intelligent Biomedical Research Engine powered by OpenClaw RAG and Llama 4 Maverick*
  
 [![Live App](https://img.shields.io/badge/Launch-Firebase-orange?style=for-the-badge&logo=firebase)](https://biomed-scholar.web.app)
+[![Showcase Deck](https://img.shields.io/badge/Presentation-Interactive%20Deck-ffb700?style=for-the-badge&logo=googleslides)](https://biomed-scholar.web.app/presentation/index.html)
 [![Hugging Face](https://img.shields.io/badge/Full--Stack-HF%20Space-yellow?style=for-the-badge&logo=huggingface)](https://huggingface.co/spaces/sasidhara123/biomed-scholar-api)
 [![Maverick AI](https://img.shields.io/badge/Powered--By-Llama--3.3--70B-blue?style=for-the-badge&logo=meta)](https://huggingface.co/spaces/sasidhara123/maverick-ai-bot)
-[![Version](https://img.shields.io/badge/Version-1.6.5%20PREMIUM-blueviolet?style=for-the-badge)](#)
+[![Version](https://img.shields.io/badge/Version-1.6.5%20PROFESSIONAL-blueviolet?style=for-the-badge)](#)
  
 </div>
 
@@ -26,6 +27,7 @@ app_port: 7860
 
 | Platform | URL | Status |
 |---|---|---|
+| 📊 **Interactive Deck (Live)** | https://biomed-scholar.web.app/presentation/index.html | ✅ Live |
 | 🌐 **Web App (Firebase)** | https://biomed-scholar.web.app | ✅ Live |
 | ⚡ **Backend API (HF Space)** | https://sasidhara123-biomed-scholar-api.hf.space | ✅ running |
 | 🤖 **Maverick Telegram Bot** | https://t.me/Meverick_AI_bot | ✅ Active |
