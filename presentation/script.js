@@ -1,8 +1,6 @@
 const slides = document.querySelectorAll('.slide');
 const prevBtn = document.getElementById('prevSlide');
 const nextBtn = document.getElementById('nextSlide');
-const activeNote = document.getElementById('activeNote');
-const notesModal = document.getElementById('notesModal');
 const indicator = document.querySelector('.curr-slide-indicator');
 
 let currentSlide = 0;
@@ -26,10 +24,16 @@ function updateSlides() {
     if (prevBtn) prevBtn.disabled = currentSlide === 0;
     if (nextBtn) nextBtn.innerText = currentSlide === slides.length - 1 ? 'FINISH' : 'NEXT';
 
-    // Update Notes
+    // Update Projector/Speaker Notes
     const notesElement = slides[currentSlide].querySelector('.speaker-notes');
+    const activeNote = document.getElementById('activeNote');
+    
     if (notesElement && activeNote) {
-        activeNote.innerText = notesElement.innerText.trim();
+        const text = notesElement.innerText.trim();
+        console.log(`Setting Note for Slide ${currentSlide + 1}: ${text}`);
+        activeNote.innerHTML = text;
+    } else {
+        console.warn(`Notes not found for Slide ${currentSlide + 1}`);
     }
 }
 
@@ -47,8 +51,8 @@ function prevSlide() {
     }
 }
 
-// Robust toggle function
 function toggleNotes() {
+    const notesModal = document.getElementById('notesModal');
     if (!notesModal) return;
     const currentDisplay = window.getComputedStyle(notesModal).display;
     if (currentDisplay === 'none') {
@@ -77,13 +81,16 @@ document.addEventListener('keydown', (e) => {
         toggleNotes();
     }
     if (key === 'Escape') {
+        const notesModal = document.getElementById('notesModal');
         if (notesModal) notesModal.style.display = 'none';
     }
 });
 
-// Expose to window for the onclick attribute in HTML
+// Expose to window for the onclick attribute
 window.toggleNotes = toggleNotes;
 
 // Initialize
-updateSlides();
-console.log("BioMedScholar Presentation Script Initialized");
+document.addEventListener('DOMContentLoaded', () => {
+    updateSlides();
+    console.log("BioMedScholar Presentation Script Loaded");
+});
