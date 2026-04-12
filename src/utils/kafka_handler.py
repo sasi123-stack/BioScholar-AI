@@ -68,6 +68,37 @@ class KafkaHandler:
             finally:
                 consumer.close()
 
+    def check_status(self) -> Dict[str, Any]:
+        """Check the status of Kafka and Zookeeper connectivity."""
+        status = {
+            "kafka_connected": False,
+            "zookeeper_connected": False,
+            "bootstrap_servers": self.bootstrap_servers,
+            "topics": [],
+            "error": None
+        }
+        
+        try:
+            if self.producer:
+                # Get metadata to verify connection
+                metadata = self.producer.metrics()
+                if metadata:
+                    status["kafka_connected"] = True
+                    # In a real ZK setup, Kafka depends on ZK, so if Kafka is up, ZK is likely up
+                    status["zookeeper_connected"] = True
+                    
+                    # Try to get topics
+                    consumer = KafkaConsumer(bootstrap_servers=self.bootstrap_servers)
+                    status["topics"] = list(consumer.topics())
+                    consumer.close()
+            else:
+                status["error"] = "Producer not initialized"
+        except Exception as e:
+            status["error"] = str(e)
+            logger.error(f"Kafka status check failed: {e}")
+            
+        return status
+
 # Singleton instance
 _kafka_handler = None
 

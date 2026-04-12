@@ -99,11 +99,22 @@ class DocumentResponse(BaseModel):
     embedding: Optional[List[float]] = Field(None, description="Document embedding vector")
 
 
+class KafkaStatus(BaseModel):
+    """Model for Kafka and Zookeeper status."""
+    
+    kafka_connected: bool = Field(..., description="Kafka connection status")
+    zookeeper_connected: bool = Field(..., description="Zookeeper connection status")
+    bootstrap_servers: List[str] = Field(..., description="Configured bootstrap servers")
+    topics: List[str] = Field(default_factory=list, description="Available topics")
+    error: Optional[str] = Field(None, description="Detailed error if connection fails")
+
+
 class HealthResponse(BaseModel):
     """Response model for health check endpoint."""
     
     status: str = Field(..., description="Service status")
     elasticsearch: bool = Field(..., description="Elasticsearch connection status")
+    kafka: Optional[KafkaStatus] = Field(None, description="Kafka and Zookeeper status")
     models_loaded: bool = Field(..., description="ML models loaded status")
     version: str = Field(..., description="API version")
     features: Optional[Dict[str, Any]] = Field(None, description="Feature availability flags and diagnostic info")
