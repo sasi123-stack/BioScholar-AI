@@ -27,3 +27,4 @@ pyyaml>=6.0
 beautifulsoup4>=4.12.0
 lxml>=4.9.0
 loguru>=0.7.0
+kafka-python>=2.0.2

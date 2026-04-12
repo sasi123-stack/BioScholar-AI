@@ -109,15 +109,6 @@ def create_app() -> FastAPI:
     async def root():
         return RedirectResponse(url="/docs")
     
-    # Root health endpoint for monitoring services
-    @app.get("/health", tags=["System"])
-    async def global_health_check():
-        """
-        Global health check endpoint.
-        Returns 200 OK if the API instance is running.
-        """
-        return {"status": "online", "message": "Biomedical Search API is running"}
-    
     return app
 
 
