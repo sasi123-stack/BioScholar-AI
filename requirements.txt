@@ -63,3 +63,4 @@ selenium
 webdriver-manager
 twilio
 python-telegram-bot>=20.0
+kafka-python>=2.0.2

@@ -28,7 +28,9 @@ from src.api.dependencies import (
     get_search_engine,
     get_reranker,
     get_qa_engine,
-    get_document_indexer
+    get_qa_engine,
+    get_document_indexer,
+    get_kafka
 )
 from src.search_engine.hybrid_search import HybridSearchEngine
 from src.search_engine.reranker import CrossEncoderReranker
@@ -119,7 +121,8 @@ async def search_documents(
     request: SearchRequest,
     search_engine: HybridSearchEngine = Depends(get_search_engine),
     reranker: CrossEncoderReranker = Depends(get_reranker),
-    settings: Settings = Depends(get_settings)
+    settings: Settings = Depends(get_settings),
+    kafka: KafkaHandler = Depends(get_kafka)
 ):
     """
     Search for documents using hybrid search or Google Serper.
@@ -127,6 +130,14 @@ async def search_documents(
     try:
         start_time = time.time()
         document_results = []
+        
+        # Log to Kafka (async)
+        kafka.send_message("search_logs", {
+            "type": "search",
+            "query": request.query,
+            "index": request.index,
+            "timestamp": time.time()
+        })
         
         if request.index == "google":
             # Perform Google Search via Serper
@@ -261,7 +272,8 @@ async def search_documents(
 @router.post("/question", response_model=QuestionResponse)
 async def answer_question(
     request: QuestionRequest,
-    qa_engine: QuestionAnsweringEngine = Depends(get_qa_engine)
+    qa_engine: QuestionAnsweringEngine = Depends(get_qa_engine),
+    kafka: KafkaHandler = Depends(get_kafka)
 ):
     """
     Answer a question using biomedical literature.
@@ -278,6 +290,14 @@ async def answer_question(
     
     try:
         start_time = time.time()
+        
+        # Log to Kafka (async)
+        kafka.send_message("search_logs", {
+            "type": "question",
+            "question": request.question,
+            "index": request.index,
+            "timestamp": time.time()
+        })
         
         # Determine index to search
         if request.index == "pubmed":

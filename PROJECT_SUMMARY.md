@@ -105,7 +105,12 @@ An **Intelligent Semantic Search Engine for Biomedical Literature and Clinical T
     │ Clinical  │   │Retriever│  │Generator│   │search     │
     │  BERT     │   │Answer   │  │Model    │   │(Port 9201)│
     │   QA      │   │Extractor│  │Loader   │   │           │
-    └───────────┘   └─────────┘  └─────────┘   └───────────┘
+    └─────┬─────┘   └────┬────┘  └────┬────┘   └─────┬─────┘
+          │              │            │              │
+    ┌─────┴──────────────┴────────────┴──────────────┴─────┐
+    │                Message Broker: Kafka                 │
+    │                    (Port 9092)                       │
+    └──────────────────────────────────────────────────────┘
 ```
 
 ## 📊 Current Data
@@ -213,6 +218,7 @@ kash_proj/
 | Database | PostgreSQL | 15 |
 | API Framework | FastAPI | 0.128.0 |
 | NLP | BioBERT, ClinicalBERT | - |
+| Message Broker | Apache Kafka | 7.5.0 |
 | Container | Docker | - |
 
 ## ✨ Key Features
@@ -240,6 +246,7 @@ kash_proj/
 - ✅ Advanced filtering
 - ✅ Result highlighting
 - ✅ Error handling
+- ✅ Kafka event logging
 
 ## 📈 Performance
 

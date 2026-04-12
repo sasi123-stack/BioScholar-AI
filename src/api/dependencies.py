@@ -12,6 +12,7 @@ from src.search_engine.reranker import CrossEncoderReranker
 from src.qa_module.qa_engine import QuestionAnsweringEngine
 from src.indexing.document_indexer import DocumentIndexer
 from src.utils.logger import logger
+from src.utils.kafka_handler import KafkaHandler, get_kafka_handler
 
 
 # Global instances
@@ -20,6 +21,7 @@ _search_engine: Optional[HybridSearchEngine] = None
 _reranker: Optional[CrossEncoderReranker] = None
 _qa_engine: Optional[QuestionAnsweringEngine] = None
 _document_indexer: Optional[DocumentIndexer] = None
+_kafka_handler: Optional[KafkaHandler] = None
 
 # Check if running on low-memory environment
 IS_LOW_MEMORY = os.getenv('LOW_MEMORY_MODE', 'false').lower() == 'true'
@@ -82,11 +84,21 @@ def get_document_indexer() -> DocumentIndexer:
     return _document_indexer
 
 
+def get_kafka():
+    """Get Kafka handler instance (singleton)."""
+    global _kafka_handler
+    if _kafka_handler is None:
+        _kafka_handler = get_kafka_handler()
+        logger.info("KafkaHandler initialized")
+    return _kafka_handler
+
+
 def initialize_services():
     """Initialize all services at startup."""
     logger.info("Initializing API services...")
     get_settings()
     get_search_engine()
+    get_kafka()
     
     if not IS_LOW_MEMORY:
         get_reranker()
@@ -106,6 +118,10 @@ def cleanup_services():
     if _search_engine is not None:
         _search_engine.es_client.close()
         _search_engine = None
+    
+    if _kafka_handler is not None and _kafka_handler._producer is not None:
+        _kafka_handler._producer.close()
+        _kafka_handler = None
     
     _reranker = None
     _qa_engine = None
