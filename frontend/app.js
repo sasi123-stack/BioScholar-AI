@@ -7225,8 +7225,8 @@ function startVoiceResearch() {
 /**
  * Shows the Beta Welcome Modal
  */
-function showBetaModal() {
-    const modal = document.getElementById('beta-modal');
+function showWelcomeModal() {
+    const modal = document.getElementById('welcome-modal');
     if (modal) {
         modal.classList.add('open');
         document.body.style.overflow = 'hidden';
@@ -7234,21 +7234,21 @@ function showBetaModal() {
 }
 
 /**
- * Closes the Beta Welcome Modal
+ * Closes the Welcome Modal
  */
-function closeBetaModal() {
-    const modal = document.getElementById('beta-modal');
+function closeWelcomeModal() {
+    const modal = document.getElementById('welcome-modal');
     if (modal) {
         modal.classList.remove('open');
         modal.classList.remove('active');
         document.body.style.overflow = '';
-        localStorage.setItem('hasSeenBeta16', 'true');
+        localStorage.setItem('hasSeenLive16', 'true');
     }
 }
 
 // Force show Beta Modal on every load (1.6.5 PREMIUM Showcase)
 window.addEventListener('load', () => {
-    setTimeout(showBetaModal, 1500); // Trigger after slight delay for visual impact
+    setTimeout(showWelcomeModal, 1500); // Trigger after slight delay for visual impact
 });
 
 /**

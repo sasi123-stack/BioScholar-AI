@@ -79,13 +79,13 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="BioMedScholar AI Command Center",
         description="Unified Semantic Intelligence Hub for Biomedical Research & Clinical Trial Analytics.",
-        version="1.6.0-BETA",
+        version="1.6.5",
         contact={
             "name": "Sasidhara - Lead AI Developer",
             "url": "https://biomed-scholar.web.app",
         },
         license_info={
-            "name": "Proprietary v1.6-BETA License",
+            "name": "Proprietary v1.6.5 Premium License",
         },
         docs_url="/docs",
         redoc_url="/redoc",

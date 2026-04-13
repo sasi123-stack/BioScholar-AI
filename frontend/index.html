@@ -128,7 +128,7 @@
         </div>
 
         <div class="header-right">
-            <!-- Global Engine Status (BETA) -->
+            <!-- Global Engine Status (LIVE) -->
             <div class="header-engine-status" id="header-engine-status" title="BioMedScholar AI Core: Operational">
                 <div class="status-dot pulsed"></div>
                 <span class="status-text">Insight Engine: Active</span>
@@ -221,13 +221,13 @@
         </div>
     </header>
     
-    <!-- Live Search Ticker (BETA Feature) -->
+    <!-- Live Search Ticker (LIVE Feature) -->
     <div class="live-ticker-bar glass-panel" id="live-ticker">
         <div class="ticker-content">
             <span class="ticker-item"><span class="ticker-label">LATEST SEARCH:</span> SARS-CoV-2 Variant Sequencing</span>
             <span class="ticker-item"><span class="ticker-label">TRENDING:</span> GLP-1 Metabolic Pathways</span>
             <span class="ticker-item"><span class="ticker-label">NEW DATA:</span> 12.4K PubMed Papers Indexed (Today)</span>
-            <span class="ticker-item"><span class="ticker-label">BETA:</span> Multi-Modal Vision Enabled</span>
+            <span class="ticker-item"><span class="ticker-label">LAUNCH:</span> Multi-Modal Vision Enabled</span>
         </div>
     </div>
 
@@ -488,7 +488,7 @@
                                 </svg>
                             </button>
                             <button class="view-btn visualization-btn" onclick="toggleKnowledgeGraph()" id="view-graph-btn"
-                                title="Knowledge Graph (BETA)">
+                                title="Knowledge Graph (LIVE)">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="12" y1="2" x2="12" y2="22"></line>
                                     <circle cx="12" cy="12" r="3"></circle>
@@ -600,7 +600,7 @@
 
                             <div class="quick-filter-divider"></div>
 
-                            <!-- Research Achievements (BETA) -->
+                            <!-- Research Achievements (LIVE) -->
                             <div class="quick-filter-section">
                                 <span class="quick-filter-sublabel">🏆 Research Milestones</span>
                                 <div class="achievement-container" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
@@ -1891,12 +1891,12 @@
         </div>
     </footer>
 
-    <!-- Beta Features Disclosure & Survey (1.6.5 PREMIUM) -->
-    <div id="beta-modal" class="modal" onclick="if(event.target === this) closeBetaModal()">
+    <!-- Launch Features Disclosure & Survey (1.6.5 PREMIUM) -->
+    <div id="welcome-modal" class="modal" onclick="if(event.target === this) closeWelcomeModal()">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>🧪 Welcome to BioMedScholar BETA</h2>
-                <button class="modal-close" onclick="closeBetaModal()">&times;</button>
+                <h2>🚀 Welcome to BioMedScholar LIVE</h2>
+                <button class="modal-close" onclick="closeWelcomeModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="beta-notice">
@@ -1921,7 +1921,7 @@
                     </div>
 
                     <div class="beta-footer-actions" style="margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border-light);">
-                        <button class="modal-btn primary full-width" onclick="closeBetaModal()" style="padding: 14px; font-size: 15px; letter-spacing: 0.5px;">Got it! Explore v1.6.5</button>
+                        <button class="modal-btn primary full-width" onclick="closeWelcomeModal()" style="padding: 14px; font-size: 15px; letter-spacing: 0.5px;">Got it! Explore v1.6.5</button>
                     </div>
                 </div>
             </div>

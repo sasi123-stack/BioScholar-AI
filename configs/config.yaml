@@ -95,12 +95,3 @@ celery:
   accept_content: ["json"]
   timezone: "UTC"
   enable_utc: true
-kafka:
-  bootstrap_servers: "localhost:9092"
-  topics:
-    search_logs: "search_logs"
-    ingestion_tasks: "ingestion_tasks"
-    model_inference: "model_inference"
-  group_ids:
-    search_logger: "search_logger_group"
-    task_processor: "task_processor_group"

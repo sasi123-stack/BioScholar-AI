@@ -20,8 +20,7 @@ from src.api.models import (
     AnswerResult,
     PassageResult,
     MaverickChatRequest,
-    MaverickChatResponse,
-    KafkaStatus
+    MaverickChatResponse
 )
 
 from src.api.dependencies import (
@@ -29,9 +28,7 @@ from src.api.dependencies import (
     get_search_engine,
     get_reranker,
     get_qa_engine,
-    get_qa_engine,
-    get_document_indexer,
-    get_kafka
+    get_document_indexer
 )
 from src.search_engine.hybrid_search import HybridSearchEngine
 from src.search_engine.reranker import CrossEncoderReranker
@@ -57,7 +54,6 @@ MAVERICK_DB = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "loc
 @router.get("/health", response_model=HealthResponse)
 async def health_check(
     search_engine: HybridSearchEngine = Depends(get_search_engine),
-    kafka: KafkaHandler = Depends(get_kafka),
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -73,26 +69,14 @@ async def health_check(
         qa_engine = get_qa_engine()
         reranker = get_reranker()
         
-        # Check Kafka status
-        kafka_info = kafka.check_status()
-        kafka_status = KafkaStatus(
-            kafka_connected=kafka_info["kafka_connected"],
-            zookeeper_connected=kafka_info["zookeeper_connected"],
-            bootstrap_servers=kafka_info["bootstrap_servers"],
-            topics=kafka_info["topics"],
-            error=kafka_info["error"]
-        )
-        
         return HealthResponse(
-            status="healthy" if (es_connected and kafka_status.kafka_connected) else "degraded",
+            status="healthy" if es_connected else "degraded",
             elasticsearch=es_connected,
-            kafka=kafka_status,
             models_loaded=qa_engine is not None,
-            version="1.6.0-BETA",
+            version="1.6.5",
             features={
                 "qa_enabled": qa_engine is not None,
                 "reranking_enabled": reranker is not None,
-                "kafka_enabled": True,
                 "maverick_sync": True,
                 "deploy_time": "2026-03-25"
             }
@@ -130,47 +114,13 @@ async def get_bot_logs():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-@router.get("/kafka/status", response_model=KafkaStatus)
-async def get_kafka_status(
-    kafka: KafkaHandler = Depends(get_kafka)
-):
-    """
-    Detailed Kafka and Zookeeper status diagnostic.
-    """
-    info = kafka.check_status()
-    return KafkaStatus(
-        kafka_connected=info["kafka_connected"],
-        zookeeper_connected=info["zookeeper_connected"],
-        bootstrap_servers=info["bootstrap_servers"],
-        topics=info["topics"],
-        error=info["error"]
-    )
-
-@router.post("/kafka/produce")
-async def manual_kafka_produce(
-    topic: str = Query(..., description="Topic to send message to"),
-    message: Dict[str, Any] = None,
-    kafka: KafkaHandler = Depends(get_kafka)
-):
-    """
-    Manually produce a message to a Kafka topic for testing.
-    """
-    if not message:
-        message = {"test": "manual_message", "timestamp": time.time()}
-        
-    success = kafka.send_message(topic, message)
-    if success:
-        return {"status": "success", "message": f"Message sent to {topic}"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to send message to Kafka")
 
 @router.post("/search", response_model=SearchResponse)
 async def search_documents(
     request: SearchRequest,
     search_engine: HybridSearchEngine = Depends(get_search_engine),
     reranker: CrossEncoderReranker = Depends(get_reranker),
-    settings: Settings = Depends(get_settings),
-    kafka: KafkaHandler = Depends(get_kafka)
+    settings: Settings = Depends(get_settings)
 ):
     """
     Search for documents using hybrid search or Google Serper.
@@ -179,13 +129,6 @@ async def search_documents(
         start_time = time.time()
         document_results = []
         
-        # Log to Kafka (async)
-        kafka.send_message("search_logs", {
-            "type": "search",
-            "query": request.query,
-            "index": request.index,
-            "timestamp": time.time()
-        })
         
         if request.index == "google":
             # Perform Google Search via Serper
@@ -320,8 +263,7 @@ async def search_documents(
 @router.post("/question", response_model=QuestionResponse)
 async def answer_question(
     request: QuestionRequest,
-    qa_engine: QuestionAnsweringEngine = Depends(get_qa_engine),
-    kafka: KafkaHandler = Depends(get_kafka)
+    qa_engine: QuestionAnsweringEngine = Depends(get_qa_engine)
 ):
     """
     Answer a question using biomedical literature.
@@ -339,13 +281,6 @@ async def answer_question(
     try:
         start_time = time.time()
         
-        # Log to Kafka (async)
-        kafka.send_message("search_logs", {
-            "type": "question",
-            "question": request.question,
-            "index": request.index,
-            "timestamp": time.time()
-        })
         
         # Determine index to search
         if request.index == "pubmed":

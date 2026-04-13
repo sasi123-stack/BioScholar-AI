@@ -98,23 +98,8 @@ if (-not $pgStarted) {
 Write-Host "`nWaiting 5 seconds for basic infrastructure to initialize..." -ForegroundColor Cyan
 Start-Sleep -Seconds 5
 
-# 4. Start Kafka (Zookeeper + Server)
-Write-Host "`n[4/6] Starting Kafka & Zookeeper..." -ForegroundColor Yellow
-$kafkaScript = Join-Path $rootDir "start_kafka_native.ps1"
-if (Test-Path $kafkaScript) {
-    # Run the dedicated kafka script
-    Start-Process powershell -ArgumentList "-NoExit -File `"$kafkaScript`"" -WindowStyle Normal
-    Write-Host "  [OK] Kafka ecosystem starting in new window" -ForegroundColor Green
-}
-else {
-    Write-Host "  [FAIL] Kafka startup script not found at $kafkaScript" -ForegroundColor Red
-}
-
-Write-Host "Waiting 10 seconds for Kafka to stabilize..." -ForegroundColor Cyan
-Start-Sleep -Seconds 10
-
-# 5. Start Backend
-Write-Host "`n[5/6] Starting Backend API..." -ForegroundColor Yellow
+# 4. Start Backend
+Write-Host "`n[4/5] Starting Backend API..." -ForegroundColor Yellow
 $activateScript = Join-Path $rootDir "venv\Scripts\activate"
 if (Test-Path $activateScript) {
     Start-Process powershell -ArgumentList "-NoExit -Command `"cd '$rootDir'; .\venv\Scripts\activate; uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload`"" -WindowStyle Normal
@@ -124,8 +109,8 @@ else {
     Write-Host "  [FAIL] Virtual environment not found at $activateScript" -ForegroundColor Red
 }
 
-# 6. Start Ngrok
-Write-Host "`n[6/6] Starting Ngrok..." -ForegroundColor Yellow
+# 5. Start Ngrok
+Write-Host "`n[5/5] Starting Ngrok..." -ForegroundColor Yellow
 $ngrokConfig = Join-Path $rootDir "ngrok_config.yml"
 if (Test-Path $ngrokConfig) {
     Start-Process powershell -ArgumentList "-NoExit -Command `"cd '$rootDir'; ngrok start api --config '$ngrokConfig'`"" -WindowStyle Normal
@@ -141,7 +126,6 @@ Write-Host "==========================================" -ForegroundColor Green
 Write-Host "  Elasticsearch : http://localhost:9201"
 Write-Host "  Redis         : localhost:6379"
 Write-Host "  PostgreSQL    : localhost:5433"
-Write-Host "  Kafka Broker  : localhost:9092"
 Write-Host "  Backend API   : http://localhost:8000"
 Write-Host "  Ngrok         : Check the ngrok window for public URL"
 Write-Host "`nUse '.\check_services.ps1' to verify status later."
