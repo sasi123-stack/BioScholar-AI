@@ -794,7 +794,7 @@ def main():
     print(f"User DB: {DB_FILE}")
     print("-" * 30)
     
-    app.run_polling(bootstrap_retries=-1, timeout=30, read_timeout=30)
+    app.run_polling(bootstrap_retries=-1, timeout=30)
 
 if __name__ == "__main__":
     main()
