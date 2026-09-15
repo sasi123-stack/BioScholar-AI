@@ -10,6 +10,7 @@ import io
 import base64
 import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram.request import HTTPXRequest
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Application
 from groq import AsyncGroq
 from dotenv import load_dotenv
@@ -758,7 +759,13 @@ def main():
     init_db()
     
     try:
-        app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(post_init).build()
+        t_request = HTTPXRequest(
+            connect_timeout=30.0,
+            read_timeout=30.0,
+            write_timeout=30.0,
+            pool_timeout=30.0
+        )
+        app = ApplicationBuilder().token(TELEGRAM_TOKEN).request(t_request).post_init(post_init).build()
         print(">>> [BOT] Application built successfully", flush=True)
     except Exception as e:
         print(f">>> [BOT ERROR] Failed to build application: {e}", flush=True)
@@ -787,7 +794,7 @@ def main():
     print(f"User DB: {DB_FILE}")
     print("-" * 30)
     
-    app.run_polling()
+    app.run_polling(bootstrap_retries=-1, timeout=30, read_timeout=30)
 
 if __name__ == "__main__":
     main()
