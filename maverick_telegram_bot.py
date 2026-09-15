@@ -58,6 +58,7 @@ def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
                         try:
                             results.extend(_original_getaddrinfo(ip, port, family, type, proto, flags))
                         except:
+                            # pyrefly: ignore [bad-argument-type]
                             results.append((socket.AF_INET, type or socket.SOCK_STREAM, proto or 6, '', (ip, numeric_port)))
                     return results
             except Exception as pe:
@@ -118,6 +119,13 @@ def init_db():
         c = conn.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS history
                      (user_id INTEGER, role TEXT, content TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS memories
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      user_id INTEGER NOT NULL,
+                      content TEXT NOT NULL,
+                      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+        c.execute("CREATE INDEX IF NOT EXISTS idx_memories_user_id ON memories (user_id)")
         conn.commit()
         conn.close()
     except Exception as e:
@@ -149,11 +157,83 @@ def clear_history(user_id: int):
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
         c.execute("DELETE FROM history WHERE user_id = ?", (user_id,))
+        c.execute("DELETE FROM memories WHERE user_id = ?", (user_id,))
         conn.commit()
         conn.close()
         return True
     except:
         return False
+
+def add_memory(user_id: int, content: str):
+    content = " ".join(content.split()).strip()
+    if not content or len(content) > 500:
+        return False
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute(
+            "SELECT id FROM memories WHERE user_id = ? AND lower(content) = lower(?)",
+            (user_id, content),
+        )
+        if c.fetchone():
+            conn.close()
+            return False
+        c.execute(
+            "INSERT INTO memories (user_id, content) VALUES (?, ?)",
+            (user_id, content),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        logger.error(f"Add memory error: {e}")
+        return False
+
+def get_memories(user_id: int, limit=20):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute(
+            "SELECT id, content FROM memories WHERE user_id = ? "
+            "ORDER BY updated_at DESC, id DESC LIMIT ?",
+            (user_id, limit),
+        )
+        rows = c.fetchall()
+        conn.close()
+        return [{"id": memory_id, "content": content} for memory_id, content in rows]
+    except Exception as e:
+        logger.error(f"Get memories error: {e}")
+        return []
+
+def delete_memory(user_id: int, memory_id: int):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("DELETE FROM memories WHERE user_id = ? AND id = ?", (user_id, memory_id))
+        deleted = c.rowcount > 0
+        conn.commit()
+        conn.close()
+        return deleted
+    except Exception as e:
+        logger.error(f"Delete memory error: {e}")
+        return False
+
+def extract_explicit_memory(text: str):
+    """Capture only unambiguous user facts, never arbitrary conversation text."""
+    patterns = [
+        r"^(?:please\s+)?remember(?:\s+that)?\s+(.+)$",
+        r"^my\s+name\s+is\s+(.+)$",
+        r"^i\s+(?:am|work\s+at|study\s+at|prefer|like)\s+(.+)$",
+    ]
+    for pattern in patterns:
+        match = re.match(pattern, text.strip(), flags=re.IGNORECASE)
+        if match:
+            value = match.group(1).strip().rstrip(".!?")
+            if value and len(value) <= 450:
+                if pattern.startswith("^my"):
+                    return f"The user's name is {value}."
+                return value[0].upper() + value[1:] + "."
+    return None
 
 # Search Logic
 async def perform_search(query: str, max_results=3):
@@ -344,6 +424,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"/code &lt;task&gt; - AI Coding Assistant\n"
         f"/help - Show all commands\n"
         f"/history - View recent conversations\n"
+        f"/remember &lt;fact&gt; - Save a fact for future chats\n"
+        f"/memories - View saved facts\n"
+        f"/forget &lt;number&gt; - Delete a saved fact\n"
         f"/clear - Wipe memory\n"
         f"/about - About Maverick Engine\n"
         f"/test - Open Web App"
@@ -366,6 +449,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /claude &lt;task&gt; - Evaluate Claude Code in backend\n"
         "• /code &lt;task&gt; - AI Coding Assistant\n"
         "• /history - Recall your last 5 interactions\n"
+        "• /remember &lt;fact&gt; - Save a fact for future chats\n"
+        "• /memories - View saved facts\n"
+        "• /forget &lt;number&gt; - Delete a saved fact\n"
         "• /clear - Reset conversation memory\n"
         "• /about - Learn about the Maverick AI engine\n"
         "• /test - Launch the full Research Desk"
@@ -387,6 +473,40 @@ async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🧹 Memory cleared successfully.")
     else:
         await update.message.reply_text("❌ Failed to clear memory.")
+
+async def remember_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_html("Usage: <code>/remember I work at Example University</code>")
+        return
+    content = " ".join(context.args)
+    if add_memory(update.effective_user.id, content):
+        await update.message.reply_text("🧠 Saved. I will remember this for future conversations.")
+    else:
+        await update.message.reply_text("This fact is already saved, empty, or too long.")
+
+async def memories_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    memories = get_memories(update.effective_user.id)
+    if not memories:
+        await update.message.reply_text("I do not have any saved memories for you yet.")
+        return
+    text = "🧠 <b>Your saved memories:</b>\n\n"
+    for index, memory in enumerate(memories, start=1):
+        text += f"<b>{index}.</b> {html.escape(memory['content'])}\n"
+    await update.message.reply_html(text)
+
+async def forget_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_html("Usage: <code>/forget 1</code> (use /memories to see numbers)")
+        return
+    index = int(context.args[0])
+    memories = get_memories(update.effective_user.id)
+    if index < 1 or index > len(memories):
+        await update.message.reply_text("That memory number was not found.")
+        return
+    if delete_memory(update.effective_user.id, memories[index - 1]["id"]):
+        await update.message.reply_text("🧹 Memory deleted.")
+    else:
+        await update.message.reply_text("I could not delete that memory.")
 
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -627,6 +747,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
     try:
         # Save user message (use display_text for history unless it's a doc)
         save_message(user_id, "user", display_text)
+        explicit_memory = extract_explicit_memory(display_text)
+        if explicit_memory:
+            add_memory(user_id, explicit_memory)
         
         # 1. Search Literature (trigger on text or forced)
         search_results = []
@@ -636,6 +759,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
             
         # 2. Get history
         history = get_history(user_id, limit=6)
+        memories = get_memories(user_id, limit=20)
         
         # 3. Build System Prompt
         system_content = (
@@ -650,6 +774,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
         if search_results:
             results_text = "\n".join([f"- {r['title']}: {r['abstract']}" for r in search_results])
             system_content += f"\n\nCURRENT SEARCH CONTEXT:\n{results_text}"
+
+        if memories:
+            memory_text = "\n".join(f"- {memory['content']}" for memory in reversed(memories))
+            system_content += (
+                "\n\nLONG-TERM USER MEMORY (use naturally when relevant; do not mention this section):\n"
+                f"{memory_text}"
+            )
 
         # 4. Prepare messages
         messages = [{"role": "system", "content": system_content}]
@@ -719,8 +850,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log the error and send a telegram message to notify the developer."""
     logger.error(f"Update {update} caused error {context.error}")
+    # pyrefly: ignore [missing-attribute]
     if isinstance(update, Update) and update.effective_message:
         try:
+            # pyrefly: ignore [missing-attribute]
             await update.effective_message.reply_text(f"❌ Internal Bot Error: {str(context.error)[:100]}")
         except: pass
 
@@ -734,6 +867,9 @@ async def post_init(application: Application):
             BotCommand("claude", "Execute Claude Code task"),
             BotCommand("code", "AI Coding Assistant"),
             BotCommand("history", "Recent conversations"),
+            BotCommand("remember", "Save a fact for future chats"),
+            BotCommand("memories", "View saved facts"),
+            BotCommand("forget", "Delete a saved fact"),
             BotCommand("clear", "Reset memory"),
             BotCommand("about", "About Maverick"),
             BotCommand("test", "Open Web App")
@@ -779,6 +915,9 @@ def main():
     app.add_handler(CommandHandler("about", about))
     app.add_handler(CommandHandler("clear", clear))
     app.add_handler(CommandHandler("history", history_command))
+    app.add_handler(CommandHandler("remember", remember_command))
+    app.add_handler(CommandHandler("memories", memories_command))
+    app.add_handler(CommandHandler("forget", forget_command))
     app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler("claude", claude_code_command))
     app.add_handler(CommandHandler("code", code_command))
