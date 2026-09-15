@@ -15,6 +15,8 @@ from groq import AsyncGroq
 from dotenv import load_dotenv
 import sys
 
+from src.utils.ai_provider import get_first_configured_api_key
+
 # Windows UTF-8 console support
 if sys.platform == 'win32':
     try:
@@ -47,13 +49,18 @@ def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
                 if answers:
                     ips = [str(ans) for ans in answers]
                     results = []
+                    try:
+                        numeric_port = int(port)
+                    except (ValueError, TypeError):
+                        numeric_port = 443 if 'https' in str(port).lower() else (80 if 'http' in str(port).lower() else 0)
                     for ip in ips:
                         try:
                             results.extend(_original_getaddrinfo(ip, port, family, type, proto, flags))
                         except:
-                            results.append((socket.AF_INET, type or socket.SOCK_STREAM, proto or 6, '', (ip, int(port) or 443)))
+                            results.append((socket.AF_INET, type or socket.SOCK_STREAM, proto or 6, '', (ip, numeric_port)))
                     return results
-            except: pass
+            except Exception as pe:
+                print(f">>> [DNS PATCH] Fallback resolution failed: {pe}", flush=True)
         raise
 
 socket.getaddrinfo = custom_getaddrinfo
@@ -70,14 +77,25 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", os.getenv("OPENCLAW_API_KEY")) # Fallback for legacy
-MODEL_NAME = "gpt-oss:120b"
-VISION_MODEL = "meta-llama/llama-3.2–11b-vision-instruct:free" 
+GROQ_API_KEY = get_first_configured_api_key(["GROQ_API_KEY"])
+OPENROUTER_API_KEY = get_first_configured_api_key([
+    "OPENROUTER_API_KEY",
+    "OPENCLAW_API_KEY",
+    "FREEMODEL_API_KEY",
+    "FREE_MODEL_API_KEY",
+    "OPENAI_API_KEY",
+])
+MODEL_NAME = "openai/gpt-oss-120b"
+VISION_MODEL = "meta-llama/llama-3.2-11b-vision-instruct:free" 
 DB_FILE = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "local_memory.db"
 
 # API Endpoints
-OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
+OPENROUTER_API_BASE = (
+    os.getenv("OPENROUTER_API_BASE")
+    or os.getenv("FREEMODEL_API_BASE")
+    or os.getenv("FREE_MODEL_API_BASE")
+    or "https://openrouter.ai/api/v1"
+)
 
 # Search Config (Bonsai/OpenSearch)
 ES_HOST = os.getenv("ELASTICSEARCH_HOST", "assertive-mahogany-1m2hcasg.us-east-1.bonsaisearch.net")
@@ -278,11 +296,10 @@ async def get_resilient_completion(messages: list, user_id: int):
         raise Exception("Groq client not initialized. Check GROQ_API_KEY environment variable.")
 
     models_to_try = [
-        MODEL_NAME,                    # Primary: gpt-oss:120b (Claude Code) via Groq
-        "llama-3.3-70b-versatile",     # Fallback 1
-        "llama-3.1-70b-versatile",     # Fallback 2
-        "llama-3.1-8b-instant",        # Fallback 3: Fast/light
-        "gemma2-9b-it",                # Fallback 4: Google Gemma
+        MODEL_NAME,                    # Primary: openai/gpt-oss-120b
+        "openai/gpt-oss-20b",          # Fallback 1: Fast 20B
+        "qwen/qwen3.8-27b",            # Fallback 2: Qwen 27B
+        "groq/compound-mini",          # Fallback 3: Compound Mini
     ]
     
     last_err = None
@@ -295,14 +312,16 @@ async def get_resilient_completion(messages: list, user_id: int):
                 temperature=0.3,
                 max_tokens=2048
             )
-            answer = completion.choices[0].message.content
+            msg = completion.choices[0].message
+            answer = msg.content or getattr(msg, "reasoning", "") or ""
             
             # Guard against HTML gateway error pages
             if answer and ("<!DOCTYPE" in answer[:20] or "<html>" in answer.lower()[:20]):
                 logger.warning(f"Model {model} returned HTML. Trying next model...")
                 continue
                 
-            return answer
+            if answer and len(answer.strip()) > 5:
+                return answer.strip()
             
         except Exception as e:
             logger.warning(f"Groq model '{model}' failed: {e}")
@@ -659,24 +678,42 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
         if len(answer) > 4000:
             answer = answer[:3990] + "..."
             
-        await context.bot.edit_message_text(
-            chat_id=update.effective_chat.id,
-            message_id=thinking_msg.message_id,
-            text=answer,
-            parse_mode='HTML'
-        )
+        try:
+            await context.bot.edit_message_text(
+                chat_id=update.effective_chat.id,
+                message_id=thinking_msg.message_id,
+                text=answer,
+                parse_mode='HTML'
+            )
+        except Exception as html_err:
+            logger.warning(f"HTML edit_message_text failed: {html_err}. Falling back to plain text.")
+            plain_answer = re.sub(r'<[^>]+>', '', answer)
+            await context.bot.edit_message_text(
+                chat_id=update.effective_chat.id,
+                message_id=thinking_msg.message_id,
+                text=plain_answer
+            )
             
     except Exception as e:
         logger.error(f"Error processing message: {e}")
-        # Escape the error message to avoid Telegram parse errors (like <!doctype)
         safe_error = html.escape(str(e))[:200]
         error_text = f"❌ <b>Maverick Error</b>: {safe_error}"
-        await context.bot.edit_message_text(
-            chat_id=update.effective_chat.id,
-            message_id=thinking_msg.message_id,
-            text=error_text,
-            parse_mode='HTML'
-        )
+        try:
+            await context.bot.edit_message_text(
+                chat_id=update.effective_chat.id,
+                message_id=thinking_msg.message_id,
+                text=error_text,
+                parse_mode='HTML'
+            )
+        except Exception:
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=thinking_msg.message_id,
+                    text=f"❌ Maverick Error: {str(e)[:200]}"
+                )
+            except Exception:
+                pass
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log the error and send a telegram message to notify the developer."""
@@ -688,21 +725,26 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def post_init(application: Application):
     """Set bot commands and description during startup."""
-    await application.bot.set_my_commands([
-        BotCommand("start", "Welcome message"),
-        BotCommand("help", "Show all commands"),
-        BotCommand("search", "Search literature"),
-        BotCommand("claude", "Execute Claude Code task"),
-        BotCommand("code", "AI Coding Assistant"),
-        BotCommand("history", "Recent conversations"),
-        BotCommand("clear", "Reset memory"),
-        BotCommand("about", "About Maverick"),
-        BotCommand("test", "Open Web App")
-    ])
     try:
-        await application.bot.set_my_description("Maverick AI 💠: Your advanced clinical research synthesis engine. Powered by gpt-oss:120b (Claude Code) via Groq with biomedical search.")
-        await application.bot.set_my_short_description("Maverick AI — Powered by gpt-oss:120b (Claude Code) via Groq")
-        logger.info("Bot commands and description updated successfully")
+        await application.bot.set_my_commands([
+            BotCommand("start", "Welcome message"),
+            BotCommand("help", "Show all commands"),
+            BotCommand("search", "Search literature"),
+            BotCommand("claude", "Execute Claude Code task"),
+            BotCommand("code", "AI Coding Assistant"),
+            BotCommand("history", "Recent conversations"),
+            BotCommand("clear", "Reset memory"),
+            BotCommand("about", "About Maverick"),
+            BotCommand("test", "Open Web App")
+        ])
+        logger.info("Bot commands updated successfully")
+    except Exception as e:
+        logger.warning(f"Failed to set bot commands: {e}")
+
+    try:
+        await application.bot.set_my_description("Maverick AI 💠: Your advanced clinical research synthesis engine. Powered by OpenAI GPT OSS 120B via Groq with biomedical search.")
+        await application.bot.set_my_short_description("Maverick AI — Powered by OpenAI GPT OSS 120B via Groq")
+        logger.info("Bot description updated successfully")
     except Exception as e:
         logger.warning(f"Failed to set bot description: {e}")
 

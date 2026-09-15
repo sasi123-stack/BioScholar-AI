@@ -13,6 +13,7 @@ import httpx
 import base64
 import requests
 from typing import List, Dict, Any, Optional
+from src.utils.ai_provider import get_first_configured_api_key
 from src.utils.web_search import WebSearchTool
 
 
@@ -69,16 +70,27 @@ print(">>> [DNS PATCH] Applied robust socket monkeypatch", flush=True)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", os.getenv("OPENCLAW_API_KEY"))
-MODEL_NAME = "gpt-oss:120b"
+GROQ_API_KEY = get_first_configured_api_key(["GROQ_API_KEY"])
+OPENROUTER_API_KEY = get_first_configured_api_key([
+    "OPENROUTER_API_KEY",
+    "OPENCLAW_API_KEY",
+    "FREEMODEL_API_KEY",
+    "FREE_MODEL_API_KEY",
+    "OPENAI_API_KEY",
+])
+MODEL_NAME = "openai/gpt-oss-120b"
 VISION_MODEL = "meta-llama/llama-3.2-11b-vision-instruct:free"
 DB_FILE = "/tmp/conversation_history.db" if os.path.exists("/tmp") else "local_memory.db"
 ES_HOST = os.getenv("ELASTICSEARCH_HOST", "assertive-mahogany-1m2hcasg.us-east-1.bonsaisearch.net")
 ES_USER = os.getenv("ELASTICSEARCH_USER", "0204784e62")
 ES_PASS = os.getenv("ELASTICSEARCH_PASSWORD", "38aa998d6c5c2891232c")
 
-OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
+OPENROUTER_API_BASE = (
+    os.getenv("OPENROUTER_API_BASE")
+    or os.getenv("FREEMODEL_API_BASE")
+    or os.getenv("FREE_MODEL_API_BASE")
+    or "https://openrouter.ai/api/v1"
+)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 RUN_BOT = os.getenv("RUN_BOT", "true")
 
@@ -349,6 +361,25 @@ async def health():
         "index_source": engine or "fallback"
     }
 
+@app.get("/api/v1/bot/status")
+async def bot_status():
+    """Diagnostic endpoint to inspect Telegram bot state and logs."""
+    log_file = "/tmp/logs/telegram_bot.log"
+    recent_logs = ""
+    if os.path.exists(log_file):
+        try:
+            with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
+                recent_logs = "".join(lines[-50:])
+        except Exception as e:
+            recent_logs = f"Error reading log: {e}"
+            
+    return {
+        "bot_token_configured": bool(os.getenv("TELEGRAM_BOT_TOKEN")),
+        "run_bot_enabled": os.getenv("RUN_BOT", "true").lower() != "false",
+        "recent_logs": recent_logs
+    }
+
 @app.get("/api/v1/statistics")
 async def statistics():
     """Get statistics from Elasticsearch/OpenSearch."""
@@ -586,9 +617,15 @@ async def maverick_chat(request: ChatRequest):
             messages.append({"role": "user", "content": request.question})
         
         client = AsyncGroq(api_key=GROQ_API_KEY)
-        # Use officially supported Groq models
-        models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"]
+        # Verified active Groq models
+        models_to_try = [
+            MODEL_NAME,                # Primary: openai/gpt-oss-120b
+            "openai/gpt-oss-20b",      # Fallback 1: Fast 20B
+            "qwen/qwen3.8-27b",        # Fallback 2: Qwen 27B
+            "groq/compound-mini",      # Fallback 3: Compound Mini
+        ]
         answer = None
+        model_used = None
         
         for model in models_to_try:
             try:
@@ -597,11 +634,13 @@ async def maverick_chat(request: ChatRequest):
                     model=model,
                     messages=messages,
                     temperature=0.3,
-                    max_tokens=1024
+                    max_tokens=2048
                 )
-                temp_answer = response.choices[0].message.content
-                if temp_answer and len(temp_answer) > 20:
-                    answer = temp_answer
+                msg = response.choices[0].message
+                temp_answer = msg.content or getattr(msg, "reasoning", "") or ""
+                if temp_answer and len(temp_answer.strip()) > 5:
+                    answer = temp_answer.strip()
+                    model_used = model
                     logger.info(f">>> [MAVERICK] Model {model} success")
                     break
             except Exception as e:
@@ -616,7 +655,7 @@ async def maverick_chat(request: ChatRequest):
         return {
             "status": "success",
             "answer": answer,
-            "reasoning": f"BioMed Intelligence (v1.6.5) via Llama-3-70B (Groq)",
+            "reasoning": f"BioMed Intelligence (v1.6.5) via {model_used or 'OpenAI GPT OSS 120B'} (Groq)",
             "sources": []
         }
         
