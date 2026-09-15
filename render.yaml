@@ -4,8 +4,8 @@ services:
     env: python
     region: oregon
     plan: free
-    buildCommand: "pip install --upgrade pip && pip install -r requirements-minimal.txt"
-    startCommand: "uvicorn app_minimal:app --host 0.0.0.0 --port $PORT"
+    buildCommand: "pip install --upgrade pip && pip install -r requirements_bot.txt"
+    startCommand: "bash entrypoint.sh"
     envVars:
       - key: LOW_MEMORY_MODE
         value: true
